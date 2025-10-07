@@ -1,0 +1,85 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy to production server
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -i ~/.ssh/deploy_key ${SSH_USER}@${SSH_HOST} << 'EOF'
+            set -e
+
+            echo "🚀 Starting deployment..."
+
+            # Navigate to project directory
+            cd ${DEPLOY_PATH}
+
+            # Pull latest changes
+            echo "📥 Pulling latest code..."
+            git pull origin main
+
+            # Run deployment script
+            echo "🔧 Running deployment script..."
+            bash infra/deploy.sh
+
+            echo "✅ Deployment completed successfully!"
+          EOF
+
+      - name: Verify deployment
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          HEALTH_CHECK_URL: ${{ secrets.HEALTH_CHECK_URL }}
+        run: |
+          echo "🔍 Verifying deployment..."
+          sleep 10
+
+          # Check if services are healthy
+          ssh -i ~/.ssh/deploy_key ${SSH_USER}@${SSH_HOST} << 'EOF'
+            cd ${DEPLOY_PATH}/infra
+            docker compose -f docker-compose.prod.yml ps
+          EOF
+
+          # Check health endpoints
+          if [ -n "$HEALTH_CHECK_URL" ]; then
+            curl -f ${HEALTH_CHECK_URL}/health || exit 1
+            echo "✅ Health check passed!"
+          fi
+
+      - name: Cleanup SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Deployment failed!"
+          fi

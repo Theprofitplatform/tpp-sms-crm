@@ -1,0 +1,29 @@
+FROM node:20-alpine AS base
+RUN npm install -g pnpm@8.15.0
+
+FROM base AS deps
+WORKDIR /app
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+COPY packages/lib/package.json ./packages/lib/
+COPY worker/shortener/package.json ./worker/shortener/
+RUN pnpm install --frozen-lockfile
+
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN pnpm --filter @sms-crm/lib build
+RUN pnpm --filter @sms-crm/worker build
+
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=builder /app/packages/lib/dist ./packages/lib/dist
+COPY --from=builder /app/packages/lib/package.json ./packages/lib/
+COPY --from=builder /app/worker/shortener/dist ./worker/shortener/dist
+COPY --from=builder /app/worker/shortener/package.json ./worker/shortener/
+COPY --from=deps /app/node_modules ./node_modules
+
+EXPOSE 3002
+CMD ["node", "worker/shortener/dist/index.js"]

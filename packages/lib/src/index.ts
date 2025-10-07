@@ -1,0 +1,18 @@
+// Export database
+export { db, closeDb } from './db/client';
+export * as schema from './db/schema';
+
+// Export utilities
+export * from './utils/phone';
+export * from './utils/time';
+export * from './utils/message';
+export * from './utils/token';
+
+// Export types
+export type {
+  ConsentStatus,
+  CampaignStatus,
+  SendJobStatus,
+  EventType,
+  UserRole,
+} from './types';

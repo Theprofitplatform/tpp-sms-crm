@@ -1,0 +1,24 @@
+{
+  "name": "@sms-crm/worker",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "start:shortener": "node dist/shortener.js"
+  },
+  "dependencies": {
+    "@sms-crm/lib": "workspace:*",
+    "bullmq": "^5.1.9",
+    "ioredis": "^5.3.2",
+    "drizzle-orm": "^0.29.3",
+    "postgres": "^3.4.3",
+    "fastify": "^4.25.2",
+    "twilio": "^4.20.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "@types/node": "^20.11.5"
+  }
+}

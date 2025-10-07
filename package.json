@@ -1,0 +1,43 @@
+{
+  "name": "sms-crm-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-tenant SMS campaign management platform",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "scripts": {
+    "dev:api": "pnpm --filter @sms-crm/api dev",
+    "dev:web": "pnpm --filter @sms-crm/web dev",
+    "dev:worker": "pnpm --filter @sms-crm/worker dev",
+    "build": "pnpm -r build",
+    "build:api": "pnpm --filter @sms-crm/api build",
+    "build:web": "pnpm --filter @sms-crm/web build",
+    "build:worker": "pnpm --filter @sms-crm/worker build",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:db": "pnpm --filter @sms-crm/lib test:migrations",
+    "migrate": "pnpm --filter @sms-crm/lib migrate",
+    "migrate:generate": "pnpm --filter @sms-crm/lib migrate:generate",
+    "seed": "pnpm --filter @sms-crm/lib seed",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "prettier": "^3.2.4",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.1",
+    "@vitest/coverage-v8": "^1.2.1"
+  },
+  "packageManager": "pnpm@8.15.0"
+}

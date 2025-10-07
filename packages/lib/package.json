@@ -1,0 +1,27 @@
+{
+  "name": "@sms-crm/lib",
+  "version": "1.0.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "migrate": "tsx src/db/migrate.ts",
+    "migrate:generate": "drizzle-kit generate:pg",
+    "migrate:push": "drizzle-kit push:pg",
+    "seed": "tsx src/db/seed.ts",
+    "test:migrations": "vitest run src/db/__tests__"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.29.3",
+    "postgres": "^3.4.3",
+    "libphonenumber-js": "^1.10.55",
+    "date-fns": "^2.30.0",
+    "date-fns-tz": "^2.0.0"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.20.9",
+    "tsx": "^4.7.0",
+    "@types/node": "^20.11.5"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "version": "5",
+  "dialect": "pg",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1759841925834,
+      "tag": "0000_nice_sunfire",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+'use client';
+
+export default function Dashboard() {
+  return (
+    <div>
+      <h2 className="text-2xl font-bold mb-6">Dashboard</h2>
+
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="card">
+          <h3 className="text-sm font-medium text-gray-500">Total Contacts</h3>
+          <p className="mt-2 text-3xl font-semibold">-</p>
+        </div>
+
+        <div className="card">
+          <h3 className="text-sm font-medium text-gray-500">Active Campaigns</h3>
+          <p className="mt-2 text-3xl font-semibold">-</p>
+        </div>
+
+        <div className="card">
+          <h3 className="text-sm font-medium text-gray-500">Messages Sent Today</h3>
+          <p className="mt-2 text-3xl font-semibold">-</p>
+        </div>
+
+        <div className="card">
+          <h3 className="text-sm font-medium text-gray-500">Delivery Rate</h3>
+          <p className="mt-2 text-3xl font-semibold">-</p>
+        </div>
+      </div>
+
+      <div className="mt-8">
+        <h3 className="text-lg font-medium mb-4">Quick Actions</h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <a href="/imports/new" className="card hover:shadow-lg cursor-pointer">
+            <h4 className="font-medium">Import Contacts</h4>
+            <p className="text-sm text-gray-500 mt-1">Upload CSV to add or update contacts</p>
+          </a>
+          <a href="/campaigns/new" className="card hover:shadow-lg cursor-pointer">
+            <h4 className="font-medium">Create Campaign</h4>
+            <p className="text-sm text-gray-500 mt-1">Start a new SMS campaign</p>
+          </a>
+          <a href="/reports" className="card hover:shadow-lg cursor-pointer">
+            <h4 className="font-medium">View Reports</h4>
+            <p className="text-sm text-gray-500 mt-1">Campaign analytics and metrics</p>
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}

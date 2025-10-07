@@ -1,0 +1,190 @@
+{
+  "info": {
+    "name": "SMS CRM API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/health",
+          "host": ["{{api_url}}"],
+          "path": ["health"]
+        }
+      }
+    },
+    {
+      "name": "Auth - Request Magic Link",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\": \"admin@example.com\"}"
+        },
+        "url": {
+          "raw": "{{api_url}}/auth/magic-link",
+          "host": ["{{api_url}}"],
+          "path": ["auth", "magic-link"]
+        }
+      }
+    },
+    {
+      "name": "Imports - Dry Run",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "/path/to/contacts.csv"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{api_url}}/imports/contacts/dry-run",
+          "host": ["{{api_url}}"],
+          "path": ["imports", "contacts", "dry-run"]
+        }
+      }
+    },
+    {
+      "name": "Imports - Commit",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "/path/to/contacts.csv"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{api_url}}/imports/contacts/commit",
+          "host": ["{{api_url}}"],
+          "path": ["imports", "contacts", "commit"]
+        }
+      }
+    },
+    {
+      "name": "Campaigns - Create",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"Test Campaign\", \"templateIds\": [\"template-uuid\"], \"targetUrl\": \"https://example.com\"}"
+        },
+        "url": {
+          "raw": "{{api_url}}/campaigns",
+          "host": ["{{api_url}}"],
+          "path": ["campaigns"]
+        }
+      }
+    },
+    {
+      "name": "Campaigns - Queue",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{api_url}}/campaigns/:id/queue",
+          "host": ["{{api_url}}"],
+          "path": ["campaigns", ":id", "queue"]
+        }
+      }
+    },
+    {
+      "name": "Reports - Campaign",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/reports/campaigns/:id",
+          "host": ["{{api_url}}"],
+          "path": ["reports", "campaigns", ":id"]
+        }
+      }
+    },
+    {
+      "name": "Reports - Contact Timeline",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/reports/contacts/:id/timeline",
+          "host": ["{{api_url}}"],
+          "path": ["reports", "contacts", ":id", "timeline"]
+        }
+      }
+    },
+    {
+      "name": "Tenants - Pause (Kill Switch)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/tenants/:id/pause",
+          "host": ["{{api_url}}"],
+          "path": ["tenants", ":id", "pause"]
+        }
+      }
+    },
+    {
+      "name": "Tenants - Resume",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/tenants/:id/resume",
+          "host": ["{{api_url}}"],
+          "path": ["tenants", ":id", "resume"]
+        }
+      }
+    },
+    {
+      "name": "Webhooks - Provider Callback",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/x-www-form-urlencoded"},
+          {"key": "X-Twilio-Signature", "value": "signature"}
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {"key": "MessageSid", "value": "SM123"},
+            {"key": "MessageStatus", "value": "delivered"},
+            {"key": "To", "value": "+61400000000"},
+            {"key": "From", "value": "+61411111111"}
+          ]
+        },
+        "url": {
+          "raw": "{{api_url}}/webhooks/provider",
+          "host": ["{{api_url}}"],
+          "path": ["webhooks", "provider"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "api_url",
+      "value": "http://localhost:3000"
+    }
+  ]
+}
