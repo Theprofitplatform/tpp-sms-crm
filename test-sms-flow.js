@@ -90,7 +90,7 @@ async function testTwilioConfiguration() {
   console.log('\n📱 Twilio Configuration Check:');
   console.log('   1. Log in to Twilio Console: https://console.twilio.com');
   console.log('   2. Go to Phone Numbers → Active Numbers');
-  console.log('   3. Select: +61468033323');
+  console.log('   3. Select: [YOUR_TWILIO_PHONE_NUMBER]');
   console.log('   4. Under Messaging Configuration:');
   console.log('      - A MESSAGE COMES IN: Webhook');
   console.log('      - URL: https://sms.theprofitplatform.com.au/webhooks/provider');
