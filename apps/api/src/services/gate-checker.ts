@@ -2,8 +2,15 @@ import { db, schema, isWithinQuietHours, getWarmupLimit } from '@sms-crm/lib';
 import { eq, and, sql, gte } from 'drizzle-orm';
 import { addDays } from 'date-fns';
 import Redis from 'ioredis';
+import { BudgetService } from './budget.service';
 
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+// Parse Redis connection from environment
+const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+const redis = new Redis(redisUrl, {
+  // ioredis will parse the URL including username and password
+  lazyConnect: false,
+});
+const budgetService = new BudgetService();
 
 export interface GateResult {
   allowed: boolean;
@@ -15,14 +22,15 @@ export class GateChecker {
   async checkAllGates(
     tenantId: string,
     contactId: string,
-    campaignId: string
+    campaignId: string,
+    costCents: number = 1 // Estimated cost for this send
   ): Promise<GateResult> {
     // Gate 1: Campaign pause
     const pauseCheck = await this.checkCampaignPause(tenantId);
     if (!pauseCheck.allowed) return pauseCheck;
 
     // Gate 2: Budget caps
-    const budgetCheck = await this.checkBudget(tenantId);
+    const budgetCheck = await this.checkBudget(tenantId, costCents);
     if (!budgetCheck.allowed) return budgetCheck;
 
     // Gate 3: DNC
@@ -62,35 +70,14 @@ export class GateChecker {
     return { allowed: true };
   }
 
-  private async checkBudget(tenantId: string): Promise<GateResult> {
-    const [tenant] = await db
-      .select()
-      .from(schema.tenants)
-      .where(eq(schema.tenants.id, tenantId))
-      .limit(1);
+  private async checkBudget(tenantId: string, costCents: number): Promise<GateResult> {
+    const budgetStatus = await budgetService.checkBudget(tenantId, costCents);
 
-    if (!tenant) {
-      return { allowed: false, reason: 'Tenant not found' };
-    }
-
-    const [budget] = await db
-      .select()
-      .from(schema.budgets)
-      .where(eq(schema.budgets.tenantId, tenantId))
-      .limit(1);
-
-    if (!budget) {
-      return { allowed: true }; // No budget set
-    }
-
-    // Check daily budget
-    if (tenant.dailyBudgetCents && budget.dailySpentCents >= tenant.dailyBudgetCents) {
-      return { allowed: false, reason: 'Daily budget exceeded' };
-    }
-
-    // Check monthly budget
-    if (tenant.monthlyBudgetCents && budget.monthlySpentCents >= tenant.monthlyBudgetCents) {
-      return { allowed: false, reason: 'Monthly budget exceeded' };
+    if (!budgetStatus.allowed) {
+      return {
+        allowed: false,
+        reason: budgetStatus.reason || 'Budget limit exceeded',
+      };
     }
 
     return { allowed: true };

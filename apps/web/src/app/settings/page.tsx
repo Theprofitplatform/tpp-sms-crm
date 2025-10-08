@@ -2,8 +2,15 @@
 
 import { useState, useEffect } from 'react';
 
+interface Budget {
+  dailySpentCents: number;
+  dailyBudgetCents: number;
+  monthlySpentCents: number;
+  monthlyBudgetCents: number;
+}
+
 export default function Settings() {
-  const [budget, setBudget] = useState<any>(null);
+  const [budget, setBudget] = useState<Budget | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const tenantId = '00000000-0000-0000-0000-000000000001'; // Primary tenant
 

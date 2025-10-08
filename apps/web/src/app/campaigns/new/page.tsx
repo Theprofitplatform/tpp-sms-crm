@@ -1,16 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export default function NewCampaign() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    message: '',
-    segmentId: '',
-    scheduledAt: '',
+    templateIds: '',
+    targetUrl: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -18,14 +15,25 @@ export default function NewCampaign() {
     setLoading(true);
 
     try {
+      // Convert comma-separated templateIds to array
+      const templateIdsArray = formData.templateIds
+        .split(',')
+        .map((id) => id.trim())
+        .filter((id) => id.length > 0);
+
+      if (templateIdsArray.length === 0) {
+        alert('Please provide at least one template ID');
+        setLoading(false);
+        return;
+      }
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/campaigns`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: formData.name,
-          message: formData.message,
-          segmentId: formData.segmentId || null,
-          scheduledAt: formData.scheduledAt || null,
+          templateIds: templateIdsArray,
+          targetUrl: formData.targetUrl || undefined,
         }),
         credentials: 'include',
       });
@@ -36,9 +44,9 @@ export default function NewCampaign() {
         return;
       }
 
-      const data = await res.json();
+      await res.json();
       alert('Campaign created successfully!');
-      router.push('/campaigns');
+      window.location.href = '/campaigns';
     } catch (error) {
       alert('Failed to create campaign');
     } finally {
@@ -66,39 +74,32 @@ export default function NewCampaign() {
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">Message</label>
-          <textarea
-            required
-            value={formData.message}
-            onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            rows={4}
-            placeholder="Your SMS message (160 characters recommended)"
-            maxLength={1600}
-          />
-          <p className="text-xs text-gray-500 mt-1">{formData.message.length} characters</p>
-        </div>
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">Segment ID (Optional)</label>
+          <label className="block text-sm font-medium mb-2">Template IDs</label>
           <input
             type="text"
-            value={formData.segmentId}
-            onChange={(e) => setFormData({ ...formData, segmentId: e.target.value })}
+            required
+            value={formData.templateIds}
+            onChange={(e) => setFormData({ ...formData, templateIds: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Leave empty to send to all contacts"
+            placeholder="e.g., template-id-1, template-id-2 (comma-separated)"
           />
+          <p className="text-xs text-gray-500 mt-1">
+            Enter one or more template IDs separated by commas. Messages will rotate through templates.
+          </p>
         </div>
 
         <div className="mb-6">
-          <label className="block text-sm font-medium mb-2">Schedule For (Optional)</label>
+          <label className="block text-sm font-medium mb-2">Target URL (Optional)</label>
           <input
-            type="datetime-local"
-            value={formData.scheduledAt}
-            onChange={(e) => setFormData({ ...formData, scheduledAt: e.target.value })}
+            type="url"
+            value={formData.targetUrl}
+            onChange={(e) => setFormData({ ...formData, targetUrl: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="https://example.com/offer"
           />
-          <p className="text-xs text-gray-500 mt-1">Leave empty to send immediately</p>
+          <p className="text-xs text-gray-500 mt-1">
+            If provided, a short link will be generated for tracking clicks
+          </p>
         </div>
 
         <div className="flex gap-4">
@@ -109,13 +110,12 @@ export default function NewCampaign() {
           >
             {loading ? 'Creating...' : 'Create Campaign'}
           </button>
-          <button
-            type="button"
-            onClick={() => router.push('/campaigns')}
+          <a
+            href="/campaigns"
             className="btn btn-secondary"
           >
             Cancel
-          </button>
+          </a>
         </div>
       </form>
     </div>

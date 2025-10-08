@@ -15,4 +15,8 @@ export type {
   SendJobStatus,
   EventType,
   UserRole,
+  ImportRow,
+  DryRunResult,
+  ImportSummary,
+  ImportDecision,
 } from './types';

@@ -1,9 +1,11 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
-import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
 import formbody from '@fastify/formbody';
+import rateLimit from '@fastify/rate-limit';
+import { setupSessions } from './services/session.service';
+import { setupRateLimitRedis, RedisRateLimitStore, getRateLimitRedisClient } from './services/rate-limit.service';
 
 import healthRoutes from './routes/health';
 import authRoutes from './routes/auth';
@@ -31,8 +33,29 @@ async function start() {
   });
 
   await fastify.register(helmet);
-  await fastify.register(cookie, {
-    secret: process.env.COOKIE_SECRET || 'change-this-secret',
+
+  // Setup Redis-backed sessions (includes cookie support)
+  await setupSessions(fastify);
+
+  // Setup rate limiting with Redis
+  await setupRateLimitRedis(fastify);
+
+  // TODO: Fix RedisRateLimitStore configuration for @fastify/rate-limit
+  // Temporarily using default in-memory store
+  await fastify.register(rateLimit, {
+    global: true,
+    max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
+    timeWindow: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10),
+    // store: new RedisRateLimitStore({
+    //   client: getRateLimitRedisClient(),
+    //   keyPrefix: 'rl:global:',
+    //   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10),
+    // }),
+    skipOnError: true, // Don't fail requests if Redis is down
+    allowList: (req) => {
+      // Skip rate limiting for health checks
+      return req.url === '/health';
+    },
   });
 
   await fastify.register(multipart, {

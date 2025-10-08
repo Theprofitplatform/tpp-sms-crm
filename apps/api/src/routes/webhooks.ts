@@ -1,23 +1,19 @@
 import { FastifyPluginAsync } from 'fastify';
 import { db, schema, isStopKeyword, isStartKeyword } from '@sms-crm/lib';
 import { eq, and } from 'drizzle-orm';
-import crypto from 'crypto';
+import { initWebhookSecurity } from '../services/webhook-security.service';
+import { createTwilioWebhookSecurityMiddleware } from '../middleware/webhook-security';
 
 const webhookRoutes: FastifyPluginAsync = async (fastify) => {
+  // Initialize webhook security
+  const webhookSecurity = await initWebhookSecurity();
+  const twilioSecurityMiddleware = createTwilioWebhookSecurityMiddleware(webhookSecurity);
+
   // Provider webhook endpoint (Twilio-compatible)
-  fastify.post('/provider', async (request, reply) => {
+  fastify.post('/provider', { preHandler: twilioSecurityMiddleware }, async (request, reply) => {
     const body = request.body as any;
 
-    // Verify signature (Twilio example)
-    const signature = request.headers['x-twilio-signature'] as string;
-    const url = `${process.env.API_BASE_URL}/webhooks/provider`;
-
-    if (!verifyTwilioSignature(url, body, signature)) {
-      fastify.log.warn({ body }, 'Invalid webhook signature');
-      return reply.status(401).send({ error: 'Invalid signature' });
-    }
-
-    // Check for replay (idempotency)
+    // Check for replay (database-level idempotency for permanent deduplication)
     const eventId = body.MessageSid || body.SmsSid;
 
     const [existing] = await db
@@ -67,23 +63,6 @@ const webhookRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.send({ status: 'ok' });
   });
 };
-
-function verifyTwilioSignature(url: string, params: any, signature: string): boolean {
-  const authToken = process.env.TWILIO_AUTH_TOKEN || '';
-
-  // Create data string
-  let data = url;
-  Object.keys(params)
-    .sort()
-    .forEach((key) => {
-      data += key + params[key];
-    });
-
-  // Generate HMAC
-  const hmac = crypto.createHmac('sha1', authToken).update(Buffer.from(data, 'utf-8')).digest('base64');
-
-  return hmac === signature;
-}
 
 async function handleStatusUpdate(tenantId: string, body: any, fastify: any) {
   const status = body.MessageStatus.toUpperCase();

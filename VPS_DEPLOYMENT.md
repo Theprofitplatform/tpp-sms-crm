@@ -22,7 +22,7 @@
 Run the deployment script from your local machine:
 
 ```bash
-cd "/mnt/c/Users/abhis/projects/ghl copy"
+cd "/projects/sms-crm"
 ./deploy-vps.sh tpp-vps
 ```
 
@@ -75,7 +75,7 @@ mkdir -p /root/projects/sms-crm
 
 From your local machine:
 ```bash
-cd "/mnt/c/Users/abhis/projects/ghl copy"
+cd "/projects/sms-crm"
 
 rsync -avz --progress \
     --exclude 'node_modules' \
@@ -367,7 +367,7 @@ journalctl -u sms-crm-api -f | grep webhook
 
 From local machine:
 ```bash
-cd "/mnt/c/Users/abhis/projects/ghl copy"
+cd "/projects/sms-crm"
 rsync -avz --exclude 'node_modules' ./ tpp-vps:/root/projects/sms-crm/
 ssh tpp-vps 'cd /root/projects/sms-crm && pnpm install && pnpm --filter @sms-crm/lib build && systemctl restart sms-crm-*'
 ```

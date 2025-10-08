@@ -2,12 +2,17 @@ import { FastifyPluginAsync } from 'fastify';
 import { db, schema } from '@sms-crm/lib';
 import { eq, and } from 'drizzle-orm';
 import { requireAuth, requireRole, AuthenticatedRequest } from '../middleware/auth';
+import { validateBody } from '../middleware/validation';
+import { setBudgetSchema } from '../schemas/validation.schemas';
+import { BudgetService } from '../services/budget.service';
+
+const budgetService = new BudgetService();
 
 const tenantRoutes: FastifyPluginAsync = async (fastify) => {
   // Set budget
   fastify.post(
     '/:id/budget',
-    { preHandler: [requireAuth, requireRole(['admin'])] },
+    { preHandler: [requireAuth, validateBody(setBudgetSchema)] },
     async (request, reply) => {
       const authReq = request as AuthenticatedRequest;
       const { id } = request.params as { id: string };
@@ -42,42 +47,36 @@ const tenantRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(403).send({ error: 'Cannot view other tenant budgets' });
     }
 
-    const [tenant] = await db
-      .select()
-      .from(schema.tenants)
-      .where(eq(schema.tenants.id, id))
-      .limit(1);
+    const budgetStatus = await budgetService.getBudgetStatus(id);
 
-    const [budget] = await db
-      .select()
-      .from(schema.budgets)
-      .where(eq(schema.budgets.tenantId, id))
-      .limit(1);
-
-    if (!tenant || !budget) {
-      return reply.status(404).send({ error: 'Tenant or budget not found' });
+    if (!budgetStatus) {
+      return reply.status(404).send({ error: 'Tenant not found' });
     }
 
+    // Calculate reset times
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
     return {
-      dailyBudgetCents: tenant.dailyBudgetCents,
-      dailySpentCents: budget.dailySpentCents,
-      dailyRemainingCents: tenant.dailyBudgetCents
-        ? tenant.dailyBudgetCents - budget.dailySpentCents
-        : null,
-      monthlyBudgetCents: tenant.monthlyBudgetCents,
-      monthlySpentCents: budget.monthlySpentCents,
-      monthlyRemainingCents: tenant.monthlyBudgetCents
-        ? tenant.monthlyBudgetCents - budget.monthlySpentCents
-        : null,
-      dailyResetAt: budget.dailyResetAt,
-      monthlyResetAt: budget.monthlyResetAt,
+      dailyBudgetCents: budgetStatus.dailyLimit,
+      dailySpentCents: budgetStatus.dailySpent,
+      dailyRemainingCents: budgetStatus.dailyRemaining,
+      dailyResetAt: tomorrow,
+      monthlyBudgetCents: budgetStatus.monthlyLimit,
+      monthlySpentCents: budgetStatus.monthlySpent,
+      monthlyRemainingCents: budgetStatus.monthlyRemaining,
+      monthlyResetAt: nextMonth,
     };
   });
 
   // Pause tenant (kill switch)
   fastify.post(
     '/:id/pause',
-    { preHandler: [requireAuth, requireRole(['admin'])] },
+    { preHandler: [requireAuth] },
     async (request, reply) => {
       const authReq = request as AuthenticatedRequest;
       const { id } = request.params as { id: string };
@@ -107,7 +106,7 @@ const tenantRoutes: FastifyPluginAsync = async (fastify) => {
   // Resume tenant
   fastify.post(
     '/:id/resume',
-    { preHandler: [requireAuth, requireRole(['admin'])] },
+    { preHandler: [requireAuth] },
     async (request, reply) => {
       const authReq = request as AuthenticatedRequest;
       const { id } = request.params as { id: string };

@@ -109,3 +109,4 @@ When implementing features, reference the corresponding work order for acceptanc
 - Environment: Copy `.env.example` to `.env.local`, never commit secrets
 - Rate Limiting: Check Redis counters before send, respect warm-up curves
 - Error Handling: 5xx triggers retry, 4xx marks FAILED immediately
+- rember it setup in my VPS. ssh tpp-vps under projects folder

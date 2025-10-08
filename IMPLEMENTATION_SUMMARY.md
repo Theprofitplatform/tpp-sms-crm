@@ -7,7 +7,7 @@ The full SMS CRM platform has been implemented following all Work Orders (A-J) f
 ## 📁 Repository Structure
 
 ```
-ghl copy/
+sms-crm/
 ├── apps/
 │   ├── api/                    # REST API (Fastify)
 │   │   ├── src/

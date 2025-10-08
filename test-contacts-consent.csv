@@ -1,0 +1,4 @@
+phone,name,email,consentStatus,consentSource
++61400000001,John Doe,john@example.com,explicit,website
++61400000002,Jane Smith,jane@example.com,implied,previous_campaign
++61400000003,Bob Johnson,bob@example.com,explicit,import

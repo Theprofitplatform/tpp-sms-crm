@@ -1,0 +1,21 @@
+FROM node:20-alpine AS base
+RUN npm install -g pnpm@8.15.0 && npm install -g tsx@4.7.0
+
+FROM base AS deps
+WORKDIR /app
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+COPY packages/lib/package.json ./packages/lib/
+COPY apps/api/package.json ./apps/api/
+RUN pnpm install --frozen-lockfile
+
+FROM base AS runner
+WORKDIR /app
+
+COPY . .
+RUN pnpm install --frozen-lockfile --prod=false
+RUN pnpm --filter @sms-crm/lib build
+
+ENV NODE_ENV=production
+
+EXPOSE 3000
+CMD ["tsx", "apps/api/src/index.ts"]

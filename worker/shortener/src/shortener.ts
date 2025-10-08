@@ -19,7 +19,6 @@ function isBotUserAgent(userAgent: string): boolean {
 fastify.get('/:token', async (request, reply) => {
   const { token } = request.params as { token: string };
   const userAgent = request.headers['user-agent'] || '';
-  const ip = request.ip;
 
   try {
     const [link] = await db

@@ -1,8 +1,11 @@
 import { FastifyPluginAsync } from 'fastify';
-import { db, schema, calculateMessageParts, appendOptOutLine, renderTemplate } from '@sms-crm/lib';
-import { eq, and } from 'drizzle-orm';
+import { db, schema, calculateMessageParts, appendOptOutLine } from '@sms-crm/lib';
+import { eq, and, sql } from 'drizzle-orm';
 import { Queue } from 'bullmq';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth';
+import { tenantRateLimit } from '../middleware/rate-limit';
+import { validateBody } from '../middleware/validation';
+import { createCampaignSchema, queueCampaignSchema } from '../schemas/validation.schemas';
 import { GateChecker } from '../services/gate-checker';
 
 const sendQueue = new Queue('send-messages', {
@@ -16,13 +19,16 @@ const gateChecker = new GateChecker();
 
 const campaignRoutes: FastifyPluginAsync = async (fastify) => {
   // Create campaign
-  fastify.post('/', { preHandler: requireAuth }, async (request, reply) => {
-    const authReq = request as AuthenticatedRequest;
-    const { name, templateIds, targetUrl } = request.body as {
-      name: string;
-      templateIds: string[];
-      targetUrl?: string;
-    };
+  fastify.post(
+    '/',
+    { preHandler: [requireAuth, tenantRateLimit, validateBody(createCampaignSchema)] },
+    async (request, reply) => {
+      const authReq = request as AuthenticatedRequest;
+      const { name, templateIds, targetUrl } = request.body as {
+        name: string;
+        templateIds: string[];
+        targetUrl?: string;
+      };
 
     const [campaign] = await db
       .insert(schema.campaigns)
@@ -59,7 +65,10 @@ const campaignRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Queue campaign
-  fastify.post('/:id/queue', { preHandler: requireAuth }, async (request, reply) => {
+  fastify.post(
+    '/:id/queue',
+    { preHandler: [requireAuth, validateBody(queueCampaignSchema)] },
+    async (request, reply) => {
     const authReq = request as AuthenticatedRequest;
     const { id } = request.params as { id: string };
     const { segmentFilter } = request.body as { segmentFilter?: any };

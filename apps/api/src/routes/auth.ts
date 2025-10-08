@@ -2,11 +2,17 @@ import { FastifyPluginAsync } from 'fastify';
 import { db, schema, generateMagicToken } from '@sms-crm/lib';
 import { eq } from 'drizzle-orm';
 import { addMinutes } from 'date-fns';
+import { createSession, destroySession } from '../services/session.service';
+import { validateBody } from '../middleware/validation';
+import { magicLinkRequestSchema } from '../schemas/validation.schemas';
 
 const authRoutes: FastifyPluginAsync = async (fastify) => {
   // Request magic link
-  fastify.post('/magic-link', async (request, reply) => {
-    const { email } = request.body as { email: string };
+  fastify.post(
+    '/magic-link',
+    { preHandler: validateBody(magicLinkRequestSchema) },
+    async (request, reply) => {
+      const { email } = request.body as { email: string };
 
     const [user] = await db
       .select()
@@ -32,8 +38,9 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     // For now, log it
     fastify.log.info({ email, token }, 'Magic link generated');
 
-    return { message: 'If account exists, magic link sent' };
-  });
+      return { message: 'If account exists, magic link sent' };
+    }
+  );
 
   // Verify magic link and create session
   fastify.get('/verify/:token', async (request, reply) => {
@@ -72,17 +79,13 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       .set({ lastLoginAt: new Date() })
       .where(eq(schema.users.id, user.id));
 
-    // Create session (simplified - in production use Redis)
-    const sessionData = Buffer.from(
-      JSON.stringify({ userId: user.id, tenantId: user.tenantId })
-    ).toString('base64');
-
-    reply.setCookie('session_id', sessionData, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-    });
+    // Create Redis-backed session
+    try {
+      await createSession(request, user.id, user.tenantId, user.email, user.role);
+    } catch (error) {
+      fastify.log.error({ error }, 'Failed to create session');
+      return reply.status(500).send({ error: 'Failed to create session' });
+    }
 
     return {
       user: {
@@ -95,8 +98,14 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Logout
-  fastify.post('/logout', async (_, reply) => {
-    reply.clearCookie('session_id');
+  fastify.post('/logout', async (request, reply) => {
+    try {
+      await destroySession(request);
+    } catch (error) {
+      fastify.log.error({ error }, 'Failed to destroy session');
+      // Continue anyway to clear client state
+    }
+
     return { message: 'Logged out' };
   });
 };

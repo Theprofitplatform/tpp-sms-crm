@@ -143,7 +143,7 @@ ssh tpp-vps 'sudo systemctl restart sms-crm-web'
 ### Update Code
 ```bash
 # From your local machine
-cd "/mnt/c/Users/abhis/projects/ghl copy"
+cd "/projects/sms-crm"
 
 # Sync code changes
 rsync -avz --progress \
