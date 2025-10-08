@@ -4,8 +4,8 @@ const nextConfig = {
   // output: 'export', // Disabled for dynamic routes
   trailingSlash: true,
   env: {
-    API_URL: process.env.API_URL || 'http://115.128.86.148:3000',
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://115.128.86.148:3000',
+    API_URL: process.env.API_URL || 'https://apisms.theprofitplatform.com.au',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://apisms.theprofitplatform.com.au',
   },
   images: {
     unoptimized: true,
