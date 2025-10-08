@@ -1,10 +1,65 @@
 import { db, schema } from '@sms-crm/lib';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, gte } from 'drizzle-orm';
 import { FastifyPluginAsync } from 'fastify';
 
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth';
 
 const reportRoutes: FastifyPluginAsync = async (fastify) => {
+  // Dashboard stats
+  fastify.get('/dashboard', async (request, reply) => {
+    // Use default tenant ID for demo purposes
+    const defaultTenantId = '00000000-0000-0000-0000-000000000001';
+
+    // Get total contacts count
+    const [contactCount] = await db
+      .select({ count: sql<number>`COUNT(*)`.as('count') })
+      .from(schema.contacts)
+      .where(eq(schema.contacts.tenantId, defaultTenantId));
+
+    // Get active campaigns count
+    const [campaignCount] = await db
+      .select({ count: sql<number>`COUNT(*)`.as('count') })
+      .from(schema.campaigns)
+      .where(and(
+        eq(schema.campaigns.tenantId, defaultTenantId),
+        eq(schema.campaigns.status, 'active')
+      ));
+
+    // Get messages sent today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const [todayMessages] = await db
+      .select({ count: sql<number>`COUNT(*)`.as('count') })
+      .from(schema.sendJobs)
+      .where(and(
+        eq(schema.sendJobs.tenantId, defaultTenantId),
+        gte(schema.sendJobs.queuedAt, today),
+        sql`${schema.sendJobs.status} IN ('sent', 'delivered')`
+      ));
+
+    // Get delivery rate (delivered / sent)
+    const [deliveryStats] = await db
+      .select({
+        sent: sql<number>`COUNT(*)`.as('sent'),
+        delivered: sql<number>`COUNT(CASE WHEN ${schema.sendJobs.status} = 'delivered' THEN 1 END)`.as('delivered')
+      })
+      .from(schema.sendJobs)
+      .where(and(
+        eq(schema.sendJobs.tenantId, defaultTenantId),
+        sql`${schema.sendJobs.status} IN ('sent', 'delivered')`
+      ));
+
+    const deliveryRate = deliveryStats.sent > 0
+      ? Math.round((Number(deliveryStats.delivered) / Number(deliveryStats.sent)) * 100)
+      : 0;
+
+    return {
+      totalContacts: Number(contactCount?.count || 0),
+      activeCampaigns: Number(campaignCount?.count || 0),
+      messagesSentToday: Number(todayMessages?.count || 0),
+      deliveryRate: `${deliveryRate}%`
+    };
+  });
   // Campaign report
   fastify.get('/campaigns/:id', { preHandler: requireAuth }, async (request, reply) => {
     const authReq = request as AuthenticatedRequest;

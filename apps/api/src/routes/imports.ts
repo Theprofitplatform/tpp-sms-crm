@@ -328,6 +328,19 @@ const importRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
+  // List all import batches
+  fastify.get('/', async (request, reply) => {
+    // const authReq = request as AuthenticatedRequest;
+
+    const batches = await db
+      .select()
+      .from(schema.importBatches)
+      .where(eq(schema.importBatches.tenantId, '00000000-0000-0000-0000-000000000001'))
+      .orderBy(schema.importBatches.createdAt);
+
+    return { batches };
+  });
+
   // Get import summary
   fastify.get('/:id', async (request, reply) => {
     // const authReq = request as AuthenticatedRequest;
