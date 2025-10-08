@@ -59,9 +59,9 @@ All services are running and fully functional on your VPS.
 ## 📱 Twilio Configuration
 
 ### Current Credentials (Configured)
-- **Account SID:** ACb8c6693a5d8cc44a91c7b77a777324ee
-- **Auth Token:** fb153997e6ad93115137dc69149962e9
-- **Phone Number:** +61468033323
+- **Account SID:** [REDACTED]
+- **Auth Token:** [REDACTED]
+- **Phone Number:** [REDACTED]
 
 ### ⚠️ REQUIRED: Set Webhook URL
 
