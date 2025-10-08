@@ -8,6 +8,9 @@ export * from './utils/time';
 export * from './utils/message';
 export * from './utils/token';
 
+// Export environment validation
+export * from './env';
+
 // Export types
 export type {
   ConsentStatus,

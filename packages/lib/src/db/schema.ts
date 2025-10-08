@@ -1,5 +1,5 @@
-import { pgTable, text, timestamp, uuid, boolean, integer, uniqueIndex, index, jsonb } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+import { pgTable, text, timestamp, uuid, boolean, integer, uniqueIndex, index, jsonb } from 'drizzle-orm/pg-core';
 
 // Tenants table
 export const tenants = pgTable('tenants', {

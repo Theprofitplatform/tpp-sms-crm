@@ -1,0 +1,17 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy everything
+COPY . .
+
+# Install dependencies
+RUN npm install -g pnpm@8.15.0
+RUN pnpm install --frozen-lockfile
+
+# Build the project
+RUN pnpm --filter @sms-crm/lib build
+RUN pnpm --filter @sms-crm/worker build
+
+EXPOSE 3002
+CMD ["node", "worker/shortener/dist/index.js"]

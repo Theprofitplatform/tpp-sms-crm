@@ -12,19 +12,18 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Skip TypeScript compilation in Docker - already built locally
-# RUN pnpm --filter @sms-crm/lib build
-# RUN pnpm --filter @sms-crm/api build
+RUN pnpm --filter @sms-crm/lib build
+RUN pnpm --filter @sms-crm/api build
 
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Copy locally built dist folders
-COPY packages/lib/dist ./packages/lib/dist
-COPY packages/lib/package.json ./packages/lib/
-COPY apps/api/dist ./apps/api/dist
-COPY apps/api/package.json ./apps/api/
+# Copy locally built dist folders from builder stage
+COPY --from=builder /app/packages/lib/dist ./packages/lib/dist
+COPY --from=builder /app/packages/lib/package.json ./packages/lib/
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/apps/api/package.json ./apps/api/
 COPY --from=deps /app/node_modules ./node_modules
 
 EXPOSE 3000

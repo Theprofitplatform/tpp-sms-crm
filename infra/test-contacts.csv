@@ -1,0 +1,3 @@
+firstName,lastName,phone,email,timezone,consentStatus,consentSource
+John,Doe,+61412345678,john@example.com,Australia/Sydney,explicit,website
+Jane,Smith,+61487654321,jane@example.com,Australia/Sydney,implied,form

@@ -1,8 +1,9 @@
-import { FastifyPluginAsync } from 'fastify';
 import { db, schema, isStopKeyword, isStartKeyword } from '@sms-crm/lib';
 import { eq, and } from 'drizzle-orm';
-import { initWebhookSecurity } from '../services/webhook-security.service';
+import { FastifyPluginAsync } from 'fastify';
+
 import { createTwilioWebhookSecurityMiddleware } from '../middleware/webhook-security';
+import { initWebhookSecurity } from '../services/webhook-security.service';
 
 const webhookRoutes: FastifyPluginAsync = async (fastify) => {
   // Initialize webhook security

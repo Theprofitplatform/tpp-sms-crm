@@ -2,15 +2,17 @@ name = "sms-crm-shortener"
 compatibility_date = "2024-01-01"
 main = "src/index.ts"
 
+# Custom domain for production
+[env.production]
+route = "links.theprofitplatform.com.au/*"
+domains = ["links.theprofitplatform.com.au"]
+API_BASE_URL = "https://apisms.theprofitplatform.com.au"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "sms-crm-shortener"
 database_id = "f3935701-653b-4b63-9136-88f377f392f1"
 
-[env.production]
-# Environment variables for production
-API_BASE_URL = "https://api.yourdomain.com"
-
 [env.staging]
 # Environment variables for staging
-API_BASE_URL = "https://staging-api.yourdomain.com"
+API_BASE_URL = "http://2a02:4780:59:2608::1:3000"

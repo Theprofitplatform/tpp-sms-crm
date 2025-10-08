@@ -1,6 +1,7 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
 import { db, schema } from '@sms-crm/lib';
 import { eq } from 'drizzle-orm';
+import { FastifyRequest, FastifyReply } from 'fastify';
+
 import { getSessionData, refreshSession } from '../services/session.service';
 
 export interface AuthenticatedRequest extends FastifyRequest {

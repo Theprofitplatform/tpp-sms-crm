@@ -1,6 +1,7 @@
+import { addMonths } from 'date-fns';
+
 import { db, closeDb } from './client';
 import * as schema from './schema';
-import { addMonths } from 'date-fns';
 
 async function seed() {
   console.log('Seeding database...');

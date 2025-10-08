@@ -1,0 +1,52 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - navigation [ref=e3]:
+      - generic [ref=e6]:
+        - heading "SMS CRM" [level=1] [ref=e8]
+        - generic [ref=e9]:
+          - link "Dashboard" [ref=e10] [cursor=pointer]:
+            - /url: /
+          - link "Imports" [ref=e11] [cursor=pointer]:
+            - /url: /imports
+          - link "Campaigns" [ref=e12] [cursor=pointer]:
+            - /url: /campaigns
+          - link "Reports" [ref=e13] [cursor=pointer]:
+            - /url: /reports
+          - link "Settings" [ref=e14] [cursor=pointer]:
+            - /url: /settings
+    - main [ref=e15]:
+      - generic [ref=e16]:
+        - heading "Dashboard" [level=2] [ref=e17]
+        - generic [ref=e18]:
+          - generic [ref=e19]:
+            - heading "Total Contacts" [level=3] [ref=e20]
+            - paragraph [ref=e21]: "-"
+          - generic [ref=e22]:
+            - heading "Active Campaigns" [level=3] [ref=e23]
+            - paragraph [ref=e24]: "-"
+          - generic [ref=e25]:
+            - heading "Messages Sent Today" [level=3] [ref=e26]
+            - paragraph [ref=e27]: "-"
+          - generic [ref=e28]:
+            - heading "Delivery Rate" [level=3] [ref=e29]
+            - paragraph [ref=e30]: "-"
+        - generic [ref=e31]:
+          - heading "Quick Actions" [level=3] [ref=e32]
+          - generic [ref=e33]:
+            - link "Import Contacts Upload CSV to add or update contacts" [ref=e34] [cursor=pointer]:
+              - /url: /imports/new
+              - heading "Import Contacts" [level=4] [ref=e35]
+              - paragraph [ref=e36]: Upload CSV to add or update contacts
+            - link "Create Campaign Start a new SMS campaign" [ref=e37] [cursor=pointer]:
+              - /url: /campaigns/new
+              - heading "Create Campaign" [level=4] [ref=e38]
+              - paragraph [ref=e39]: Start a new SMS campaign
+            - link "View Reports Campaign analytics and metrics" [ref=e40] [cursor=pointer]:
+              - /url: /reports
+              - heading "View Reports" [level=4] [ref=e41]
+              - paragraph [ref=e42]: Campaign analytics and metrics
+  - alert [ref=e43]
+```

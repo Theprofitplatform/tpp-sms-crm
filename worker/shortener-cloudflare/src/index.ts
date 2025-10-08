@@ -22,6 +22,15 @@ const app = new Hono<{ Bindings: Env }>()
 // Enable CORS for API calls
 app.use('/health', cors())
 
+// Health check
+app.get('/health', (c) => {
+  return c.json({
+    ok: true,
+    ts: new Date().toISOString(),
+    service: 'shortener-cloudflare',
+  })
+})
+
 // Redirect endpoint
 app.get('/:token', async (c) => {
   const token = c.req.param('token')
@@ -73,22 +82,13 @@ app.get('/:token', async (c) => {
   }
 })
 
-// Health check
-app.get('/health', (c) => {
-  return c.json({
-    ok: true,
-    ts: new Date().toISOString(),
-    service: 'shortener-cloudflare',
-  })
-})
-
 // API endpoint to create short links
 app.post('/create', async (c) => {
   try {
     const { tenantId, campaignId, contactId, targetUrl, expiresAt } = await c.req.json()
 
     // Generate unique token
-    const token = generateShortToken(tenantId, campaignId, contactId)
+    const token = await generateShortToken(tenantId, campaignId, contactId)
 
     // Insert into D1
     const result = await c.env.DB.prepare(
@@ -107,17 +107,16 @@ app.post('/create', async (c) => {
 })
 
 // Generate short token (same logic as original)
-function generateShortToken(tenantId: string, campaignId: string, contactId: string): string {
+async function generateShortToken(tenantId: string, campaignId: string, contactId: string): Promise<string> {
   const input = `${tenantId}:${campaignId}:${contactId}:${Date.now()}`
   const encoder = new TextEncoder()
   const data = encoder.encode(input)
 
   // Simple hash using Web Crypto API
-  return crypto.subtle.digest('SHA-256', data).then(hash => {
-    const hashArray = Array.from(new Uint8Array(hash))
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-    return hashHex.substring(0, 8) // Use first 8 chars for shorter tokens
-  })
+  const hash = await crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hash))
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+  return hashHex.substring(0, 8) // Use first 8 chars for shorter tokens
 }
 
 export default app

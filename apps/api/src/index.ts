@@ -1,34 +1,37 @@
-import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import formbody from '@fastify/formbody';
 import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
-import formbody from '@fastify/formbody';
 import rateLimit from '@fastify/rate-limit';
-import { setupSessions } from './services/session.service';
-import { setupRateLimitRedis, RedisRateLimitStore, getRateLimitRedisClient } from './services/rate-limit.service';
+import Fastify from 'fastify';
 
-import healthRoutes from './routes/health';
+import { env } from '@sms-crm/lib';
+
 import authRoutes from './routes/auth';
-import importRoutes from './routes/imports';
 import campaignRoutes from './routes/campaigns';
+import contactsRoutes from './routes/contacts';
+import healthRoutes from './routes/health';
+import importRoutes from './routes/imports';
 import reportRoutes from './routes/reports';
-import webhookRoutes from './routes/webhooks';
-import tenantRoutes from './routes/tenants';
 import shortLinkRoutes from './routes/short-links';
+import tenantRoutes from './routes/tenants';
+import webhookRoutes from './routes/webhooks';
+import { setupRateLimitRedis } from './services/rate-limit.service';
+import { setupSessions } from './services/session.service';
 
-const PORT = parseInt(process.env.PORT || '3000', 10);
-const HOST = process.env.HOST || '0.0.0.0';
+const PORT = env.PORT;
+const HOST = '0.0.0.0';
 
 async function start() {
   const fastify = Fastify({
     logger: {
-      level: process.env.LOG_LEVEL || 'info',
+      level: env.LOG_LEVEL,
     },
   });
 
   // Plugins
   await fastify.register(cors, {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
+    origin: env.CORS_ORIGIN,
     credentials: true,
   });
 
@@ -44,12 +47,12 @@ async function start() {
   // Temporarily using default in-memory store
   await fastify.register(rateLimit, {
     global: true,
-    max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
-    timeWindow: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10),
+    max: env.RATE_LIMIT_MAX,
+    timeWindow: env.RATE_LIMIT_WINDOW_MS,
     // store: new RedisRateLimitStore({
     //   client: getRateLimitRedisClient(),
     //   keyPrefix: 'rl:global:',
-    //   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10),
+    //   windowMs: env.RATE_LIMIT_WINDOW_MS,
     // }),
     skipOnError: true, // Don't fail requests if Redis is down
     allowList: (req) => {
@@ -70,6 +73,7 @@ async function start() {
   await fastify.register(healthRoutes);
   await fastify.register(authRoutes, { prefix: '/auth' });
   await fastify.register(importRoutes, { prefix: '/imports' });
+  await fastify.register(contactsRoutes, { prefix: '/contacts' });
   await fastify.register(campaignRoutes, { prefix: '/campaigns' });
   await fastify.register(reportRoutes, { prefix: '/reports' });
   await fastify.register(webhookRoutes, { prefix: '/webhooks' });
@@ -78,9 +82,9 @@ async function start() {
 
   try {
     await fastify.listen({ port: PORT, host: HOST });
-    console.log(`API server listening on ${HOST}:${PORT}`);
+    fastify.log.info({ host: HOST, port: PORT }, 'API server started');
   } catch (err) {
-    fastify.log.error(err);
+    fastify.log.error({ err }, 'Failed to start API server');
     process.exit(1);
   }
 }

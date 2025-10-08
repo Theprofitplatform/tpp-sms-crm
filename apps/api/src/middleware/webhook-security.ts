@@ -1,4 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+
 import { WebhookSecurityService } from '../services/webhook-security.service';
 
 /**

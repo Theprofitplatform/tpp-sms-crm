@@ -1,6 +1,8 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { AuthenticatedRequest } from './auth';
+
 import { checkTenantRateLimit } from '../services/rate-limit.service';
+
+import { AuthenticatedRequest } from './auth';
 
 /**
  * Per-tenant rate limiting middleware

@@ -83,6 +83,9 @@ importers:
       date-fns:
         specifier: ^2.30.0
         version: 2.30.0
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.2.3
       drizzle-orm:
         specifier: ^0.29.3
         version: 0.29.5(postgres@3.4.7)
@@ -92,6 +95,9 @@ importers:
       ioredis:
         specifier: ^5.3.2
         version: 5.8.1
+      pino:
+        specifier: ^9.13.1
+        version: 9.13.1
       postgres:
         specifier: ^3.4.3
         version: 3.4.7
@@ -116,7 +122,7 @@ importers:
         version: 5.90.2(react@18.3.1)
       next:
         specifier: ^14.1.0
-        version: 14.2.33(react-dom@18.3.1)(react@18.3.1)
+        version: 14.2.33(@playwright/test@1.56.0)(react-dom@18.3.1)(react@18.3.1)
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -124,6 +130,9 @@ importers:
         specifier: ^18.2.0
         version: 18.3.1(react@18.3.1)
     devDependencies:
+      '@playwright/test':
+        specifier: ^1.56.0
+        version: 1.56.0
       '@types/node':
         specifier: ^20.11.5
         version: 20.19.19
@@ -163,6 +172,9 @@ importers:
       postgres:
         specifier: ^3.4.3
         version: 3.4.7
+      zod:
+        specifier: ^4.1.12
+        version: 4.1.12
     devDependencies:
       '@types/node':
         specifier: ^20.11.5
@@ -2010,6 +2022,13 @@ packages:
     dev: true
     optional: true
 
+  /@playwright/test@1.56.0:
+    resolution: {integrity: sha512-Tzh95Twig7hUwwNe381/K3PggZBZblKUe2wv25oIpzWLr6Z0m4KgV1ZVIjnR6GM9ANEqjZD7XsZEa6JL/7YEgg==}
+    engines: {node: '>=18'}
+    hasBin: true
+    dependencies:
+      playwright: 1.56.0
+
   /@redis/bloom@5.8.3(@redis/client@5.8.3):
     resolution: {integrity: sha512-1eldTzHvdW3Oi0TReb8m1yiFt8ZwyF6rv1NpZyG5R4TpCwuAdKQetBKoCw7D96tNFgsVVd6eL+NaGZZCqhRg4g==}
     engines: {node: '>= 18'}
@@ -3466,6 +3485,11 @@ packages:
     engines: {node: '>=10'}
     dev: false
 
+  /dotenv@17.2.3:
+    resolution: {integrity: sha512-JVUnt+DUIzu87TABbhPmNfVdBDt18BLOWjMUFJMSi/Qqg7NTYtabbvSNJGOJ7afbRuv9D/lngizHtP7QyLQ+9w==}
+    engines: {node: '>=12'}
+    dev: false
+
   /dreamopt@0.8.0:
     resolution: {integrity: sha512-vyJTp8+mC+G+5dfgsY+r3ckxlz+QMX40VjPQsZc5gxVAxLmi64TBoVkP54A/pRAXMXsbu2GMMBrZPxNv23waMg==}
     engines: {node: '>=0.4.0'}
@@ -4371,6 +4395,13 @@ packages:
   /fs.realpath@1.0.0:
     resolution: {integrity: sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw==}
     dev: true
+
+  /fsevents@2.3.2:
+    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
+    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+    os: [darwin]
+    requiresBuild: true
+    optional: true
 
   /fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
@@ -5468,7 +5499,7 @@ packages:
     resolution: {integrity: sha512-CXdUiJembsNjuToQvxayPZF9Vqht7hewsvy2sOWafLvi2awflj9mOC6bHIg50orX8IJvWKY9wYQ/zB2kogPslQ==}
     dev: true
 
-  /next@14.2.33(react-dom@18.3.1)(react@18.3.1):
+  /next@14.2.33(@playwright/test@1.56.0)(react-dom@18.3.1)(react@18.3.1):
     resolution: {integrity: sha512-GiKHLsD00t4ACm1p00VgrI0rUFAC9cRDGReKyERlM57aeEZkOQGcZTpIbsGn0b562FTPJWmYfKwplfO9EaT6ng==}
     engines: {node: '>=18.17.0'}
     hasBin: true
@@ -5487,6 +5518,7 @@ packages:
         optional: true
     dependencies:
       '@next/env': 14.2.33
+      '@playwright/test': 1.56.0
       '@swc/helpers': 0.5.5
       busboy: 1.6.0
       caniuse-lite: 1.0.30001748
@@ -5875,6 +5907,20 @@ packages:
       mlly: 1.8.0
       pathe: 2.0.3
     dev: true
+
+  /playwright-core@1.56.0:
+    resolution: {integrity: sha512-1SXl7pMfemAMSDn5rkPeZljxOCYAmQnYLBTExuh6E8USHXGSX3dx6lYZN/xPpTz1vimXmPA9CDnILvmJaB8aSQ==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  /playwright@1.56.0:
+    resolution: {integrity: sha512-X5Q1b8lOdWIE4KAoHpW3SE8HvUB+ZZsUoN64ZhjnN8dOb1UpujxBtENGiZFE+9F/yhzJwYa+ca3u43FeLbboHA==}
+    engines: {node: '>=18'}
+    hasBin: true
+    dependencies:
+      playwright-core: 1.56.0
+    optionalDependencies:
+      fsevents: 2.3.2
 
   /possible-typed-array-names@1.1.0:
     resolution: {integrity: sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg==}

@@ -2,6 +2,39 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Tech Stack Summary
+
+### Core Framework
+- **Fastify** - API server (apps/api)
+- **Next.js** - Web frontend (apps/web)
+- **Drizzle ORM** - Database layer
+- **TypeScript** - Language throughout
+
+### Infrastructure
+- **PostgreSQL** - Main database
+- **Redis** - Sessions, rate limiting, queues
+- **Docker** - Containerization
+- **pnpm** - Package manager with workspaces
+
+### Key Dependencies
+- **date-fns** + **date-fns-tz** - Date handling
+- **Zod** - Validation
+- **BullMQ** - Job queues
+- **Twilio** - SMS provider
+- **Vitest** - Testing framework
+
+### Deployment
+- **Cloudflare Pages** - Web frontend (https://sms.theprofitplatform.com.au/)
+- **VPS** - API & services (tpp-vps)
+- **Docker Compose** - Production deployment
+
+### Current Status
+- ✅ **10 tests passing** (Vitest working)
+- ✅ **API server running** successfully
+- ✅ **Web app deployed** to Cloudflare Pages
+- ✅ **Contact upload** functionality working
+- ❌ **369+ linting issues** (to be addressed)
+
 ## Essential Commands
 
 ### Development

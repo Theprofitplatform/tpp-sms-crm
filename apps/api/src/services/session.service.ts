@@ -1,8 +1,8 @@
-import { createClient } from 'redis';
-import type { FastifyInstance } from 'fastify';
 import fastifyCookie from '@fastify/cookie';
 import fastifySession from '@fastify/session';
 import RedisStore from 'connect-redis';
+import type { FastifyInstance } from 'fastify';
+import { createClient } from 'redis';
 
 export interface SessionData {
   userId: string;
@@ -88,7 +88,7 @@ export async function createSession(
 
 // Helper to get session data
 export function getSessionData(request: any): SessionData | null {
-  return request.session.get('user') || null;
+  return request.session.user || null;
 }
 
 // Helper to destroy session

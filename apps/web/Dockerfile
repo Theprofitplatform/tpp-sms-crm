@@ -5,21 +5,20 @@ FROM base AS deps
 WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY apps/web/package.json ./apps/web/
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY apps/web ./apps/web
+RUN pnpm --filter @sms-crm/web install --no-frozen-lockfile
 RUN pnpm --filter @sms-crm/web build
 
-FROM base AS runner
-WORKDIR /app
-ENV NODE_ENV=production
+FROM nginx:alpine AS runner
+WORKDIR /usr/share/nginx/html
 
-COPY --from=builder /app/apps/web/.next/standalone ./
-COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
-COPY --from=builder /app/apps/web/public ./apps/web/public
+COPY --from=builder /app/apps/web/out ./
+COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 3001
-CMD ["node", "apps/web/server.js"]
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

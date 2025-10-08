@@ -1,7 +1,8 @@
-import { FastifyPluginAsync } from 'fastify';
 import { db, schema } from '@sms-crm/lib';
-import { eq, and } from 'drizzle-orm';
-import { requireAuth, requireRole, AuthenticatedRequest } from '../middleware/auth';
+import { eq } from 'drizzle-orm';
+import { FastifyPluginAsync } from 'fastify';
+
+import { requireAuth, AuthenticatedRequest } from '../middleware/auth';
 import { validateBody } from '../middleware/validation';
 import { setBudgetSchema } from '../schemas/validation.schemas';
 import { BudgetService } from '../services/budget.service';

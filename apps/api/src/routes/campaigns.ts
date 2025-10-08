@@ -1,7 +1,8 @@
-import { FastifyPluginAsync } from 'fastify';
 import { db, schema, calculateMessageParts, appendOptOutLine } from '@sms-crm/lib';
-import { eq, and, sql } from 'drizzle-orm';
 import { Queue } from 'bullmq';
+import { eq, and, sql } from 'drizzle-orm';
+import { FastifyPluginAsync } from 'fastify';
+
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth';
 import { tenantRateLimit } from '../middleware/rate-limit';
 import { validateBody } from '../middleware/validation';

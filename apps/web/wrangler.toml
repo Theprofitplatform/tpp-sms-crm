@@ -1,10 +1,14 @@
 name = "sms-crm-web"
 compatibility_date = "2024-01-01"
 
+# Cloudflare Pages configuration
+pages_build_output_dir = "out"
+
+# Custom domain for production
 [env.production]
+domains = ["sms.theprofitplatform.com.au"]
+
 # Environment variables will be set in Cloudflare dashboard
 
-[env.staging]
-# Environment variables for staging
-
-# For Pages deployment, this file is optional but can be used for configuration
+[env.preview]
+# Environment variables for preview

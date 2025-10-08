@@ -1,6 +1,6 @@
-import { FastifyPluginAsync } from 'fastify';
 import { db, schema } from '@sms-crm/lib';
 import { eq } from 'drizzle-orm';
+import { FastifyPluginAsync } from 'fastify';
 
 const shortLinkRoutes: FastifyPluginAsync = async (fastify) => {
   // Record click (called by shortener service)

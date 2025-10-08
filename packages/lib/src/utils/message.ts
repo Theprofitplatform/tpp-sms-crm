@@ -2,7 +2,7 @@ export function calculateMessageParts(text: string): number {
   // SMS encoding: GSM-7 (160 chars) or UCS-2/UTF-16 (70 chars)
   // With concatenation: 153 chars (GSM-7) or 67 chars (UCS-2)
 
-  const hasUnicode = /[^\x00-\x7F]/.test(text);
+  const hasUnicode = /[^\u0000-\u007F]/.test(text);
   const length = text.length;
 
   if (hasUnicode) {

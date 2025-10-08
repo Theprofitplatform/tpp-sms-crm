@@ -1,10 +1,11 @@
-import { FastifyPluginAsync } from 'fastify';
 import { db, schema, generateMagicToken } from '@sms-crm/lib';
-import { eq } from 'drizzle-orm';
 import { addMinutes } from 'date-fns';
-import { createSession, destroySession } from '../services/session.service';
+import { eq } from 'drizzle-orm';
+import { FastifyPluginAsync } from 'fastify';
+
 import { validateBody } from '../middleware/validation';
 import { magicLinkRequestSchema } from '../schemas/validation.schemas';
+import { createSession, destroySession } from '../services/session.service';
 
 const authRoutes: FastifyPluginAsync = async (fastify) => {
   // Request magic link
@@ -98,7 +99,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Logout
-  fastify.post('/logout', async (request, reply) => {
+  fastify.post('/logout', async (request, _reply) => {
     try {
       await destroySession(request);
     } catch (error) {

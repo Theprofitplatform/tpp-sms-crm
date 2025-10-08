@@ -1,7 +1,9 @@
-import { Worker, Job } from 'bullmq';
 import { db, schema, renderTemplate, appendOptOutLine, calculateMessageParts, generateShortToken } from '@sms-crm/lib';
+import { Worker, Job } from 'bullmq';
 import { eq, sql } from 'drizzle-orm';
+import Fastify from 'fastify';
 import Redis from 'ioredis';
+
 import { TwilioProvider } from './providers/twilio';
 
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
@@ -217,7 +219,6 @@ worker.on('failed', (job, err) => {
 console.log('Worker started');
 
 // Health check endpoint
-import Fastify from 'fastify';
 const fastify = Fastify();
 
 fastify.get('/health', async () => {

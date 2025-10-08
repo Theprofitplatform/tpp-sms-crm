@@ -1,4 +1,4 @@
-phone,name,email
-+61400000001,John Doe,john@example.com
-+61400000002,Jane Smith,jane@example.com
-+61400000003,Bob Johnson,bob@example.com
+phone,firstName,lastName,email,consentStatus,consentSource
++61400000001,John,Doe,john@example.com,explicit,website
++61400000002,Jane,Smith,jane@example.com,implied,purchase
++61400000003,Bob,Johnson,bob@example.com,explicit,event

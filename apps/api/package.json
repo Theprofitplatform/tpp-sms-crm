@@ -23,9 +23,11 @@
     "csv-parse": "^5.5.3",
     "csv-stringify": "^6.4.6",
     "date-fns": "^2.30.0",
+    "dotenv": "^17.2.3",
     "drizzle-orm": "^0.29.3",
     "fastify": "^4.25.2",
     "ioredis": "^5.3.2",
+    "pino": "^9.13.1",
     "postgres": "^3.4.3",
     "redis": "^5.8.3",
     "zod": "^4.1.12"

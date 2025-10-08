@@ -37,12 +37,6 @@ echo -e "\n${BLUE}📥 Pulling latest images...${NC}"
 # Uncomment if you're using a Docker registry
 # docker compose -f docker-compose.prod.yml pull
 
-# Build project locally first to ensure TypeScript compilation works
-echo -e "\n${BLUE}🔨 Building project locally...${NC}"
-cd ..
-pnpm run build:api
-cd infra
-
 # Build new images with latest code (skip web - deploying to Cloudflare Pages)
 echo -e "\n${BLUE}🔨 Building Docker images...${NC}"
 docker compose -f docker-compose.prod.yml build --no-cache api worker

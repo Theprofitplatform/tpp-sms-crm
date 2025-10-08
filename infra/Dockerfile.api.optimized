@@ -1,0 +1,76 @@
+# Multi-stage Docker build for API
+# Stage 1: Dependencies
+FROM node:20-alpine AS deps
+WORKDIR /app
+
+# Install pnpm globally
+RUN npm install -g pnpm@8.15.0
+
+# Copy package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/lib/package.json ./packages/lib/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile --prod
+
+# Stage 2: Build
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# Install pnpm globally
+RUN npm install -g pnpm@8.15.0
+
+# Copy package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/lib/package.json ./packages/lib/
+
+# Install all dependencies (including dev)
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Build the project
+RUN pnpm --filter @sms-crm/lib build
+RUN pnpm --filter @sms-crm/api build
+
+# Stage 3: Runtime
+FROM node:20-alpine AS runtime
+WORKDIR /app
+
+# Install pnpm globally
+RUN npm install -g pnpm@8.15.0
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nextjs -u 1001
+
+# Copy dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=deps /app/packages/lib/node_modules ./packages/lib/node_modules
+
+# Copy built artifacts from builder stage
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/packages/lib/dist ./packages/lib/dist
+
+# Copy package.json files for module resolution
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/apps/api/package.json ./apps/api/
+COPY --from=builder /app/packages/lib/package.json ./packages/lib/
+
+# Change ownership to non-root user
+RUN chown -R nextjs:nodejs /app
+
+# Switch to non-root user
+USER nextjs
+
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
+
+CMD ["node", "apps/api/dist/index.js"]

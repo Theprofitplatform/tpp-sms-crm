@@ -1,6 +1,7 @@
-import { FastifyPluginAsync } from 'fastify';
 import { db, schema } from '@sms-crm/lib';
 import { eq, and, sql } from 'drizzle-orm';
+import { FastifyPluginAsync } from 'fastify';
+
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth';
 
 const reportRoutes: FastifyPluginAsync = async (fastify) => {

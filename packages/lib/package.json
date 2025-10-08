@@ -17,7 +17,8 @@
     "postgres": "^3.4.3",
     "libphonenumber-js": "^1.10.55",
     "date-fns": "^2.30.0",
-    "date-fns-tz": "^2.0.0"
+    "date-fns-tz": "^2.0.0",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "drizzle-kit": "^0.20.9",

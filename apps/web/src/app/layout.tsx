@@ -26,6 +26,9 @@ export default function RootLayout({
                     <a href="/" className="inline-flex items-center px-1 pt-1 text-sm font-medium">
                       Dashboard
                     </a>
+                    <a href="/contacts" className="inline-flex items-center px-1 pt-1 text-sm font-medium">
+                      Contacts
+                    </a>
                     <a href="/imports" className="inline-flex items-center px-1 pt-1 text-sm font-medium">
                       Imports
                     </a>

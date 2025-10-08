@@ -1,6 +1,6 @@
-import Fastify from 'fastify';
 import { db, schema } from '@sms-crm/lib';
 import { eq } from 'drizzle-orm';
+import Fastify from 'fastify';
 
 const fastify = Fastify({ logger: true });
 
