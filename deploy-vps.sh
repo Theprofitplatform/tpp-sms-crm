@@ -5,7 +5,7 @@ set -e
 # Usage: ./deploy-vps.sh tpp-vps
 
 VPS_HOST="$1"
-PROJECT_NAME="sms-crm"
+PROJECT_NAME="tpp-sms-crm"
 
 if [ -z "$VPS_HOST" ]; then
     echo "Usage: ./deploy-vps.sh <vps-host>"
@@ -32,7 +32,7 @@ echo "✅ SSH connection successful"
 # Get remote user and home directory
 VPS_USER=$(ssh "$VPS_HOST" 'whoami')
 VPS_HOME=$(ssh "$VPS_HOST" 'echo $HOME')
-REMOTE_PATH="$VPS_HOME/projects/$PROJECT_NAME"
+REMOTE_PATH="$VPS_HOME/projects/tpp-sms-crm"
 
 echo "📋 Remote user: $VPS_USER"
 echo "📋 Remote path: $REMOTE_PATH"
@@ -119,9 +119,9 @@ ENDSSH
 echo "🔧 Creating systemd services..."
 ssh "$VPS_HOST" "REMOTE_PATH=$REMOTE_PATH VPS_USER=$VPS_USER bash -s" << 'ENDSSH'
     # API Service
-    sudo tee /etc/systemd/system/sms-crm-api.service > /dev/null << EOF
+    sudo tee /etc/systemd/system/tpp-sms-crm-api.service > /dev/null << EOF
 [Unit]
-Description=SMS CRM API Service
+Description=TPP SMS CRM API Service
 After=network.target docker.service
 
 [Service]
@@ -142,9 +142,9 @@ WantedBy=multi-user.target
 EOF
 
     # Worker Service
-    sudo tee /etc/systemd/system/sms-crm-worker.service << 'EOF'
+    sudo tee /etc/systemd/system/tpp-sms-crm-worker.service << 'EOF'
 [Unit]
-Description=SMS CRM Worker Service
+Description=TPP SMS CRM Worker Service
 After=network.target docker.service
 
 [Service]
@@ -165,9 +165,9 @@ WantedBy=multi-user.target
 EOF
 
     # Web Service
-    sudo tee /etc/systemd/system/sms-crm-web.service << 'EOF'
+    sudo tee /etc/systemd/system/tpp-sms-crm-web.service << 'EOF'
 [Unit]
-Description=SMS CRM Web Service
+Description=TPP SMS CRM Web Service
 After=network.target
 
 [Service]
@@ -188,8 +188,8 @@ EOF
     sudo systemctl daemon-reload
 
     # Enable and start services
-    sudo systemctl enable sms-crm-api sms-crm-worker sms-crm-web
-    sudo systemctl start sms-crm-api sms-crm-worker sms-crm-web
+    sudo systemctl enable tpp-sms-crm-api tpp-sms-crm-worker tpp-sms-crm-web
+    sudo systemctl start tpp-sms-crm-api tpp-sms-crm-worker tpp-sms-crm-web
 
     echo "✅ Services created and started"
 ENDSSH
@@ -245,14 +245,14 @@ echo "  - Web UI: http://$VPS_HOST"
 echo "  - API: http://$VPS_HOST/api/health"
 echo ""
 echo "To check service status:"
-echo "  ssh $VPS_HOST 'systemctl status sms-crm-*'"
+echo "  ssh $VPS_HOST 'systemctl status tpp-sms-crm-*'"
 echo ""
 echo "To view logs:"
-echo "  ssh $VPS_HOST 'journalctl -u sms-crm-api -f'"
-echo "  ssh $VPS_HOST 'journalctl -u sms-crm-worker -f'"
-echo "  ssh $VPS_HOST 'journalctl -u sms-crm-web -f'"
+echo "  ssh $VPS_HOST 'journalctl -u tpp-sms-crm-api -f'"
+echo "  ssh $VPS_HOST 'journalctl -u tpp-sms-crm-worker -f'"
+echo "  ssh $VPS_HOST 'journalctl -u tpp-sms-crm-web -f'"
 echo ""
 echo "To update Twilio credentials:"
-echo "  ssh $VPS_HOST 'cd /root/projects/sms-crm && vi .env'"
-echo "  Then restart services: systemctl restart sms-crm-*"
+echo "  ssh $VPS_HOST 'cd /root/projects/tpp-sms-crm && vi .env'"
+echo "  Then restart services: systemctl restart tpp-sms-crm-*"
 echo ""
