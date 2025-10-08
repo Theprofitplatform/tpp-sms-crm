@@ -24,8 +24,7 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
-# Navigate to infra directory
-cd infra
+# We're already in the infra directory
 
 # Create backup of database (optional but recommended)
 echo -e "\n${BLUE}📦 Creating database backup...${NC}"
@@ -38,17 +37,23 @@ echo -e "\n${BLUE}📥 Pulling latest images...${NC}"
 # Uncomment if you're using a Docker registry
 # docker compose -f docker-compose.prod.yml pull
 
-# Build new images with latest code
-echo -e "\n${BLUE}🔨 Building Docker images...${NC}"
-docker compose -f docker-compose.prod.yml build --no-cache
+# Build project locally first to ensure TypeScript compilation works
+echo -e "\n${BLUE}🔨 Building project locally...${NC}"
+cd ..
+pnpm run build:api
+cd infra
 
-# Stop old containers
+# Build new images with latest code (skip web - deploying to Cloudflare Pages)
+echo -e "\n${BLUE}🔨 Building Docker images...${NC}"
+docker compose -f docker-compose.prod.yml build --no-cache api worker
+
+# Stop old containers (except shortener - now on Cloudflare)
 echo -e "\n${BLUE}🛑 Stopping old containers...${NC}"
 docker compose -f docker-compose.prod.yml down
 
-# Start new containers
+# Start new containers (API and Worker only - web/shortener on Cloudflare)
 echo -e "\n${BLUE}🚀 Starting new containers...${NC}"
-docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d api worker
 
 # Wait for services to be healthy
 echo -e "\n${BLUE}⏳ Waiting for services to be healthy...${NC}"

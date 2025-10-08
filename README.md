@@ -1,6 +1,6 @@
-# SMS CRM Platform
+# TPP SMS CRM Platform
 
-Multi-tenant SMS campaign management platform built for Australian compliance and deliverability.
+SMS CRM Platform for The Profit Platform - Multi-tenant SMS campaign management built for Australian compliance and deliverability.
 
 ## Features
 
@@ -34,7 +34,8 @@ Multi-tenant SMS campaign management platform built for Australian compliance an
 
 2. **Clone and Install**
    ```bash
-   cd ghl\ copy
+   git clone https://github.com/Theprofitplatform/tpp-sms-crm.git
+   cd tpp-sms-crm
    pnpm install
    ```
 
