@@ -1,0 +1,86 @@
+name: Test Coverage
+
+on:
+  push:
+    branches: [ main, develop, cleanup/* ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  coverage:
+    name: Generate Coverage Report
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: NODE_OPTIONS=--experimental-vm-modules npm run test:coverage
+        env:
+          NODE_ENV: test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Generate coverage badge
+        run: |
+          COVERAGE=$(cat coverage/coverage-summary.json | jq '.total.lines.pct')
+          echo "Coverage: $COVERAGE%"
+          echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
+
+      - name: Comment coverage on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const coverage = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+
+            const comment = `## Test Coverage Report
+
+            | Metric | Coverage |
+            |--------|----------|
+            | Lines | ${coverage.total.lines.pct}% |
+            | Functions | ${coverage.total.functions.pct}% |
+            | Branches | ${coverage.total.branches.pct}% |
+            | Statements | ${coverage.total.statements.pct}% |
+
+            **Thresholds:** Lines: 100% | Functions: 100% | Statements: 99% | Branches: 90%
+
+            ${coverage.total.lines.pct >= 100 ? '✅ PERFECT Coverage!' : coverage.total.lines.pct >= 99 ? '⭐ Excellent Coverage' : '⚠️ Coverage below threshold'}
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
+
+      - name: Check coverage threshold
+        run: |
+          # Jest will exit with non-zero if coverage is below threshold
+          # This is already handled by jest.config.js coverageThreshold
+          echo "Coverage check complete"
