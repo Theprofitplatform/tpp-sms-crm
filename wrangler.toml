@@ -1,0 +1,15 @@
+# Cloudflare Pages Configuration for SEO Reports
+# Deploys reports to: seo.theprofitplatform.com.au
+
+name = "seo-reports"
+compatibility_date = "2024-10-21"
+pages_build_output_dir = "web-dist"
+compatibility_flags = ["nodejs_compat"]
+
+[env.production]
+name = "seo-reports-production"
+compatibility_flags = ["nodejs_compat"]
+
+# Custom domain configuration
+# After deployment, add custom domain in Cloudflare dashboard:
+# seo.theprofitplatform.com.au → this Pages project
