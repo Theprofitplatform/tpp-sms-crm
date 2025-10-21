@@ -101,9 +101,9 @@ describe('Logger', () => {
   test('should create logs directory if it does not exist (line 19)', () => {
     // To test line 19, we need to create a Logger instance when directory doesn't exist
 
-    // Clean up directory
+    // Clean up directory - force remove even if not empty
     if (fs.existsSync(testLogDir)) {
-      fs.rmSync(testLogDir, { recursive: true });
+      fs.rmSync(testLogDir, { recursive: true, force: true });
     }
 
     // Verify directory is gone
