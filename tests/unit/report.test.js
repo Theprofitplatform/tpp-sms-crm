@@ -20,8 +20,12 @@ describe('Report Generator', () => {
   afterEach(() => {
     // Clean up test report files
     testFiles.forEach(file => {
-      if (fs.existsSync(file)) {
-        fs.unlinkSync(file);
+      try {
+        if (fs.existsSync(file)) {
+          fs.unlinkSync(file);
+        }
+      } catch (error) {
+        // Ignore cleanup errors - file may already be deleted
       }
     });
     testFiles = [];
