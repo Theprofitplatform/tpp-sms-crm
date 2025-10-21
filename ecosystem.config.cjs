@@ -2,11 +2,15 @@ module.exports = {
   apps: [
     {
       name: 'seo-audit-all',
-      script: 'audit-all-clients.js',
+      script: 'bash',
+      args: '-c "node audit-all-clients.js && ./deploy-to-cloudflare.sh --production"',
       cron_restart: '0 0 * * *', // Daily at midnight
       watch: false,
       autorestart: false,
-      max_memory_restart: '1G'
+      max_memory_restart: '1G',
+      env: {
+        NODE_ENV: 'production'
+      }
     },
     {
       name: 'client-status-check',

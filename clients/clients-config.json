@@ -5,51 +5,22 @@
     "contact": "client@instantautotraders.com.au",
     "wordpress_user": "admin",
     "package": "professional",
-    "status": "pending_setup",
+    "status": "active",
     "ga4_property_id": "496897015",
     "gsc_property": "https://instantautotraders.com.au/",
-    "notes": "Migrated from SEOAnalyst - WordPress credentials needed"
+    "notes": "Migrated from SEOAnalyst - Password configured"
   },
   "theprofitplatform": {
     "name": "The Profit Platform",
     "url": "https://theprofitplatform.com.au",
     "contact": "client@theprofitplatform.com.au",
-    "wordpress_user": "admin",
-    "package": "professional",
-    "status": "pending_setup",
+    "wordpress_user": "",
+    "package": "internal",
+    "status": "non-wordpress",
     "ga4_property_id": "500340846",
     "gsc_property": "sc-domain:theprofitplatform.com.au",
-    "notes": "Migrated from SEOAnalyst - WordPress credentials needed"
-  },
-  "example-client-1": {
-    "name": "Client Business Name 1",
-    "url": "https://clientwebsite1.com",
-    "contact": "client1@email.com",
-    "wordpress_user": "",
-    "package": "professional",
-    "status": "pending-setup",
-    "started": "2025-10-21",
-    "notes": "Add client details here"
-  },
-  "example-client-2": {
-    "name": "Client Business Name 2",
-    "url": "https://clientwebsite2.com",
-    "contact": "client2@email.com",
-    "wordpress_user": "",
-    "package": "professional",
-    "status": "pending-setup",
-    "started": "2025-10-21",
-    "notes": "Add client details here"
-  },
-  "example-client-3": {
-    "name": "Client Business Name 3",
-    "url": "https://clientwebsite3.com",
-    "contact": "client3@email.com",
-    "wordpress_user": "",
-    "package": "professional",
-    "status": "pending-setup",
-    "started": "2025-10-21",
-    "notes": "Add client details here"
+    "vps_location": "/home/avi/projects/tpp",
+    "notes": "NOT WordPress - Static site in projects/tpp. SEOAnalyst only (GA4/GSC tracking)."
   },
   "hottyres": {
     "name": "Hot Tyres",
@@ -57,10 +28,10 @@
     "contact": "client@hottyres.com.au",
     "wordpress_user": "admin",
     "package": "professional",
-    "status": "pending_setup",
+    "status": "active",
     "ga4_property_id": "487936109",
     "gsc_property": "https://www.hottyres.com.au/",
-    "notes": "Migrated from SEOAnalyst - WordPress credentials needed"
+    "notes": "Migrated from SEOAnalyst - Password configured"
   },
   "sadcdisabilityservices": {
     "name": "SADC Disability Services",
@@ -68,9 +39,9 @@
     "contact": "client@sadcdisabilityservices.com.au",
     "wordpress_user": "admin",
     "package": "professional",
-    "status": "pending_setup",
+    "status": "active",
     "ga4_property_id": "499372671",
     "gsc_property": "https://sadcdisabilityservices.com.au/",
-    "notes": "Migrated from SEOAnalyst - WordPress credentials needed"
+    "notes": "Migrated from SEOAnalyst - Password configured"
   }
 }
