@@ -1,0 +1,54 @@
+YOUR OFFICIAL NAP FORMAT
+=========================
+
+Copy this EXACTLY everywhere (directories, website, everywhere):
+
+Business Name: Instant Auto Traders
+Street Address: [Your exact street address - no abbreviations]
+City: Sydney
+State: NSW
+Postcode: [Your postcode]
+Phone: [Your phone - pick ONE format and use everywhere]
+Website: https://instantautotraders.com.au
+Email: [Your business email]
+
+---
+
+PHONE FORMAT OPTIONS (pick ONE):
+
+Option A: (02) 9XXX XXXX
+Option B: 02 9XXX XXXX
+Option C: +61 2 9XXX XXXX
+
+Choose one and use it EVERYWHERE - consistency is critical!
+
+---
+
+CRITICAL RULES:
+
+✅ DO:
+- Spell out "Street", "Road", "Avenue" (no abbreviations)
+- Use exact same format everywhere
+- Copy-paste (don't retype) to avoid typos
+- Use same phone format everywhere
+
+❌ DON'T:
+- Abbreviate street names (St. → Street)
+- Use different phone formats on different sites
+- Add keywords to business name
+- Use P.O. Box (use physical address)
+
+---
+
+WHERE TO USE THIS:
+
+□ Your website footer
+□ Contact page
+□ About page
+□ Google Business Profile
+□ All 19+ directory submissions
+□ Schema markup
+□ Social media profiles
+□ Email signatures
+
+Consistency = Higher local rankings!

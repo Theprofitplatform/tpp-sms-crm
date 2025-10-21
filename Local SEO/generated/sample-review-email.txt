@@ -1,0 +1,35 @@
+SAMPLE REVIEW REQUEST EMAIL
+============================
+
+To: customer@example.com
+Subject: Thanks for choosing Instant Auto Traders!
+
+---
+
+Hi [Customer Name],
+
+Thanks for selling your [Car Make/Model] to us [last week]! We hope the
+process was smooth and you were happy with our service.
+
+Would you mind taking 2 minutes to share your experience on Google? Your
+feedback helps other Sydney car sellers know what to expect when working
+with us.
+
+👉 Click here to leave a review: [YOUR GOOGLE REVIEW LINK]
+
+We really appreciate your time!
+
+Cheers,
+[Your Name]
+Instant Auto Traders
+[Your Phone]
+
+---
+
+TO USE THIS TEMPLATE:
+1. Get your Google Review Link from business.google.com
+2. Replace [Customer Name], [Car Make/Model], etc.
+3. Send to recent happy customers
+4. Follow up once after 1 week if no response
+
+EXPECTED RESULT: 40-60% response rate = 2-3 reviews per 5 emails sent

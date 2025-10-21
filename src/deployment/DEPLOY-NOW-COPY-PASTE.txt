@@ -1,0 +1,68 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║                                                                      ║
+║  🚀 DEPLOY SCHEMA FIXER v1.1.0 - COPY & PASTE METHOD                ║
+║                                                                      ║
+║  Fastest deployment: 2 minutes                                       ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+
+STEP 1: Login to WordPress
+───────────────────────────────────────────────────────────────────────
+Open: https://instantautotraders.com.au/wp-admin
+Username: Claude
+Password: [your WordPress password]
+
+
+STEP 2: Open Plugin Editor
+───────────────────────────────────────────────────────────────────────
+1. In left menu, click: Plugins → Plugin File Editor
+2. In dropdown "Select plugin to edit", choose:
+   → "Instant Auto Traders - Schema Error Fixer"
+3. You should see the file: schema-fixer.php
+
+
+STEP 3: Replace Plugin Code
+───────────────────────────────────────────────────────────────────────
+1. Open this file: src/deployment/schema-fixer-v1.1.0.php
+2. Select ALL content (Ctrl+A / Cmd+A)
+3. Copy (Ctrl+C / Cmd+C)
+4. Go back to WordPress Plugin Editor
+5. Select ALL existing code (Ctrl+A / Cmd+A)
+6. Paste new code (Ctrl+V / Cmd+V)
+7. Click "Update File" button at bottom
+
+
+STEP 4: Clear Cache
+───────────────────────────────────────────────────────────────────────
+In WordPress admin, top bar:
+→ LiteSpeed Cache → Purge All
+
+
+STEP 5: Verify
+───────────────────────────────────────────────────────────────────────
+1. Visit: https://instantautotraders.com.au
+2. Right-click → View Page Source
+3. Search for: "Fixed Schema v1.1.0"
+4. Should see: <!-- Instant Auto Traders - Fixed Schema v1.1.0 -->
+
+✅ If found: DEPLOYMENT SUCCESSFUL!
+
+
+VERIFICATION COMMANDS (run in terminal):
+───────────────────────────────────────────────────────────────────────
+curl -s https://instantautotraders.com.au | grep "Fixed Schema"
+curl -s https://instantautotraders.com.au | grep -c '"@type":"Product"'
+
+
+GOOGLE TEST:
+───────────────────────────────────────────────────────────────────────
+https://search.google.com/test/rich-results
+Enter: https://instantautotraders.com.au
+Expected: ✅ 0 warnings, 100% validation
+
+
+═══════════════════════════════════════════════════════════════════════
+
+Ready to copy! Plugin content is in: schema-fixer-v1.1.0.php
+

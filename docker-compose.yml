@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  seo-automation:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: seo-automation:latest
+    container_name: seo-automation
+
+    # Environment variables
+    environment:
+      - NODE_ENV=production
+      - WORDPRESS_URL=${WORDPRESS_URL}
+      - WORDPRESS_USER=${WORDPRESS_USER}
+      - WORDPRESS_APP_PASSWORD=${WORDPRESS_APP_PASSWORD}
+      - GOOGLE_PAGESPEED_API_KEY=${GOOGLE_PAGESPEED_API_KEY}
+      - DRY_RUN=${DRY_RUN:-true}
+      - AUTO_FIX_ENABLED=${AUTO_FIX_ENABLED:-false}
+      - MAX_POSTS_PER_RUN=${MAX_POSTS_PER_RUN:-100}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+
+    # Volumes for persistent data
+    volumes:
+      - ./logs:/app/logs
+      - ./env:/app/env:ro
+
+    # Network
+    networks:
+      - seo-network
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Command override (optional)
+    # command: ["node", "index.js", "--mode=audit", "--max-posts=50"]
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('healthy')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Scheduled runs using cron container
+  seo-scheduler:
+    image: seo-automation:latest
+    container_name: seo-scheduler
+
+    environment:
+      - NODE_ENV=production
+      - WORDPRESS_URL=${WORDPRESS_URL}
+      - WORDPRESS_USER=${WORDPRESS_USER}
+      - WORDPRESS_APP_PASSWORD=${WORDPRESS_APP_PASSWORD}
+      - DRY_RUN=false
+
+    volumes:
+      - ./logs:/app/logs
+      - ./env:/app/env:ro
+      - ./scripts/docker-cron.sh:/app/cron.sh:ro
+
+    networks:
+      - seo-network
+
+    # Override with cron command
+    command: >
+      sh -c "
+        echo '0 2 * * * cd /app && node index.js --mode=audit >> /app/logs/cron.log 2>&1' > /etc/crontabs/seouser &&
+        crond -f -l 2
+      "
+
+    restart: unless-stopped
+    profiles:
+      - scheduler  # Only start with: docker-compose --profile scheduler up
+
+networks:
+  seo-network:
+    driver: bridge
+
+# Optional: Volume definitions for data persistence
+volumes:
+  logs-data:
+    driver: local

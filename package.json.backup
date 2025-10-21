@@ -1,0 +1,49 @@
+{
+  "name": "wp-seo-automation",
+  "version": "1.0.0",
+  "description": "WordPress SEO audit and automation tool",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "audit": "node index.js --mode=audit",
+    "fix": "node index.js --mode=fix",
+    "test": "node --test tests/*.test.js",
+    "test:api": "node --test tests/api-connect.test.js",
+    "test:audit": "node --test tests/audit.test.js",
+    "test:apis": "node test-apis.js",
+    "competitor": "node examples/competitor-analysis-example.js",
+    "ai-optimize": "node examples/ai-content-example.js",
+    "optimize-posts": "node optimize-my-posts.js",
+    "optimize-all": "node optimize-my-posts.js 69",
+    "bulk:h1": "node bulk-fix-h1.js",
+    "bulk:h1:apply": "node bulk-fix-h1.js --apply",
+    "bulk:titles": "node bulk-fix-titles.js",
+    "bulk:titles:apply": "node bulk-fix-titles.js --apply",
+    "bulk:meta": "node bulk-fix-meta.js",
+    "bulk:meta:apply": "node bulk-fix-meta.js --apply",
+    "monitor": "node monitor-rankings.js",
+    "report": "node daily-report.js",
+    "discord:test": "node send-discord-test.js",
+    "batch": "node scripts/batch-process.js",
+    "batch:parallel": "node scripts/batch-process.js sites.json --parallel",
+    "health": "node scripts/health-check.js",
+    "docker:build": "docker build -t seo-automation .",
+    "docker:run": "docker-compose up",
+    "docker:dev": "docker-compose -f docker-compose.yml -f docker-compose.dev.yml up"
+  },
+  "keywords": [
+    "wordpress",
+    "seo",
+    "automation",
+    "audit"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@playwright/test": "^1.56.0",
+    "axios": "^1.6.0",
+    "cheerio": "^1.0.0-rc.12",
+    "dotenv": "^16.3.1"
+  }
+}

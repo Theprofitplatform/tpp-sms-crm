@@ -1,0 +1,276 @@
+{
+  "timestamp": "2024-01-15T14:30:00.000Z",
+  "summary": {
+    "totalPosts": 10,
+    "totalIssues": 23,
+    "avgScore": 67.5,
+    "issuesBySeverity": {
+      "critical": 2,
+      "high": 8,
+      "medium": 10,
+      "low": 3
+    },
+    "technicalIssues": 3,
+    "performanceScore": 72,
+    "fixesApplied": 0,
+    "fixesTotal": 0
+  },
+  "contentAudit": {
+    "posts": [
+      {
+        "postId": 1,
+        "title": "10 Best SEO Practices for 2024",
+        "url": "https://example.com/10-best-seo-practices-for-2024",
+        "issues": [
+          {
+            "type": "title",
+            "severity": "warning",
+            "message": "Title too long (68 chars)",
+            "fix": "Keep under 60 characters to avoid truncation"
+          },
+          {
+            "type": "images",
+            "severity": "high",
+            "message": "2 image(s) missing alt text",
+            "fix": "Add descriptive alt text to all images",
+            "details": [
+              "https://example.com/wp-content/uploads/image1.jpg",
+              "https://example.com/wp-content/uploads/image2.jpg"
+            ]
+          }
+        ],
+        "suggestions": [
+          {
+            "type": "content",
+            "message": "Content could be expanded (currently 450 words)"
+          }
+        ],
+        "score": 75,
+        "meta": {
+          "wordCount": 450,
+          "paragraphCount": 8,
+          "imageCount": 3,
+          "internalLinks": 5,
+          "externalLinks": 2,
+          "keywordDensity": "1.2"
+        }
+      },
+      {
+        "postId": 2,
+        "title": "WordPress SEO Guide",
+        "url": "https://example.com/wordpress-seo-guide",
+        "issues": [
+          {
+            "type": "headings",
+            "severity": "critical",
+            "message": "Multiple H1 tags found (2)",
+            "fix": "Use only one H1 tag per page"
+          },
+          {
+            "type": "meta_description",
+            "severity": "high",
+            "message": "Missing meta description",
+            "fix": "Add a compelling meta description (150-160 chars)"
+          },
+          {
+            "type": "content",
+            "severity": "high",
+            "message": "Thin content (245 words)",
+            "fix": "Expand content to at least 300 words"
+          }
+        ],
+        "suggestions": [],
+        "score": 45,
+        "meta": {
+          "wordCount": 245,
+          "paragraphCount": 4,
+          "imageCount": 1,
+          "internalLinks": 2,
+          "externalLinks": 1,
+          "keywordDensity": "2.5"
+        }
+      }
+    ],
+    "issuesByType": {
+      "title": [
+        {
+          "postId": 1,
+          "postTitle": "10 Best SEO Practices for 2024",
+          "message": "Title too long (68 chars)",
+          "severity": "warning"
+        }
+      ],
+      "images": [
+        {
+          "postId": 1,
+          "postTitle": "10 Best SEO Practices for 2024",
+          "message": "2 image(s) missing alt text",
+          "severity": "high"
+        }
+      ],
+      "headings": [
+        {
+          "postId": 2,
+          "postTitle": "WordPress SEO Guide",
+          "message": "Multiple H1 tags found (2)",
+          "severity": "critical"
+        }
+      ],
+      "meta_description": [
+        {
+          "postId": 2,
+          "postTitle": "WordPress SEO Guide",
+          "message": "Missing meta description",
+          "severity": "high"
+        }
+      ],
+      "content": [
+        {
+          "postId": 2,
+          "postTitle": "WordPress SEO Guide",
+          "message": "Thin content (245 words)",
+          "severity": "high"
+        }
+      ]
+    }
+  },
+  "technicalAudit": {
+    "timestamp": "2024-01-15T14:30:00.000Z",
+    "siteUrl": "https://example.com",
+    "issues": [
+      {
+        "type": "performance",
+        "severity": "high",
+        "message": "LCP too slow on mobile: 3.2s",
+        "fix": "Target LCP under 2.5s - optimize largest content element"
+      },
+      {
+        "type": "technical",
+        "severity": "medium",
+        "message": "No structured data found",
+        "fix": "Add Schema.org JSON-LD markup"
+      }
+    ],
+    "recommendations": [
+      {
+        "type": "technical",
+        "message": "Add sitemap reference to robots.txt"
+      },
+      {
+        "type": "schema",
+        "message": "Consider adding Organization schema"
+      }
+    ],
+    "metrics": {
+      "mobile": {
+        "strategy": "mobile",
+        "scores": {
+          "performance": 72,
+          "accessibility": 89,
+          "bestPractices": 85,
+          "seo": 92
+        },
+        "coreWebVitals": {
+          "lcp": 3200,
+          "fid": 85,
+          "cls": 0.08,
+          "fcp": 1800,
+          "ttfb": 450
+        },
+        "opportunities": [
+          {
+            "title": "Eliminate render-blocking resources",
+            "savings": "1.2s",
+            "description": "Resources are blocking the first paint of your page"
+          },
+          {
+            "title": "Serve images in next-gen formats",
+            "savings": "0.8s",
+            "description": "Image formats like WebP provide better compression"
+          }
+        ]
+      },
+      "desktop": {
+        "strategy": "desktop",
+        "scores": {
+          "performance": 85,
+          "accessibility": 89,
+          "bestPractices": 85,
+          "seo": 92
+        },
+        "coreWebVitals": {
+          "lcp": 1850,
+          "fid": 45,
+          "cls": 0.05,
+          "fcp": 980,
+          "ttfb": 280
+        },
+        "opportunities": []
+      }
+    }
+  },
+  "fixes": null,
+  "recommendations": [
+    {
+      "priority": "CRITICAL",
+      "title": "Address Critical Issues Immediately",
+      "items": [
+        {
+          "post": "WordPress SEO Guide",
+          "issue": "Multiple H1 tags found (2)",
+          "fix": "Use only one H1 tag per page"
+        }
+      ]
+    },
+    {
+      "priority": "HIGH",
+      "title": "Technical SEO Improvements",
+      "items": [
+        {
+          "issue": "LCP too slow on mobile: 3.2s",
+          "fix": "Target LCP under 2.5s - optimize largest content element"
+        }
+      ]
+    },
+    {
+      "priority": "HIGH",
+      "title": "Performance Optimization Opportunities",
+      "items": [
+        {
+          "issue": "Eliminate render-blocking resources",
+          "savings": "1.2s",
+          "fix": "Resources are blocking the first paint of your page"
+        },
+        {
+          "issue": "Serve images in next-gen formats",
+          "savings": "0.8s",
+          "fix": "Image formats like WebP provide better compression"
+        }
+      ]
+    },
+    {
+      "priority": "MEDIUM",
+      "title": "Common Content Issues",
+      "items": [
+        {
+          "type": "images",
+          "message": "2 image(s) missing alt text",
+          "fix": "Add descriptive alt text to all images",
+          "count": 3
+        },
+        {
+          "type": "meta_description",
+          "message": "Missing meta description",
+          "fix": "Add a compelling meta description (150-160 chars)",
+          "count": 5
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "totalPosts": 10,
+    "mode": "audit",
+    "dryRun": true,
+    "timestamp": "2024-01-15T14:30:00.000Z"
+  }
+}

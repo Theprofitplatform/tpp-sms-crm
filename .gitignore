@@ -1,0 +1,87 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+**/.env
+*.env
+!*.env.template
+!*.env.example
+*.pem
+*.key
+.cpanel-credentials
+*credentials*
+*password*
+
+# WordPress Core & Database
+public_html/
+wp-admin/
+wp-includes/
+wp-content/uploads/
+files/
+*.sql
+*.sql.gz
+*.sql.zip
+*.db
+
+# Backups & Archives
+*backup*/
+*BACKUP*/
+_archive/
+archive/
+*.zip
+*.tar.gz
+*.tar
+*.rar
+*.7z
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+deployment.log
+cron.log
+
+# Media Files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.mp4
+*.mov
+
+# OS & IDE
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude Code & AI Tools
+.claude/
+.claude-flow/
+
+# Test & Coverage
+coverage/
+.nyc_output/
+test-results/
+
+# Temporary files
+tmp/
+temp/
+_analysis/
+*.tmp
+*.cache

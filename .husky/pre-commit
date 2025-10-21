@@ -1,0 +1,8 @@
+echo "🔍 Running pre-commit checks..."
+
+# Run tests with coverage to ensure 100% coverage is maintained
+echo "📊 Running tests with coverage..."
+NODE_OPTIONS=--experimental-vm-modules npm test -- --coverage --silent
+
+# If tests pass, coverage thresholds are automatically checked by jest.config.js
+echo "✅ All pre-commit checks passed! Coverage thresholds met."

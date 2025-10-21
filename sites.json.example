@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Main Production Site",
+    "url": "https://example.com",
+    "user": "seo_admin",
+    "password": "xxxx-xxxx-xxxx-xxxx",
+    "maxPosts": 100,
+    "mode": "audit"
+  },
+  {
+    "name": "Blog Subdomain",
+    "url": "https://blog.example.com",
+    "user": "admin",
+    "password": "yyyy-yyyy-yyyy-yyyy",
+    "maxPosts": 50,
+    "mode": "audit"
+  },
+  {
+    "name": "Client Site 1",
+    "url": "https://client1.com",
+    "user": "cloudcode",
+    "password": "zzzz-zzzz-zzzz-zzzz",
+    "maxPosts": 200,
+    "mode": "fix"
+  }
+]

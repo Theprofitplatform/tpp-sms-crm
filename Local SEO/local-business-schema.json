@@ -1,0 +1,126 @@
+{
+  "@context": "https://schema.org",
+  "@type": "AutomotiveBusiness",
+  "name": "Instant Auto Traders",
+  "image": "https://instantautotraders.com.au/logo.png",
+  "description": "Sydney's trusted cash car buyer offering instant quotes and same-day service. We buy all makes and models in any condition across Sydney and NSW. Get paid immediately with free car removal.",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "[Your street address here]",
+    "addressLocality": "Sydney",
+    "addressRegion": "NSW",
+    "postalCode": "[Your postcode]",
+    "addressCountry": "AU"
+  },
+  "geo": {
+    "@type": "GeoCoordinates",
+    "latitude": "[Your latitude - get from Google Maps]",
+    "longitude": "[Your longitude - get from Google Maps]"
+  },
+  "telephone": "[Your phone number in format: +61-2-XXXX-XXXX]",
+  "email": "[Your business email]",
+  "url": "https://instantautotraders.com.au",
+  "openingHoursSpecification": [
+    {
+      "@type": "OpeningHoursSpecification",
+      "dayOfWeek": [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday"
+      ],
+      "opens": "08:00",
+      "closes": "18:00"
+    },
+    {
+      "@type": "OpeningHoursSpecification",
+      "dayOfWeek": "Saturday",
+      "opens": "09:00",
+      "closes": "16:00"
+    }
+  ],
+  "priceRange": "$$",
+  "areaServed": [
+    {
+      "@type": "City",
+      "name": "Sydney",
+      "sameAs": "https://en.wikipedia.org/wiki/Sydney"
+    },
+    {
+      "@type": "State",
+      "name": "New South Wales",
+      "sameAs": "https://en.wikipedia.org/wiki/New_South_Wales"
+    }
+  ],
+  "serviceArea": {
+    "@type": "GeoCircle",
+    "geoMidpoint": {
+      "@type": "GeoCoordinates",
+      "latitude": "-33.8688",
+      "longitude": "151.2093"
+    },
+    "geoRadius": "100000"
+  },
+  "hasOfferCatalog": {
+    "@type": "OfferCatalog",
+    "name": "Car Buying Services",
+    "itemListElement": [
+      {
+        "@type": "Offer",
+        "itemOffered": {
+          "@type": "Service",
+          "name": "Cash for Cars",
+          "description": "Instant cash offers for all makes and models in any condition"
+        }
+      },
+      {
+        "@type": "Offer",
+        "itemOffered": {
+          "@type": "Service",
+          "name": "Same-Day Car Removal",
+          "description": "Free car removal and towing across Sydney within 24 hours"
+        }
+      },
+      {
+        "@type": "Offer",
+        "itemOffered": {
+          "@type": "Service",
+          "name": "Instant Car Valuation",
+          "description": "Get a no-obligation cash quote within 5 minutes by phone or online"
+        }
+      },
+      {
+        "@type": "Offer",
+        "itemOffered": {
+          "@type": "Service",
+          "name": "Damaged Car Buyer",
+          "description": "We buy accident-damaged, non-running, and total write-off vehicles"
+        }
+      }
+    ]
+  },
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.8",
+    "reviewCount": "150"
+  },
+  "sameAs": [
+    "https://www.facebook.com/[your-facebook-page]",
+    "https://www.instagram.com/[your-instagram]",
+    "https://www.linkedin.com/company/[your-linkedin]",
+    "https://twitter.com/[your-twitter]"
+  ],
+  "founder": {
+    "@type": "Person",
+    "name": "[Founder name if applicable]"
+  },
+  "foundingDate": "[Year founded, e.g., 2015]",
+  "numberOfEmployees": {
+    "@type": "QuantitativeValue",
+    "value": "[Number of employees, e.g., 10-20]"
+  },
+  "slogan": "Sydney's Trusted Cash Car Buyer - Instant Quotes, Same-Day Service",
+  "paymentAccepted": "Cash, Bank Transfer",
+  "currenciesAccepted": "AUD"
+}

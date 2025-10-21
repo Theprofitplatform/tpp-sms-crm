@@ -1,0 +1,82 @@
+version: '3.8'
+
+# Development Docker Compose configuration
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  seo-automation:
+    build:
+      target: development
+
+    # Mount source code for live reload
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./logs:/app/logs
+
+    # Development environment
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+      - DRY_RUN=true
+
+    # Interactive mode
+    stdin_open: true
+    tty: true
+
+    # Override command for development
+    command: ["sh", "-c", "npm test && node index.js --mode=audit --max-posts=5"]
+
+    # Expose for debugging
+    ports:
+      - "9229:9229"  # Node.js debug port
+
+  # Optional: Local WordPress for testing
+  wordpress:
+    image: wordpress:latest
+    container_name: test-wordpress
+
+    environment:
+      - WORDPRESS_DB_HOST=db
+      - WORDPRESS_DB_NAME=wordpress
+      - WORDPRESS_DB_USER=wordpress
+      - WORDPRESS_DB_PASSWORD=wordpress
+
+    ports:
+      - "8080:80"
+
+    volumes:
+      - wordpress-data:/var/www/html
+
+    networks:
+      - seo-network
+
+    depends_on:
+      - db
+
+    profiles:
+      - test-env
+
+  # MySQL database for test WordPress
+  db:
+    image: mysql:8.0
+    container_name: test-db
+
+    environment:
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=wordpress
+      - MYSQL_PASSWORD=wordpress
+      - MYSQL_ROOT_PASSWORD=rootpassword
+
+    volumes:
+      - db-data:/var/lib/mysql
+
+    networks:
+      - seo-network
+
+    profiles:
+      - test-env
+
+volumes:
+  wordpress-data:
+  db-data:
