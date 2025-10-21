@@ -449,7 +449,7 @@ describe('Performance Monitor', () => {
 
     test('should measure duration even when function fails', async () => {
       const fn = async () => {
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise(resolve => setTimeout(resolve, 15));
         throw new Error('Test error');
       };
 
