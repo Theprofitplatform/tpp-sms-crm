@@ -6,6 +6,10 @@ compatibility_date = "2024-10-21"
 pages_build_output_dir = "web-dist"
 compatibility_flags = ["nodejs_compat"]
 
+# Pages Functions configuration
+# Functions in /functions directory will be deployed as Workers
+# Example: /functions/api/analyze-csv.js → /api/analyze-csv endpoint
+
 [env.production]
 name = "seo-reports-production"
 compatibility_flags = ["nodejs_compat"]

@@ -32,6 +32,10 @@
                     <span class="icon">📈</span>
                     Reports
                 </a>
+                <a href="#" class="nav-link" data-page="position-tracking">
+                    <span class="icon">📍</span>
+                    Position Tracking
+                </a>
                 <a href="#" class="nav-link" data-page="docs">
                     <span class="icon">📚</span>
                     Documentation
@@ -174,6 +178,92 @@
 
                 <div id="reports-list" class="reports-list">
                     <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Position Tracking Page -->
+            <div id="position-tracking-page" class="page">
+                <header class="page-header">
+                    <h2>Position Tracking Analysis</h2>
+                    <p>Upload and analyze SEMrush position tracking CSV files</p>
+                </header>
+
+                <div class="upload-section">
+                    <div class="upload-card">
+                        <h3>📊 Upload Position Tracking CSV</h3>
+                        <p class="upload-description">
+                            Upload your SEMrush position tracking CSV file to analyze rankings, 
+                            identify opportunities, and get actionable SEO recommendations.
+                        </p>
+                        <div class="file-upload-wrapper">
+                            <input type="file" id="csv-file-input" accept=".csv" style="display: none;" onchange="handleCSVUpload(event)">
+                            <button class="btn-upload" onclick="document.getElementById('csv-file-input').click()">
+                                <span class="icon">📁</span>
+                                Choose CSV File
+                            </button>
+                            <div id="file-name" class="file-name"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="analysis-results" class="analysis-results" style="display: none;">
+                    <div class="analysis-stats">
+                        <div class="analysis-stat-card">
+                            <div class="stat-icon">📍</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="total-keywords">-</div>
+                                <div class="stat-label">Total Keywords</div>
+                            </div>
+                        </div>
+                        <div class="analysis-stat-card success">
+                            <div class="stat-icon">🏆</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="top-10">-</div>
+                                <div class="stat-label">Top 10 Positions</div>
+                            </div>
+                        </div>
+                        <div class="analysis-stat-card warning">
+                            <div class="stat-icon">📉</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="declined">-</div>
+                                <div class="stat-label">Declined</div>
+                            </div>
+                        </div>
+                        <div class="analysis-stat-card info">
+                            <div class="stat-icon">🎯</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="opportunities">-</div>
+                                <div class="stat-label">Opportunities</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="analysis-sections">
+                        <div class="analysis-section">
+                            <h3>🔴 Critical Issues</h3>
+                            <div id="critical-issues" class="issue-list"></div>
+                        </div>
+
+                        <div class="analysis-section">
+                            <h3>🏆 Top Performers (Position 1-10)</h3>
+                            <div id="top-performers" class="keyword-list"></div>
+                        </div>
+
+                        <div class="analysis-section">
+                            <h3>🎯 High-Value Opportunities (Position 11-20)</h3>
+                            <div id="high-opportunities" class="keyword-list"></div>
+                        </div>
+
+                        <div class="analysis-section">
+                            <h3>📉 Recent Declines</h3>
+                            <div id="recent-declines" class="keyword-list"></div>
+                        </div>
+
+                        <div class="analysis-section">
+                            <h3>🤖 AI Overview Placements</h3>
+                            <div id="ai-overview" class="keyword-list"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

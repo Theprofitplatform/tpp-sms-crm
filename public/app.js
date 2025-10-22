@@ -444,3 +444,191 @@ document.addEventListener('click', (e) => {
         closeModal();
     }
 });
+
+// ============================================
+// Position Tracking CSV Analysis
+// ============================================
+
+async function handleCSVUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    document.getElementById('file-name').textContent = `📄 ${file.name}`;
+    
+    showModal('Analyzing CSV', 'Parsing and analyzing position tracking data...');
+
+    try {
+        const formData = new FormData();
+        formData.append('csv', file);
+
+        const response = await fetch('/api/analyze-csv', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            displayAnalysisResults(data.analysis);
+            closeModal();
+            showNotification('Analysis complete!');
+        } else {
+            updateModalTitle('❌ Analysis Failed');
+            updateModalMessage(data.error || 'Failed to analyze CSV');
+        }
+    } catch (error) {
+        updateModalTitle('❌ Error');
+        updateModalMessage('Error: ' + error.message);
+    }
+}
+
+function displayAnalysisResults(analysis) {
+    const resultsDiv = document.getElementById('analysis-results');
+    resultsDiv.style.display = 'block';
+
+    // Update stats
+    document.getElementById('total-keywords').textContent = analysis.stats.totalKeywords;
+    document.getElementById('top-10').textContent = analysis.stats.top10;
+    document.getElementById('declined').textContent = analysis.stats.declined;
+    document.getElementById('opportunities').textContent = analysis.stats.opportunities;
+
+    // Display critical issues
+    displayCriticalIssues(analysis.critical);
+
+    // Display top performers
+    displayTopPerformers(analysis.topPerformers);
+
+    // Display opportunities
+    displayOpportunities(analysis.opportunities);
+
+    // Display declines
+    displayDeclines(analysis.declines);
+
+    // Display AI Overview
+    displayAIOverview(analysis.aiOverview);
+}
+
+function displayCriticalIssues(issues) {
+    const container = document.getElementById('critical-issues');
+    
+    if (!issues || issues.length === 0) {
+        container.innerHTML = '<p class="text-success">✅ No critical issues detected</p>';
+        return;
+    }
+
+    container.innerHTML = issues.map(issue => `
+        <div class="issue-card critical">
+            <div class="issue-header">
+                <span class="issue-icon">🚨</span>
+                <strong>${issue.keyword || issue.issue}</strong>
+            </div>
+            <div class="issue-details">
+                ${issue.currentPosition ? `<span>Position: ${issue.currentPosition}</span>` : ''}
+                ${issue.volume ? `<span>Volume: ${issue.volume}/mo</span>` : ''}
+                ${issue.impact ? `<span>Impact: ${issue.impact}</span>` : ''}
+            </div>
+            <div class="issue-action">
+                <strong>Action:</strong> ${issue.action}
+            </div>
+        </div>
+    `).join('');
+}
+
+function displayTopPerformers(performers) {
+    const container = document.getElementById('top-performers');
+    
+    if (!performers || performers.length === 0) {
+        container.innerHTML = '<p class="text-warning">⚠️ No keywords in top 10 positions</p>';
+        return;
+    }
+
+    container.innerHTML = performers.slice(0, 10).map(kw => `
+        <div class="keyword-card success">
+            <div class="keyword-header">
+                <span class="keyword-name">${kw.keyword}</span>
+                <span class="position-badge top">#${kw.position}</span>
+            </div>
+            <div class="keyword-details">
+                <span>📊 Volume: ${kw.volume}/mo</span>
+                <span>🎯 Intent: ${kw.intent || 'N/A'}</span>
+            </div>
+            <div class="keyword-url">${kw.url}</div>
+        </div>
+    `).join('');
+}
+
+function displayOpportunities(opportunities) {
+    const container = document.getElementById('high-opportunities');
+    
+    if (!opportunities || opportunities.length === 0) {
+        container.innerHTML = '<p class="text-secondary">No high-value opportunities in positions 11-20</p>';
+        return;
+    }
+
+    container.innerHTML = opportunities.slice(0, 10).map(opp => `
+        <div class="keyword-card opportunity">
+            <div class="keyword-header">
+                <span class="keyword-name">${opp.keyword}</span>
+                <span class="position-badge">#${opp.position}</span>
+            </div>
+            <div class="keyword-details">
+                <span>📊 Volume: ${opp.volume}/mo</span>
+                ${opp.cpc ? `<span>💰 CPC: $${opp.cpc}</span>` : ''}
+                ${opp.potentialTraffic ? `<span>📈 Potential: +${opp.potentialTraffic} clicks/mo</span>` : ''}
+            </div>
+            <div class="keyword-action">
+                <strong>Action:</strong> ${opp.action}
+            </div>
+        </div>
+    `).join('');
+}
+
+function displayDeclines(declines) {
+    const container = document.getElementById('recent-declines');
+    
+    if (!declines || declines.length === 0) {
+        container.innerHTML = '<p class="text-success">✅ No significant position declines detected</p>';
+        return;
+    }
+
+    container.innerHTML = declines.map(decline => `
+        <div class="keyword-card decline">
+            <div class="keyword-header">
+                <span class="keyword-name">${decline.keyword}</span>
+                <span class="decline-badge">-${Math.abs(decline.change)} positions</span>
+            </div>
+            <div class="keyword-details">
+                <span>📍 Now at: #${decline.currentPosition}</span>
+                <span>📊 Volume: ${decline.volume}/mo</span>
+                ${decline.impact ? `<span>⚠️ Impact: ${decline.impact}</span>` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function displayAIOverview(aiKeywords) {
+    const container = document.getElementById('ai-overview');
+    
+    if (!aiKeywords || aiKeywords.length === 0) {
+        container.innerHTML = '<p class="text-secondary">No AI Overview placements detected in this dataset</p>';
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="ai-overview-summary">
+            <p class="text-success">✅ ${aiKeywords.length} keywords appearing in AI Overviews</p>
+        </div>
+        ${aiKeywords.map(kw => `
+            <div class="keyword-card ai-overview">
+                <div class="keyword-header">
+                    <span class="keyword-name">${kw.keyword}</span>
+                    <span class="ai-badge">🤖 AI Overview</span>
+                </div>
+                <div class="keyword-details">
+                    <span>📍 Position: #${kw.position}</span>
+                    <span>📊 Volume: ${kw.volume}/mo</span>
+                </div>
+            </div>
+        `).join('')}
+    `;
+}
