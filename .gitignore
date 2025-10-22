@@ -89,3 +89,5 @@ _analysis/
 *.tmp
 *.cache
 web-dist/
+/data/
+node_modules/

@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SEO Automation Dashboard</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
 <body>
     <div class="app">
@@ -24,12 +26,16 @@
                     <span class="icon">👥</span>
                     Clients
                 </a>
+                <a href="#" class="nav-link" data-page="analytics">
+                    <span class="icon">📈</span>
+                    Analytics
+                </a>
                 <a href="#" class="nav-link" data-page="operations">
                     <span class="icon">⚙️</span>
                     Operations
                 </a>
                 <a href="#" class="nav-link" data-page="reports">
-                    <span class="icon">📈</span>
+                    <span class="icon">📋</span>
                     Reports
                 </a>
                 <a href="#" class="nav-link" data-page="docs">
@@ -130,6 +136,122 @@
                 </div>
             </div>
 
+            <!-- Analytics Page -->
+            <div id="analytics-page" class="page">
+                <header class="page-header">
+                    <h2>Analytics & Insights</h2>
+                    <p>Track performance trends and client metrics over time</p>
+                </header>
+
+                <!-- Analytics Stats -->
+                <div class="stats-grid analytics-stats">
+                    <div class="stat-card info">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="analytics-total-audits">-</div>
+                            <div class="stat-label">Total Audits</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card success">
+                        <div class="stat-icon">📈</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="analytics-avg-score">-</div>
+                            <div class="stat-label">Avg Performance</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card warning">
+                        <div class="stat-icon">🔥</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="analytics-recent-audits">-</div>
+                            <div class="stat-label">Last 30 Days</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">⚡</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="analytics-optimizations">-</div>
+                            <div class="stat-label">Optimizations</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Section -->
+                <div class="charts-container">
+                    <!-- Performance Trends Chart -->
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3>Performance Trends</h3>
+                            <div class="chart-controls">
+                                <select id="trend-period" onchange="updateTrendChart()">
+                                    <option value="7">Last 7 Days</option>
+                                    <option value="30" selected>Last 30 Days</option>
+                                    <option value="90">Last 90 Days</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="performance-trend-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Client Comparison Chart -->
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3>Client Performance Comparison</h3>
+                            <div class="chart-controls">
+                                <button class="btn-chart-refresh" onclick="refreshCharts()">
+                                    <span class="icon">🔄</span> Refresh
+                                </button>
+                            </div>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="client-comparison-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Activity Timeline -->
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3>Activity Timeline</h3>
+                            <div class="chart-legend">
+                                <span class="legend-item"><span class="legend-color audit"></span> Audits</span>
+                                <span class="legend-item"><span class="legend-color optimization"></span> Optimizations</span>
+                            </div>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="activity-timeline-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Client Metrics Table -->
+                    <div class="chart-card full-width">
+                        <div class="chart-header">
+                            <h3>Client Metrics Summary</h3>
+                        </div>
+                        <div class="metrics-table-wrapper">
+                            <table class="metrics-table" id="client-metrics-table">
+                                <thead>
+                                    <tr>
+                                        <th>Client</th>
+                                        <th>Total Audits</th>
+                                        <th>Optimizations</th>
+                                        <th>Avg Score</th>
+                                        <th>Last Activity</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Operations Page -->
             <div id="operations-page" class="page">
                 <header class="page-header">
@@ -207,5 +329,6 @@
     </div>
 
     <script src="app.js"></script>
+    <script src="charts.js"></script>
 </body>
 </html>

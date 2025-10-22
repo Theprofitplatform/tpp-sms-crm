@@ -18,17 +18,22 @@
  */
 
 import express from 'express';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import historyDB from './src/database/history-db.js';
 
 const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer);
 const PORT = 3000;
 
 // Middleware
@@ -186,13 +191,50 @@ app.post('/api/audit/:clientId', async (req, res) => {
   const { clientId } = req.params;
 
   try {
+    const startTime = Date.now();
     const { stdout } = await execAsync(`node client-manager.js audit ${clientId}`);
+    const duration = Date.now() - startTime;
+
+    // Store audit in history
+    historyDB.addAuditRecord(clientId, {
+      type: 'audit',
+      success: true,
+      duration,
+      output: stdout.substring(0, 500) // Store first 500 chars
+    });
+
+    // Update client metrics
+    const metrics = historyDB.getClientMetrics(clientId) || {};
+    historyDB.updateClientMetrics(clientId, {
+      ...metrics,
+      totalAudits: (metrics.totalAudits || 0) + 1
+    });
+
+    // Broadcast real-time update
+    broadcastUpdate('audit-completed', {
+      clientId,
+      success: true,
+      timestamp: new Date().toISOString()
+    });
 
     res.json({
       success: true,
       output: stdout
     });
   } catch (error) {
+    // Store failed audit
+    historyDB.addAuditRecord(clientId, {
+      type: 'audit',
+      success: false,
+      error: error.message
+    });
+
+    broadcastUpdate('audit-failed', {
+      clientId,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+
     res.json({
       success: false,
       error: error.message,
@@ -206,13 +248,50 @@ app.post('/api/optimize/:clientId', async (req, res) => {
   const { clientId } = req.params;
 
   try {
+    const startTime = Date.now();
     const { stdout } = await execAsync(`node client-manager.js optimize ${clientId}`);
+    const duration = Date.now() - startTime;
+
+    // Store optimization in history
+    historyDB.addAuditRecord(clientId, {
+      type: 'optimization',
+      success: true,
+      duration,
+      output: stdout.substring(0, 500)
+    });
+
+    // Update client metrics
+    const metrics = historyDB.getClientMetrics(clientId) || {};
+    historyDB.updateClientMetrics(clientId, {
+      ...metrics,
+      totalOptimizations: (metrics.totalOptimizations || 0) + 1
+    });
+
+    // Broadcast real-time update
+    broadcastUpdate('optimization-completed', {
+      clientId,
+      success: true,
+      timestamp: new Date().toISOString()
+    });
 
     res.json({
       success: true,
       output: stdout
     });
   } catch (error) {
+    // Store failed optimization
+    historyDB.addAuditRecord(clientId, {
+      type: 'optimization',
+      success: false,
+      error: error.message
+    });
+
+    broadcastUpdate('optimization-failed', {
+      clientId,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+
     res.json({
       success: false,
       error: error.message,
@@ -346,14 +425,138 @@ app.post('/api/client/:clientId/status', (req, res) => {
   }
 });
 
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
+});
+
+// Broadcast real-time updates
+function broadcastUpdate(event, data) {
+  io.emit(event, data);
+}
+
+// Analytics API endpoints
+
+// Get analytics summary
+app.get('/api/analytics/summary', (req, res) => {
+  try {
+    const summary = historyDB.getAnalyticsSummary();
+    res.json({
+      success: true,
+      data: summary
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get client performance history
+app.get('/api/analytics/client/:clientId/performance', (req, res) => {
+  const { clientId } = req.params;
+  const limit = parseInt(req.query.limit) || 50;
+
+  try {
+    const history = historyDB.getClientPerformanceHistory(clientId, limit);
+    res.json({
+      success: true,
+      data: history
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get client audit history
+app.get('/api/analytics/client/:clientId/audits', (req, res) => {
+  const { clientId } = req.params;
+  const limit = parseInt(req.query.limit) || 50;
+
+  try {
+    const history = historyDB.getClientAuditHistory(clientId, limit);
+    res.json({
+      success: true,
+      data: history
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get all performance history
+app.get('/api/analytics/performance', (req, res) => {
+  const limit = parseInt(req.query.limit) || 100;
+
+  try {
+    const history = historyDB.getAllPerformanceHistory(limit);
+    res.json({
+      success: true,
+      data: history
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get daily stats history
+app.get('/api/analytics/daily-stats', (req, res) => {
+  const days = parseInt(req.query.days) || 30;
+
+  try {
+    const stats = historyDB.getDailyStatsHistory(days);
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get all client metrics
+app.get('/api/analytics/clients/metrics', (req, res) => {
+  try {
+    const metrics = historyDB.getAllClientMetrics();
+    res.json({
+      success: true,
+      data: metrics
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Start server
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log('');
   console.log('='.repeat(70));
   console.log('🚀 SEO Automation Dashboard Server');
   console.log('='.repeat(70));
   console.log('');
   console.log(`✅ Server running at: http://localhost:${PORT}`);
+  console.log('✅ Real-time updates: WebSocket enabled');
+  console.log('✅ Analytics API: Available');
   console.log('');
   console.log('Open your browser and navigate to the URL above');
   console.log('');
