@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SEO Automation Dashboard</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div class="app">
@@ -39,6 +40,14 @@
                 <a href="#" class="nav-link" data-page="gsc">
                     <span class="icon">🔍</span>
                     GSC Analytics
+                </a>
+                <a href="#" class="nav-link" data-page="local-seo">
+                    <span class="icon">🏪</span>
+                    Local SEO
+                </a>
+                <a href="#" class="nav-link" data-page="competitors">
+                    <span class="icon">🎯</span>
+                    Competitors
                 </a>
                 <a href="#" class="nav-link" data-page="docs">
                     <span class="icon">📚</span>
@@ -320,6 +329,217 @@
                 <div id="gsc-results" class="gsc-results" style="display: none;">
                     <h3>Results</h3>
                     <pre id="gsc-output"></pre>
+                </div>
+            </div>
+
+            <!-- Local SEO Page -->
+            <div id="local-seo-page" class="page">
+                <header class="page-header">
+                    <h2>🏪 Local SEO Automation</h2>
+                    <p>NAP consistency, schema markup, directory tracking, and review management</p>
+                </header>
+
+                <!-- Client Selector -->
+                <div class="control-section">
+                    <label for="local-seo-client-select">Select Client:</label>
+                    <select id="local-seo-client-select" onchange="loadLocalSEOData()">
+                        <option value="">-- Select Client --</option>
+                    </select>
+                    <button class="btn-primary" onclick="runLocalSEOAudit()">
+                        <span class="icon">🔄</span>
+                        Run Audit
+                    </button>
+                </div>
+
+                <!-- Loading State -->
+                <div id="local-seo-loading" class="loading" style="display: none;">
+                    <div class="loader"></div>
+                    <p>Loading Local SEO data...</p>
+                </div>
+
+                <!-- Main Dashboard -->
+                <div id="local-seo-dashboard" style="display: none;">
+                    <!-- Score Overview -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">📊</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="local-seo-nap-score">-</div>
+                                <div class="stat-label">NAP Consistency Score</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon">📋</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="local-seo-schema-status">-</div>
+                                <div class="stat-label">Schema Status</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon">⚠️</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="local-seo-issues-count">-</div>
+                                <div class="stat-label">Issues Found</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon">📂</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="local-seo-directories">-</div>
+                                <div class="stat-label">Directories Tracked</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- NAP Score Trend Chart -->
+                    <div class="chart-container">
+                        <h3>NAP Score Trend (90 Days)</h3>
+                        <canvas id="nap-trend-chart"></canvas>
+                    </div>
+
+                    <!-- Issues and Recommendations -->
+                    <div class="section-grid">
+                        <div class="section-card">
+                            <h3>🔴 Critical Issues</h3>
+                            <div id="local-seo-critical-issues" class="issue-list">
+                                <p class="no-data">No critical issues found</p>
+                            </div>
+                        </div>
+
+                        <div class="section-card">
+                            <h3>🎯 Recommendations</h3>
+                            <div id="local-seo-recommendations" class="recommendation-list">
+                                <p class="no-data">No recommendations available</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Directory Tracker -->
+                    <div class="section-card full-width">
+                        <h3>📂 Directory Submission Tracker</h3>
+                        <div id="local-seo-directories-list" class="directory-list">
+                            <p class="no-data">No directory data available</p>
+                        </div>
+                    </div>
+
+                    <!-- Schema Validation -->
+                    <div class="section-card full-width">
+                        <h3>📋 Schema Markup Validation</h3>
+                        <div id="local-seo-schema-details" class="schema-details">
+                            <p class="no-data">No schema data available</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Competitor Tracking Page -->
+            <div id="competitors-page" class="page">
+                <header class="page-header">
+                    <h2>🎯 Competitor Tracking</h2>
+                    <p>Automatic competitor discovery, ranking comparisons, and competitive intelligence</p>
+                </header>
+
+                <!-- Client Selector -->
+                <div class="control-section">
+                    <label for="competitors-client-select">Select Client:</label>
+                    <select id="competitors-client-select" onchange="loadCompetitorData()">
+                        <option value="">-- Select Client --</option>
+                    </select>
+                    <button class="btn-primary" onclick="runCompetitorAnalysis()">
+                        <span class="icon">🔄</span>
+                        Run Analysis
+                    </button>
+                </div>
+
+                <!-- Loading State -->
+                <div id="competitors-loading" class="loading" style="display: none;">
+                    <div class="loader"></div>
+                    <p>Running competitor analysis...</p>
+                </div>
+
+                <!-- Main Dashboard -->
+                <div id="competitors-dashboard" style="display: none;">
+                    <!-- Stats Overview -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">🏢</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="competitors-count">-</div>
+                                <div class="stat-label">Competitors Tracked</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card warning">
+                            <div class="stat-icon">🔔</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="competitors-alerts-count">-</div>
+                                <div class="stat-label">Active Alerts</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card info">
+                            <div class="stat-icon">📊</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="competitors-keywords-tracked">-</div>
+                                <div class="stat-label">Keywords Tracked</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card success">
+                            <div class="stat-icon">🎯</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="competitors-opportunities">-</div>
+                                <div class="stat-label">Opportunities</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Alerts Section -->
+                    <div class="section-card full-width">
+                        <h3>🔔 Active Alerts</h3>
+                        <div id="competitors-alerts-list" class="alerts-list">
+                            <p class="no-data">No active alerts</p>
+                        </div>
+                    </div>
+
+                    <!-- Competitors List -->
+                    <div class="section-card full-width">
+                        <h3>🏢 Tracked Competitors</h3>
+                        <div id="competitors-list" class="competitors-grid">
+                            <p class="no-data">No competitors tracked yet</p>
+                        </div>
+                    </div>
+
+                    <!-- Ranking Comparison Chart -->
+                    <div class="chart-container">
+                        <h3>📊 Ranking Positions Comparison</h3>
+                        <canvas id="competitors-ranking-chart"></canvas>
+                    </div>
+
+                    <!-- Gap Analysis -->
+                    <div class="section-card full-width">
+                        <h3>🎯 Content Gap Analysis</h3>
+                        <div id="competitors-gap-analysis" class="gap-analysis">
+                            <p class="no-data">Run analysis to see content gaps</p>
+                        </div>
+                    </div>
+
+                    <!-- Detailed Rankings Table -->
+                    <div class="section-card full-width">
+                        <h3>📈 Detailed Rankings</h3>
+                        <div class="table-controls">
+                            <input type="text" id="rankings-search" placeholder="Search keywords..." onkeyup="filterRankings()">
+                            <select id="rankings-competitor-filter" onchange="filterRankings()">
+                                <option value="">All Competitors</option>
+                            </select>
+                        </div>
+                        <div id="competitors-rankings-table" class="rankings-table">
+                            <p class="no-data">No ranking data available</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 

@@ -21,9 +21,15 @@ import express from 'express';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
+import { promises as fsPromises } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
+import { LocalSEOOrchestrator } from './src/automation/local-seo-orchestrator.js';
+import { LocalSEOReportGenerator } from './src/reports/local-seo-report-generator.js';
+import { CompetitorTracker } from './src/automation/competitor-tracker.js';
+import { GoogleSearchConsole } from './src/automation/google-search-console.js';
+import db from './src/database/index.js';
 
 const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
@@ -577,6 +583,394 @@ function analyzePositionTracking(csvContent) {
   };
 }
 
+// ============================================================================
+// LOCAL SEO ENDPOINTS
+// ============================================================================
+
+// Run Local SEO audit for a client
+app.post('/api/local-seo/:clientId/run', async (req, res) => {
+  const { clientId } = req.params;
+
+  try {
+    console.log(`Running Local SEO audit for ${clientId}...`);
+
+    // Load client config (from your existing client configs)
+    const clientConfigs = {
+      instantautotraders: {
+        id: 'instantautotraders',
+        businessName: 'Instant Auto Traders',
+        businessType: 'AutomotiveBusiness',
+        siteUrl: 'https://instantautotraders.com.au',
+        city: 'Sydney',
+        state: 'NSW',
+        country: 'AU'
+      },
+      hottyres: {
+        id: 'hottyres',
+        businessName: 'Hot Tyres',
+        businessType: 'AutomotiveBusiness',
+        siteUrl: 'https://hottyres.com.au',
+        city: 'Sydney',
+        state: 'NSW',
+        country: 'AU'
+      },
+      sadc: {
+        id: 'sadc',
+        businessName: 'SADC Disability Services',
+        businessType: 'LocalBusiness',
+        siteUrl: 'https://sadcdisabilityservices.com.au',
+        city: 'Sydney',
+        state: 'NSW',
+        country: 'AU'
+      }
+    };
+
+    const config = clientConfigs[clientId];
+    if (!config) {
+      return res.status(404).json({
+        success: false,
+        error: 'Client not found'
+      });
+    }
+
+    // Run Local SEO audit
+    const orchestrator = new LocalSEOOrchestrator(config);
+    const results = await orchestrator.runCompleteAudit();
+
+    // Store results in database
+    db.localSeoOps.recordScore(clientId, {
+      date: new Date().toISOString().split('T')[0],
+      napScore: results.tasks?.napConsistency?.score || 0,
+      hasSchema: results.tasks?.schema?.hasSchema || false,
+      directoriesSubmitted: 0, // Will be tracked separately
+      reviewsCount: 0, // Will be tracked separately
+      issuesFound: results.tasks?.napConsistency?.issues?.length || 0,
+      warningsFound: results.tasks?.napConsistency?.warnings?.length || 0,
+      metadata: results
+    });
+
+    // Generate HTML report
+    const reportGenerator = new LocalSEOReportGenerator(results, config);
+    const reportDir = path.join(__dirname, 'logs', 'local-seo', clientId);
+    await fs.mkdir(reportDir, { recursive: true });
+
+    const reportPath = path.join(reportDir, `report-${Date.now()}.html`);
+    await reportGenerator.generateHTMLReport(reportPath);
+
+    res.json({
+      success: true,
+      results,
+      reportPath: `/reports/local-seo/${clientId}/${path.basename(reportPath)}`
+    });
+
+  } catch (error) {
+    console.error('Local SEO error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get latest Local SEO score
+app.get('/api/local-seo/:clientId/latest', (req, res) => {
+  const { clientId } = req.params;
+
+  try {
+    const latest = db.localSeoOps.getLatest(clientId);
+
+    if (!latest) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'No Local SEO data yet. Run an audit first.'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        ...latest,
+        metadata: latest.metadata ? JSON.parse(latest.metadata) : null
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get Local SEO trend
+app.get('/api/local-seo/:clientId/trend', (req, res) => {
+  const { clientId } = req.params;
+  const { days = 90 } = req.query;
+
+  try {
+    const trend = db.localSeoOps.getTrend(clientId, parseInt(days));
+
+    res.json({
+      success: true,
+      data: trend.map(row => ({
+        date: row.date,
+        napScore: row.nap_score,
+        hasSchema: Boolean(row.has_schema),
+        directoriesSubmitted: row.directories_submitted,
+        reviewsCount: row.reviews_count
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get Local SEO history
+app.get('/api/local-seo/:clientId/history', (req, res) => {
+  const { clientId } = req.params;
+  const { limit = 30 } = req.query;
+
+  try {
+    const history = db.localSeoOps.getHistory(clientId, parseInt(limit));
+
+    res.json({
+      success: true,
+      data: history.map(row => ({
+        ...row,
+        metadata: row.metadata ? JSON.parse(row.metadata) : null
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// COMPETITOR TRACKING ENDPOINTS
+// ============================================================================
+
+import { CompetitorTracker } from './src/automation/competitor-tracker.js';
+import { GoogleSearchConsole } from './src/automation/google-search-console.js';
+
+// Run competitor tracking
+app.post('/api/competitors/:clientId/run', async (req, res) => {
+  const { clientId } = req.params;
+
+  try {
+    console.log(`Running competitor tracking for ${clientId}...`);
+
+    // Load client config
+    const clientConfigs = {
+      instantautotraders: {
+        id: 'instantautotraders',
+        businessName: 'Instant Auto Traders',
+        siteUrl: 'https://instantautotraders.com.au',
+        industry: 'automotive',
+        city: 'Sydney',
+        gscPropertyUrl: 'sc-domain:instantautotraders.com.au'
+      },
+      hottyres: {
+        id: 'hottyres',
+        businessName: 'Hot Tyres',
+        siteUrl: 'https://hottyres.com.au',
+        industry: 'automotive-services',
+        city: 'Sydney',
+        gscPropertyUrl: 'sc-domain:hottyres.com.au'
+      },
+      sadc: {
+        id: 'sadc',
+        businessName: 'SADC Disability Services',
+        siteUrl: 'https://sadcdisabilityservices.com.au',
+        industry: 'disability-services',
+        city: 'Sydney',
+        gscPropertyUrl: 'sc-domain:sadcdisabilityservices.com.au'
+      }
+    };
+
+    const config = clientConfigs[clientId];
+    if (!config) {
+      return res.status(404).json({
+        success: false,
+        error: 'Client not found'
+      });
+    }
+
+    // Fetch GSC data
+    let gscData = null;
+    try {
+      const gscClient = new GoogleSearchConsole(config.gscPropertyUrl);
+      gscData = await gscClient.getPerformanceData();
+    } catch (error) {
+      console.warn('GSC data unavailable:', error.message);
+    }
+
+    // Run competitor tracking
+    const tracker = new CompetitorTracker(config, gscData);
+    const results = await tracker.runCompleteAnalysis();
+
+    // Store competitor rankings in database
+    if (results.rankings) {
+      Object.entries(results.rankings).forEach(([keyword, data]) => {
+        data.competitors.forEach(comp => {
+          db.competitorOps.recordRanking(clientId, {
+            competitorDomain: comp.domain,
+            competitorName: comp.name,
+            keyword,
+            yourPosition: data.yourPosition,
+            theirPosition: comp.position,
+            searchVolume: null,
+            date: new Date().toISOString().split('T')[0],
+            metadata: { snippet: comp.snippet }
+          });
+        });
+      });
+    }
+
+    // Store alerts
+    if (results.alerts) {
+      results.alerts.forEach(alert => {
+        db.competitorOps.createAlert(clientId, {
+          competitorDomain: alert.competitor || 'unknown',
+          type: alert.type || 'RANKING_GAP',
+          severity: alert.severity,
+          keyword: alert.keyword || null,
+          message: alert.message,
+          recommendation: alert.recommendation || null
+        });
+      });
+    }
+
+    res.json({
+      success: true,
+      results
+    });
+
+  } catch (error) {
+    console.error('Competitor tracking error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get competitors list
+app.get('/api/competitors/:clientId/list', (req, res) => {
+  const { clientId } = req.params;
+
+  try {
+    const competitors = db.competitorOps.getCompetitorsList(clientId);
+
+    res.json({
+      success: true,
+      data: competitors
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get competitor rankings
+app.get('/api/competitors/:clientId/rankings', (req, res) => {
+  const { clientId } = req.params;
+  const { competitor = null, limit = 100 } = req.query;
+
+  try {
+    const rankings = db.competitorOps.getRankings(
+      clientId,
+      competitor,
+      parseInt(limit)
+    );
+
+    res.json({
+      success: true,
+      data: rankings.map(row => ({
+        ...row,
+        metadata: row.metadata ? JSON.parse(row.metadata) : null
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get competitor alerts
+app.get('/api/competitors/:clientId/alerts', (req, res) => {
+  const { clientId } = req.params;
+
+  try {
+    const alerts = db.competitorOps.getOpenAlerts(clientId);
+
+    res.json({
+      success: true,
+      data: alerts
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Resolve competitor alert
+app.put('/api/competitors/:clientId/alerts/:alertId/resolve', (req, res) => {
+  const { alertId } = req.params;
+
+  try {
+    db.competitorOps.resolveAlert(parseInt(alertId));
+
+    res.json({
+      success: true,
+      message: 'Alert resolved'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// ENHANCED DASHBOARD ENDPOINTS
+// ============================================================================
+
+// Get comprehensive client dashboard data
+app.get('/api/dashboard/:clientId/complete', (req, res) => {
+  const { clientId } = req.params;
+  const { days = 30 } = req.query;
+
+  try {
+    const dashboardData = db.analytics.getClientDashboard(clientId, parseInt(days));
+
+    res.json({
+      success: true,
+      data: dashboardData
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Serve Local SEO reports
+app.use('/reports/local-seo', express.static(path.join(__dirname, 'logs', 'local-seo')));
+
 // Start server
 app.listen(PORT, () => {
   console.log('');
@@ -585,6 +979,11 @@ app.listen(PORT, () => {
   console.log('='.repeat(70));
   console.log('');
   console.log(`✅ Server running at: http://localhost:${PORT}`);
+  console.log('');
+  console.log('📊 New Features Available:');
+  console.log('   → Local SEO: /api/local-seo/:clientId/run');
+  console.log('   → Competitors: /api/competitors/:clientId/run');
+  console.log('   → Complete Dashboard: /api/dashboard/:clientId/complete');
   console.log('');
   console.log('Open your browser and navigate to the URL above');
   console.log('');
