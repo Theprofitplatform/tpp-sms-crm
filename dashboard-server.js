@@ -1141,6 +1141,245 @@ app.get('/api/auto-fix/nap/:clientId/history', (req, res) => {
 });
 
 // ============================================
+// Schema Auto-Inject API
+// ============================================
+
+/**
+ * POST /api/auto-fix/schema/:clientId/detect
+ * Detect existing schema on the site
+ */
+app.post('/api/auto-fix/schema/:clientId/detect', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    const { SchemaAutoInjector } = await import('./src/automation/auto-fixers/schema-injector.js');
+
+    const config = {
+      id: clientId,
+      businessName: req.body.businessName || 'Client',
+      businessType: req.body.businessType || 'LocalBusiness',
+      businessDescription: req.body.businessDescription,
+      siteUrl: req.body.siteUrl,
+      address: req.body.address,
+      city: req.body.city,
+      state: req.body.state,
+      country: req.body.country || 'AU',
+      phone: req.body.phone,
+      email: req.body.email,
+      geo: req.body.geo,
+      socialProfiles: req.body.socialProfiles,
+      logo: req.body.logo,
+      priceRange: req.body.priceRange,
+      openingHours: req.body.openingHours,
+      wpUser: req.body.wpUser,
+      wpPassword: req.body.wpPassword
+    };
+
+    const injector = new SchemaAutoInjector(config);
+    const existing = await injector.detectExistingSchema();
+
+    // Check if needs update
+    let needsUpdate = false;
+    if (existing.found) {
+      needsUpdate = await injector.needsUpdate(existing);
+    }
+
+    res.json({
+      success: true,
+      clientId,
+      data: {
+        ...existing,
+        needsUpdate
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Schema detection error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/auto-fix/schema/:clientId/inject
+ * Inject or update schema markup
+ */
+app.post('/api/auto-fix/schema/:clientId/inject', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    const { SchemaAutoInjector } = await import('./src/automation/auto-fixers/schema-injector.js');
+
+    const config = {
+      id: clientId,
+      businessName: req.body.businessName || 'Client',
+      businessType: req.body.businessType || 'LocalBusiness',
+      businessDescription: req.body.businessDescription,
+      siteUrl: req.body.siteUrl,
+      address: req.body.address,
+      city: req.body.city,
+      state: req.body.state,
+      country: req.body.country || 'AU',
+      phone: req.body.phone,
+      email: req.body.email,
+      geo: req.body.geo,
+      socialProfiles: req.body.socialProfiles,
+      logo: req.body.logo,
+      priceRange: req.body.priceRange,
+      openingHours: req.body.openingHours,
+      wpUser: req.body.wpUser,
+      wpPassword: req.body.wpPassword
+    };
+
+    const injector = new SchemaAutoInjector(config);
+    const results = await injector.runAutoInject();
+
+    res.json({
+      success: results.success,
+      clientId,
+      data: results
+    });
+
+  } catch (error) {
+    console.error('❌ Schema injection error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/auto-fix/schema/:clientId/update
+ * Update existing schema if client data changed
+ */
+app.post('/api/auto-fix/schema/:clientId/update', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    const { SchemaAutoInjector } = await import('./src/automation/auto-fixers/schema-injector.js');
+
+    const config = {
+      id: clientId,
+      businessName: req.body.businessName || 'Client',
+      businessType: req.body.businessType || 'LocalBusiness',
+      businessDescription: req.body.businessDescription,
+      siteUrl: req.body.siteUrl,
+      address: req.body.address,
+      city: req.body.city,
+      state: req.body.state,
+      country: req.body.country || 'AU',
+      phone: req.body.phone,
+      email: req.body.email,
+      geo: req.body.geo,
+      socialProfiles: req.body.socialProfiles,
+      logo: req.body.logo,
+      priceRange: req.body.priceRange,
+      openingHours: req.body.openingHours,
+      wpUser: req.body.wpUser,
+      wpPassword: req.body.wpPassword
+    };
+
+    const injector = new SchemaAutoInjector(config);
+    const result = await injector.updateSchema();
+
+    res.json({
+      success: true,
+      clientId,
+      data: result
+    });
+
+  } catch (error) {
+    console.error('❌ Schema update error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/auto-fix/schema/:clientId/rollback
+ * Rollback schema changes using backup
+ */
+app.post('/api/auto-fix/schema/:clientId/rollback', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { backupId, ...config } = req.body;
+
+    if (!backupId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Backup ID is required'
+      });
+    }
+
+    const { SchemaAutoInjector } = await import('./src/automation/auto-fixers/schema-injector.js');
+
+    const schemaConfig = {
+      id: clientId,
+      businessName: config.businessName || 'Client',
+      siteUrl: config.siteUrl,
+      wpUser: config.wpUser,
+      wpPassword: config.wpPassword,
+      ...config
+    };
+
+    const injector = new SchemaAutoInjector(schemaConfig);
+    const result = await injector.rollback(backupId);
+
+    res.json({
+      success: result.success,
+      clientId,
+      backupId,
+      data: result
+    });
+
+  } catch (error) {
+    console.error('❌ Schema rollback error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/auto-fix/schema/:clientId/history
+ * Get schema injection history for a client
+ */
+app.get('/api/auto-fix/schema/:clientId/history', (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const limit = parseInt(req.query.limit) || 20;
+
+    const stmt = db.db.prepare(`
+      SELECT * FROM auto_fix_actions
+      WHERE client_id = ? AND fix_type LIKE 'schema%'
+      ORDER BY created_at DESC
+      LIMIT ?
+    `);
+
+    const history = stmt.all(clientId, limit);
+
+    res.json({
+      success: true,
+      clientId,
+      data: history,
+      count: history.length
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================
 // Bridge API - Connect SEO Expert ↔ SEO Analyst
 // ============================================
 
