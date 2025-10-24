@@ -969,6 +969,178 @@ app.get('/api/dashboard/:clientId/complete', (req, res) => {
 });
 
 // ============================================
+// NAP Auto-Fix API
+// ============================================
+
+/**
+ * POST /api/auto-fix/nap/:clientId/detect
+ * Detect NAP inconsistencies without making changes
+ */
+app.post('/api/auto-fix/nap/:clientId/detect', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    // Import NAP Auto-Fixer
+    const { NAPAutoFixer } = await import('./src/automation/auto-fixers/nap-fixer.js');
+
+    // Get client config (you'll need to have these available)
+    const config = {
+      id: clientId,
+      businessName: req.body.businessName || 'Client',
+      siteUrl: req.body.siteUrl,
+      address: req.body.address,
+      city: req.body.city,
+      state: req.body.state,
+      country: req.body.country,
+      phone: req.body.phone,
+      email: req.body.email,
+      wpUser: req.body.wpUser,
+      wpPassword: req.body.wpPassword
+    };
+
+    const fixer = new NAPAutoFixer(config);
+    const results = await fixer.detectInconsistencies();
+
+    res.json({
+      success: true,
+      clientId,
+      data: results
+    });
+
+  } catch (error) {
+    console.error('❌ NAP detection error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/auto-fix/nap/:clientId/run
+ * Run NAP auto-fix
+ */
+app.post('/api/auto-fix/nap/:clientId/run', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    // Import NAP Auto-Fixer
+    const { NAPAutoFixer } = await import('./src/automation/auto-fixers/nap-fixer.js');
+
+    // Get client config
+    const config = {
+      id: clientId,
+      businessName: req.body.businessName || 'Client',
+      siteUrl: req.body.siteUrl,
+      address: req.body.address,
+      city: req.body.city,
+      state: req.body.state,
+      country: req.body.country,
+      phone: req.body.phone,
+      email: req.body.email,
+      wpUser: req.body.wpUser,
+      wpPassword: req.body.wpPassword
+    };
+
+    const fixer = new NAPAutoFixer(config);
+    const results = await fixer.runAutoFix();
+
+    res.json({
+      success: results.success,
+      clientId,
+      data: results
+    });
+
+  } catch (error) {
+    console.error('❌ NAP auto-fix error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/auto-fix/nap/:clientId/rollback
+ * Rollback NAP changes using backup
+ */
+app.post('/api/auto-fix/nap/:clientId/rollback', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { backupId, ...config } = req.body;
+
+    if (!backupId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Backup ID is required'
+      });
+    }
+
+    // Import NAP Auto-Fixer
+    const { NAPAutoFixer } = await import('./src/automation/auto-fixers/nap-fixer.js');
+
+    const napConfig = {
+      id: clientId,
+      businessName: config.businessName || 'Client',
+      siteUrl: config.siteUrl,
+      wpUser: config.wpUser,
+      wpPassword: config.wpPassword,
+      ...config
+    };
+
+    const fixer = new NAPAutoFixer(napConfig);
+    const result = await fixer.rollback(backupId);
+
+    res.json({
+      success: result.success,
+      clientId,
+      backupId,
+      data: result
+    });
+
+  } catch (error) {
+    console.error('❌ NAP rollback error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/auto-fix/nap/:clientId/history
+ * Get NAP auto-fix history for a client
+ */
+app.get('/api/auto-fix/nap/:clientId/history', (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const limit = parseInt(req.query.limit) || 20;
+
+    const stmt = db.db.prepare(`
+      SELECT * FROM auto_fix_actions
+      WHERE client_id = ? AND fix_type LIKE 'nap%'
+      ORDER BY created_at DESC
+      LIMIT ?
+    `);
+
+    const history = stmt.all(clientId, limit);
+
+    res.json({
+      success: true,
+      clientId,
+      data: history,
+      count: history.length
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================
 // Bridge API - Connect SEO Expert ↔ SEO Analyst
 // ============================================
 
