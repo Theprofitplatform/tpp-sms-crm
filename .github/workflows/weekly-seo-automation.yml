@@ -122,6 +122,19 @@ jobs:
             automation-${{ matrix.client }}.log
           retention-days: 90
 
+      - name: Send Email Notification
+        if: always()
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          NOTIFICATION_EMAIL: abhishekmaharjan3737@gmail.com
+        run: |
+          node src/notifications/send-workflow-notification.js \
+            --client="${{ matrix.client }}" \
+            --status="${{ steps.automation.outputs.success }}" \
+            --run-url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --run-number="${{ github.run_number }}" \
+            --duration="3m" || echo "Email notification failed (non-critical)"
+
       - name: Clean up sensitive files
         if: always()
         run: |
