@@ -1,0 +1,164 @@
+name: Weekly SEO Automation
+
+on:
+  # Run every Monday at 9:00 AM UTC
+  schedule:
+    - cron: '0 9 * * 1'
+
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      client:
+        description: 'Client to run (or "all" for all clients)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - instantautotraders
+          - hottyres
+          - sadcdisabilityservices
+          - theprofitplatform
+      dryRun:
+        description: 'Dry run mode (no actual changes)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  seo-automation:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        client: [instantautotraders, hottyres, sadcdisabilityservices]
+      fail-fast: false  # Continue even if one client fails
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create config directory
+        run: mkdir -p config/google config/env
+
+      - name: Setup Google Service Account
+        env:
+          GSC_SERVICE_ACCOUNT: ${{ secrets.GSC_SERVICE_ACCOUNT }}
+        run: |
+          echo "$GSC_SERVICE_ACCOUNT" > config/google/service-account.json
+
+      - name: Setup environment variables
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          IAT_WP_USER: ${{ secrets.IAT_WP_USER }}
+          IAT_WP_PASSWORD: ${{ secrets.IAT_WP_PASSWORD }}
+          HOTTYRES_WP_USER: ${{ secrets.HOTTYRES_WP_USER }}
+          HOTTYRES_WP_PASSWORD: ${{ secrets.HOTTYRES_WP_PASSWORD }}
+          SADC_WP_USER: ${{ secrets.SADC_WP_USER }}
+          SADC_WP_PASSWORD: ${{ secrets.SADC_WP_PASSWORD }}
+        run: |
+          cat > .env <<EOF
+          ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
+          OPENAI_API_KEY=$OPENAI_API_KEY
+          IAT_WP_USER=$IAT_WP_USER
+          IAT_WP_PASSWORD=$IAT_WP_PASSWORD
+          HOTTYRES_WP_USER=$HOTTYRES_WP_USER
+          HOTTYRES_WP_PASSWORD=$HOTTYRES_WP_PASSWORD
+          SADC_WP_USER=$SADC_WP_USER
+          SADC_WP_PASSWORD=$SADC_WP_PASSWORD
+          EOF
+
+      - name: Run SEO Automation for ${{ matrix.client }}
+        id: automation
+        continue-on-error: true
+        run: |
+          echo "Running automation for ${{ matrix.client }}..."
+          node run-automation.js ${{ matrix.client }} | tee automation-${{ matrix.client }}.log
+
+          # Check if automation succeeded
+          if [ ${PIPESTATUS[0]} -eq 0 ]; then
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate Summary Report
+        if: always()
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          ## SEO Automation Report - ${{ matrix.client }}
+
+          **Date:** $(date -u +"%Y-%m-%d %H:%M UTC")
+          **Status:** ${{ steps.automation.outputs.success == 'true' && '✅ Success' || '❌ Failed' }}
+
+          ### Log Output
+          \`\`\`
+          $(tail -50 automation-${{ matrix.client }}.log)
+          \`\`\`
+
+          ### Generated Files
+          \`\`\`
+          $(ls -lh logs/clients/${{ matrix.client }}/ 2>/dev/null || echo "No files generated")
+          \`\`\`
+          EOF
+
+      - name: Upload logs and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: seo-reports-${{ matrix.client }}-${{ github.run_number }}
+          path: |
+            logs/clients/${{ matrix.client }}/
+            automation-${{ matrix.client }}.log
+          retention-days: 90
+
+      - name: Clean up sensitive files
+        if: always()
+        run: |
+          rm -f .env
+          rm -f config/google/service-account.json
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::warning::SEO automation failed for ${{ matrix.client }}"
+          echo "Check the logs artifact for details"
+
+  summary:
+    needs: seo-automation
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Create Overall Summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          # 📊 Weekly SEO Automation Complete
+
+          **Run Date:** $(date -u +"%Y-%m-%d %H:%M UTC")
+          **Workflow:** ${{ github.workflow }}
+          **Run Number:** #${{ github.run_number }}
+
+          ## Results
+          - Check individual job results above
+          - Download artifacts to view full reports
+          - Backup files are preserved in artifacts for 90 days
+
+          ## Next Steps
+          1. Review generated reports in artifacts
+          2. Check for any failed jobs
+          3. Monitor client rankings in dashboards
+
+          ---
+          *Automated by GitHub Actions*
+          EOF
