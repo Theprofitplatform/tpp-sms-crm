@@ -17,7 +17,7 @@ on:
           - all
           - instantautotraders
           - hottyres
-          - sadcdisabilityservices
+          - sadc
           - theprofitplatform
       dryRun:
         description: 'Dry run mode (no actual changes)'
@@ -31,7 +31,7 @@ jobs:
 
     strategy:
       matrix:
-        client: [instantautotraders, hottyres, sadcdisabilityservices]
+        client: [instantautotraders, hottyres, sadc]
       fail-fast: false  # Continue even if one client fails
 
     steps:
