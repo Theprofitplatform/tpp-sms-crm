@@ -544,15 +544,16 @@ export const competitorOps = {
   getCompetitorsList(clientId) {
     const stmt = db.prepare(`
       SELECT
-        competitor_domain,
-        competitor_name,
-        COUNT(DISTINCT keyword) as keywords_tracked,
-        AVG(their_position) as avg_position,
-        MAX(date) as last_checked
+        competitor_domain as domain,
+        competitor_name as name,
+        COUNT(DISTINCT keyword) as keywordsTracked,
+        AVG(their_position) as avgPosition,
+        MAX(date) as lastChecked,
+        SUM(CASE WHEN your_position > their_position THEN 1 ELSE 0 END) as outrankingCount
       FROM competitor_rankings
       WHERE client_id = ?
       GROUP BY competitor_domain
-      ORDER BY keywords_tracked DESC
+      ORDER BY keywordsTracked DESC
     `);
     return stmt.all(clientId);
   },
@@ -567,7 +568,7 @@ export const competitorOps = {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
-    return stmt.run(
+    const result = stmt.run(
       clientId,
       alert.competitorDomain,
       alert.type,
@@ -576,6 +577,8 @@ export const competitorOps = {
       alert.message,
       alert.recommendation || null
     );
+
+    return result.lastInsertRowid;
   },
 
   /**
@@ -848,6 +851,13 @@ export const logsOps = {
   },
 
   /**
+   * Alias for add() - more semantic naming
+   */
+  log(level, category, message, metadata = null) {
+    return this.add(level, category, message, metadata);
+  },
+
+  /**
    * Get recent logs
    */
   getRecent(limit = 100, level = null) {
@@ -866,6 +876,9 @@ export const logsOps = {
     return stmt.all(...params);
   }
 };
+
+// Alias for more semantic naming
+export const systemOps = logsOps;
 
 /**
  * Reports Operations
@@ -975,6 +988,7 @@ export default {
   gscOps,
   autoFixOps,
   logsOps,
+  systemOps,
   reportsOps,
   analytics,
   db
