@@ -1,0 +1,274 @@
+name: Enhanced SEO Automation (Local SEO + Competitors)
+
+on:
+  # Run on the first Monday of each month at 9:00 AM UTC
+  schedule:
+    - cron: '0 9 1 * *'
+
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      client:
+        description: 'Client to run (or "all" for all clients)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - instantautotraders
+          - hottyres
+          - sadc
+      mode:
+        description: 'Automation mode'
+        required: false
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - local-seo-only
+          - competitors-only
+
+jobs:
+  enhanced-automation:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        client: [instantautotraders, hottyres, sadc]
+      fail-fast: false  # Continue even if one client fails
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create config directory
+        run: mkdir -p config/google config/env logs/enhanced-automation
+
+      - name: Setup Google Service Account
+        env:
+          GSC_SERVICE_ACCOUNT: ${{ secrets.GSC_SERVICE_ACCOUNT }}
+        run: |
+          echo "$GSC_SERVICE_ACCOUNT" > config/google/service-account.json
+
+      - name: Setup environment variables
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          IAT_WP_USER: ${{ secrets.IAT_WP_USER }}
+          IAT_WP_PASSWORD: ${{ secrets.IAT_WP_PASSWORD }}
+          HOTTYRES_WP_USER: ${{ secrets.HOTTYRES_WP_USER }}
+          HOTTYRES_WP_PASSWORD: ${{ secrets.HOTTYRES_WP_PASSWORD }}
+          SADC_WP_USER: ${{ secrets.SADC_WP_USER }}
+          SADC_WP_PASSWORD: ${{ secrets.SADC_WP_PASSWORD }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: |
+          cat > config/env/.env <<EOF
+          ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
+          OPENAI_API_KEY=$OPENAI_API_KEY
+          IAT_WP_USER=$IAT_WP_USER
+          IAT_WP_PASSWORD=$IAT_WP_PASSWORD
+          HOTTYRES_WP_USER=$HOTTYRES_WP_USER
+          HOTTYRES_WP_PASSWORD=$HOTTYRES_WP_PASSWORD
+          SADC_WP_USER=$SADC_WP_USER
+          SADC_WP_PASSWORD=$SADC_WP_PASSWORD
+          RESEND_API_KEY=$RESEND_API_KEY
+          EOF
+
+      - name: Run Enhanced Automation for ${{ matrix.client }}
+        id: automation
+        continue-on-error: true
+        run: |
+          echo "Running enhanced automation for ${{ matrix.client }}..."
+
+          # Determine mode flags
+          MODE_FLAGS=""
+          if [ "${{ github.event.inputs.mode }}" = "local-seo-only" ]; then
+            MODE_FLAGS="--local-seo-only"
+          elif [ "${{ github.event.inputs.mode }}" = "competitors-only" ]; then
+            MODE_FLAGS="--competitors-only"
+          fi
+
+          # Run automation
+          node run-enhanced-automation.js ${{ matrix.client }} $MODE_FLAGS | tee automation-${{ matrix.client }}.log
+
+          # Check if automation succeeded
+          if [ ${PIPESTATUS[0]} -eq 0 ]; then
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate Summary Report
+        if: always()
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          ## Enhanced SEO Automation Report - ${{ matrix.client }}
+
+          **Date:** $(date -u +"%Y-%m-%d %H:%M UTC")
+          **Status:** ${{ steps.automation.outputs.success == 'true' && '✅ Success' || '❌ Failed' }}
+          **Mode:** ${{ github.event.inputs.mode || 'full' }}
+
+          ### Features Included
+          - 🏪 Local SEO Automation
+          - 🎯 Competitor Tracking
+          - 📊 Advanced Analytics
+
+          ### Log Output
+          \`\`\`
+          $(tail -100 automation-${{ matrix.client }}.log)
+          \`\`\`
+
+          ### Generated Reports
+          \`\`\`
+          $(ls -lh logs/enhanced-automation/${{ matrix.client }}/ 2>/dev/null || echo "No files generated")
+          \`\`\`
+          EOF
+
+      - name: Upload reports and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: enhanced-reports-${{ matrix.client }}-${{ github.run_number }}
+          path: |
+            logs/enhanced-automation/${{ matrix.client }}/
+            automation-${{ matrix.client }}.log
+          retention-days: 90
+
+      - name: Send Email Notification
+        if: always()
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          NOTIFICATION_EMAIL: abhishekmaharjan3737@gmail.com
+        run: |
+          # Create enhanced notification email
+          node -e "
+          const fs = require('fs');
+          const path = require('path');
+
+          const client = '${{ matrix.client }}';
+          const success = '${{ steps.automation.outputs.success }}' === 'true';
+          const runUrl = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}';
+          const runNumber = '${{ github.run_number }}';
+
+          const statusIcon = success ? '✅' : '❌';
+          const statusText = success ? 'SUCCESS' : 'FAILED';
+
+          // Read summary if available
+          const summaryPath = path.join('logs', 'enhanced-automation', client);
+          let metrics = '';
+          try {
+            const files = fs.readdirSync(summaryPath);
+            metrics = '📊 Reports generated and available in artifacts';
+          } catch(e) {
+            metrics = 'See logs for details';
+          }
+
+          const emailData = {
+            from: 'SEO Automation <noreply@seo-automation.com>',
+            to: process.env.NOTIFICATION_EMAIL,
+            subject: \`\${statusIcon} Enhanced SEO Automation - \${client} (Run #\${runNumber})\`,
+            html: \`
+              <h2>\${statusIcon} Enhanced SEO Automation Report</h2>
+              <p><strong>Client:</strong> \${client}</p>
+              <p><strong>Status:</strong> \${statusText}</p>
+              <p><strong>Run Number:</strong> #\${runNumber}</p>
+
+              <h3>Features Included:</h3>
+              <ul>
+                <li>🏪 Local SEO: NAP consistency, Schema markup, Directory tracking</li>
+                <li>🎯 Competitor Tracking: Rankings, Alerts, Gap analysis</li>
+                <li>📊 Advanced Analytics & Reporting</li>
+              </ul>
+
+              <p>\${metrics}</p>
+
+              <p><a href=\"\${runUrl}\">View Full Logs →</a></p>
+
+              <hr>
+              <p style=\"font-size: 0.9em; color: #666;\">
+                🤖 Generated with Claude Code<br>
+                Co-Authored-By: Claude &lt;noreply@anthropic.com&gt;
+              </p>
+            \`
+          };
+
+          console.log(JSON.stringify(emailData));
+          " > email-data.json
+
+          # Send via curl to Resend API
+          curl -X POST "https://api.resend.com/emails" \
+            -H "Authorization: Bearer \$RESEND_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d @email-data.json || echo "Email notification failed (non-critical)"
+
+      - name: Clean up sensitive files
+        if: always()
+        run: |
+          rm -f config/env/.env
+          rm -f config/google/service-account.json
+          rm -f email-data.json
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::warning::Enhanced automation failed for ${{ matrix.client }}"
+          echo "Check the logs artifact for details"
+
+  summary:
+    needs: enhanced-automation
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Create Overall Summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          # 📊 Enhanced SEO Automation Complete
+
+          **Run Date:** $(date -u +"%Y-%m-%d %H:%M UTC")
+          **Workflow:** ${{ github.workflow }}
+          **Run Number:** #${{ github.run_number }}
+          **Mode:** ${{ github.event.inputs.mode || 'full' }}
+
+          ## Features Included
+          - 🏪 **Local SEO Automation**
+            - NAP consistency checks
+            - Local business schema validation
+            - Directory submission tracking
+            - Review request templates
+
+          - 🎯 **Competitor Tracking**
+            - Automatic competitor discovery
+            - Keyword ranking comparisons
+            - Competitive alerts
+            - Content gap analysis
+
+          - 📊 **Advanced Reporting**
+            - HTML reports with visualizations
+            - Actionable recommendations
+            - Priority-based action items
+
+          ## Results
+          - Check individual job results above
+          - Download artifacts to view full reports
+          - HTML reports available in artifacts
+          - All data preserved for 90 days
+
+          ## Next Steps
+          1. Review generated HTML reports in artifacts
+          2. Address high-priority recommendations
+          3. Monitor competitive position changes
+          4. Complete directory submissions from tracker
+
+          ---
+          *Automated by GitHub Actions - Enhanced SEO Automation System*
+          EOF
