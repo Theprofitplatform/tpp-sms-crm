@@ -19,6 +19,7 @@ import { LocalSEOOrchestrator } from './src/automation/local-seo-orchestrator.js
 import { CompetitorTracker } from './src/automation/competitor-tracker.js';
 import { GoogleSearchConsole } from './src/automation/google-search-console.js';
 import { LocalSEOReportGenerator } from './src/reports/local-seo-report-generator.js';
+import bridgeClient from './src/automation/bridge-client.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -178,6 +179,15 @@ async function runEnhancedAutomation(clientId = null, options = {}) {
 
           console.log('\n   ✅ Local SEO automation complete');
 
+          // Send results to Bridge API
+          try {
+            console.log('   🔗 Sending Local SEO results to Bridge API...');
+            await bridgeClient.sendLocalSEOResults(config.id, localSeoResults);
+            console.log('   ✅ Results stored in database');
+          } catch (bridgeError) {
+            console.log(`   ⚠️  Bridge API warning: ${bridgeError.message}`);
+          }
+
         } catch (error) {
           console.error(`\n   ❌ Local SEO error: ${error.message}`);
           clientResult.features.localSeo = {
@@ -207,6 +217,15 @@ async function runEnhancedAutomation(clientId = null, options = {}) {
           };
 
           console.log('\n   ✅ Competitor tracking complete');
+
+          // Send results to Bridge API
+          try {
+            console.log('   🔗 Sending Competitor results to Bridge API...');
+            await bridgeClient.sendCompetitorResults(config.id, competitorResults);
+            console.log('   ✅ Results stored in database');
+          } catch (bridgeError) {
+            console.log(`   ⚠️  Bridge API warning: ${bridgeError.message}`);
+          }
 
         } catch (error) {
           console.error(`\n   ❌ Competitor tracking error: ${error.message}`);

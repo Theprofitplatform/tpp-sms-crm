@@ -274,6 +274,63 @@ export const clientOps = {
   getActive() {
     const stmt = db.prepare('SELECT * FROM clients WHERE status = ? ORDER BY name');
     return stmt.all('active');
+  },
+
+  /**
+   * Record optimization for a client
+   */
+  recordOptimization(clientId, optimization) {
+    const stmt = db.prepare(`
+      INSERT INTO optimization_history
+      (client_id, date, type, target, before_value, after_value, impact_score, status, metadata)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const result = stmt.run(
+      clientId,
+      optimization.date || new Date().toISOString().split('T')[0],
+      optimization.type,
+      optimization.target || null,
+      JSON.stringify(optimization.beforeState || {}),
+      JSON.stringify(optimization.afterState || {}),
+      optimization.impactScore || 50,
+      optimization.status || 'completed',
+      JSON.stringify({
+        pagesModified: optimization.pagesModified || 0,
+        issuesFixed: optimization.issuesFixed || 0,
+        expectedImpact: optimization.expectedImpact || 'Unknown',
+        ...optimization.metadata
+      })
+    );
+
+    return result.lastInsertRowid;
+  },
+
+  /**
+   * Get optimization history for a client
+   */
+  getOptimizationHistory(clientId, days = 30) {
+    const stmt = db.prepare(`
+      SELECT * FROM optimization_history
+      WHERE client_id = ?
+        AND date >= date('now', '-' || ? || ' days')
+      ORDER BY date DESC, created_at DESC
+    `);
+    return stmt.all(clientId, days);
+  },
+
+  /**
+   * Get recent optimizations across all clients
+   */
+  getRecentOptimizations(limit = 20) {
+    const stmt = db.prepare(`
+      SELECT oh.*, c.name as client_name, c.domain as client_domain
+      FROM optimization_history oh
+      JOIN clients c ON oh.client_id = c.id
+      ORDER BY oh.created_at DESC
+      LIMIT ?
+    `);
+    return stmt.all(limit);
   }
 };
 
@@ -610,6 +667,60 @@ export const keywordOps = {
       LIMIT ?
     `);
     return stmt.all(clientId, limit);
+  },
+
+  /**
+   * Record keyword performance with optimization context
+   */
+  recordPerformance(clientId, data) {
+    const stmt = db.prepare(`
+      INSERT INTO keyword_performance
+      (client_id, keyword, position, impressions, clicks, ctr, date)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    return stmt.run(
+      clientId,
+      data.keyword,
+      data.afterPosition || data.beforePosition || null,
+      data.impressions || 0,
+      data.clicks || 0,
+      data.ctr || 0,
+      data.date || new Date().toISOString().split('T')[0]
+    );
+  },
+
+  /**
+   * Get keyword improvements over a period
+   */
+  getImprovements(clientId, days = 90) {
+    const stmt = db.prepare(`
+      WITH ranked_keywords AS (
+        SELECT
+          keyword,
+          position,
+          date,
+          ROW_NUMBER() OVER (PARTITION BY keyword ORDER BY date DESC) as rn,
+          ROW_NUMBER() OVER (PARTITION BY keyword ORDER BY date ASC) as rn_first
+        FROM keyword_performance
+        WHERE client_id = ?
+          AND date >= date('now', '-' || ? || ' days')
+          AND position IS NOT NULL
+      )
+      SELECT
+        latest.keyword,
+        first.position as initialPosition,
+        latest.position as currentPosition,
+        (latest.position - first.position) as positionChange,
+        first.date as startDate,
+        latest.date as endDate
+      FROM ranked_keywords latest
+      JOIN ranked_keywords first ON latest.keyword = first.keyword
+      WHERE latest.rn = 1 AND first.rn_first = 1
+        AND first.position IS NOT NULL AND latest.position IS NOT NULL
+      ORDER BY positionChange ASC
+    `);
+    return stmt.all(clientId, days);
   }
 };
 

@@ -968,6 +968,222 @@ app.get('/api/dashboard/:clientId/complete', (req, res) => {
   }
 });
 
+// ============================================
+// Bridge API - Connect SEO Expert ↔ SEO Analyst
+// ============================================
+
+/**
+ * POST /api/bridge/send-results
+ * Accept optimization results from SEO Expert automation
+ * Store in database and make available for reporting
+ */
+app.post('/api/bridge/send-results', async (req, res) => {
+  try {
+    const {
+      clientId,
+      optimizationType,
+      results,
+      metadata
+    } = req.body;
+
+    if (!clientId || !optimizationType || !results) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: clientId, optimizationType, results'
+      });
+    }
+
+    // Store optimization in database
+    const optimizationId = db.clientOps.recordOptimization(clientId, {
+      type: optimizationType,
+      pagesModified: results.pagesModified || 0,
+      issuesFixed: results.issuesFixed || 0,
+      expectedImpact: results.expectedImpact || 'Unknown',
+      beforeState: results.before || {},
+      afterState: results.after || {},
+      metadata: metadata || {}
+    });
+
+    // If keywords were optimized, store in keyword_performance
+    if (results.keywords && Array.isArray(results.keywords)) {
+      results.keywords.forEach(kw => {
+        db.keywordOps.recordPerformance(clientId, {
+          keyword: kw.keyword,
+          beforePosition: kw.beforePosition,
+          afterPosition: kw.afterPosition || kw.beforePosition,
+          url: kw.url,
+          searchVolume: kw.volume || 0,
+          optimizationId
+        });
+      });
+    }
+
+    // Log the bridge activity
+    db.systemOps.log('info', 'bridge_api',
+      `Received optimization results from SEO Expert for ${clientId}: ${optimizationType}`,
+      { clientId, optimizationType, optimizationId }
+    );
+
+    res.json({
+      success: true,
+      optimizationId,
+      message: 'Results stored successfully',
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Bridge API error:', error);
+    db.systemOps.log('error', 'bridge_api', 'Failed to store optimization results', { error: error.message });
+
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/bridge/recent
+ * Get recent optimization actions across all clients
+ */
+app.get('/api/bridge/recent', (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 20;
+    const recent = db.clientOps.getRecentOptimizations(limit);
+
+    res.json({
+      success: true,
+      data: recent,
+      count: recent.length
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/bridge/:clientId/history
+ * Get optimization history for specific client
+ */
+app.get('/api/bridge/:clientId/history', (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const limit = parseInt(req.query.limit) || 50;
+    const days = parseInt(req.query.days) || 30;
+
+    const history = db.clientOps.getOptimizationHistory(clientId, days);
+
+    res.json({
+      success: true,
+      clientId,
+      data: history,
+      count: history.length
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/bridge/:clientId/roi
+ * Calculate ROI for a client based on optimization history
+ */
+app.get('/api/bridge/:clientId/roi', (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const days = parseInt(req.query.days) || 90;
+
+    // Get optimization history
+    const history = db.clientOps.getOptimizationHistory(clientId, days);
+
+    // Get keyword performance improvements
+    const keywordImprovements = db.keywordOps.getImprovements(clientId, days);
+
+    // Calculate ROI metrics
+    const roi = {
+      timeframe: `${days} days`,
+      totalOptimizations: history.length,
+      pagesModified: history.reduce((sum, opt) => sum + (opt.pagesModified || 0), 0),
+      issuesFixed: history.reduce((sum, opt) => sum + (opt.issuesFixed || 0), 0),
+      keywordImprovements: {
+        total: keywordImprovements.length,
+        improved: keywordImprovements.filter(k => k.positionChange < 0).length, // negative is better
+        declined: keywordImprovements.filter(k => k.positionChange > 0).length,
+        stable: keywordImprovements.filter(k => k.positionChange === 0).length
+      },
+      averagePositionChange: keywordImprovements.length > 0
+        ? (keywordImprovements.reduce((sum, k) => sum + k.positionChange, 0) / keywordImprovements.length).toFixed(2)
+        : 0
+    };
+
+    res.json({
+      success: true,
+      clientId,
+      roi
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/bridge/:clientId/unified
+ * Get unified view of automation + reporting data
+ */
+app.get('/api/bridge/:clientId/unified', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const days = parseInt(req.query.days) || 30;
+
+    // Get complete client dashboard from database
+    const dashboardData = db.analytics.getClientDashboard(clientId, days);
+
+    // Get ROI data
+    const roiData = await fetch(`http://localhost:${PORT}/api/bridge/${clientId}/roi?days=${days}`)
+      .then(r => r.json())
+      .catch(() => ({ success: false }));
+
+    // Combine everything
+    const unified = {
+      client: dashboardData.client,
+      automation: {
+        localSeo: dashboardData.localSeo,
+        competitors: dashboardData.competitors,
+        keywords: dashboardData.keywords,
+        gsc: dashboardData.gsc
+      },
+      optimizations: {
+        history: dashboardData.optimizations.recent,
+        stats: dashboardData.optimizations.stats,
+        roi: roiData.success ? roiData.roi : null
+      },
+      autoFixes: dashboardData.autoFixes,
+      reports: dashboardData.reports
+    };
+
+    res.json({
+      success: true,
+      clientId,
+      data: unified
+    });
+  } catch (error) {
+    console.error('❌ Unified view error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Serve Local SEO reports
 app.use('/reports/local-seo', express.static(path.join(__dirname, 'logs', 'local-seo')));
 
@@ -980,10 +1196,15 @@ app.listen(PORT, () => {
   console.log('');
   console.log(`✅ Server running at: http://localhost:${PORT}`);
   console.log('');
-  console.log('📊 New Features Available:');
+  console.log('📊 API Endpoints Available:');
   console.log('   → Local SEO: /api/local-seo/:clientId/run');
   console.log('   → Competitors: /api/competitors/:clientId/run');
   console.log('   → Complete Dashboard: /api/dashboard/:clientId/complete');
+  console.log('   → Bridge API: /api/bridge/send-results (POST)');
+  console.log('   → Unified View: /api/bridge/:clientId/unified');
+  console.log('   → ROI Metrics: /api/bridge/:clientId/roi');
+  console.log('');
+  console.log('🔗 SEO Expert ↔ SEO Analyst Bridge Active');
   console.log('');
   console.log('Open your browser and navigate to the URL above');
   console.log('');
