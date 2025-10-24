@@ -632,3 +632,110 @@ function displayAIOverview(aiKeywords) {
         `).join('')}
     `;
 }
+
+// ============================================
+// GSC Analytics Functions
+// ============================================
+
+async function testGSCSetup() {
+    showModal('Testing GSC Connection', 'Checking Google Search Console API setup...');
+    
+    try {
+        const response = await fetch('/api/gsc-metrics', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ siteUrl: 'https://instantautotraders.com.au' })
+        });
+        
+        const data = await response.json();
+        
+        if (data.setup && data.setup.required) {
+            updateModalTitle('⚙️ GSC Setup Required');
+            updateModalMessage('Follow these steps to enable GSC features:');
+            updateModalOutput(data.setup.steps.join('\n'));
+        } else {
+            updateModalTitle('✅ GSC Connected');
+            updateModalMessage('Google Search Console API is working!');
+            updateModalOutput(JSON.stringify(data.data, null, 2));
+        }
+    } catch (error) {
+        updateModalTitle('❌ Error');
+        updateModalMessage('Failed to connect to GSC API');
+        updateModalOutput(error.message);
+    }
+}
+
+async function fetchGSCRankings() {
+    const resultsDiv = document.getElementById('gsc-results');
+    const outputPre = document.getElementById('gsc-output');
+    
+    resultsDiv.style.display = 'block';
+    outputPre.textContent = 'Loading rankings...';
+    
+    try {
+        const response = await fetch('/api/gsc-rankings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ siteUrl: 'https://instantautotraders.com.au' })
+        });
+        
+        const data = await response.json();
+        outputPre.textContent = JSON.stringify(data, null, 2);
+        
+        if (data.note) {
+            alert(data.note);
+        }
+    } catch (error) {
+        outputPre.textContent = 'Error: ' + error.message;
+    }
+}
+
+async function fetchQuickWins() {
+    const resultsDiv = document.getElementById('gsc-results');
+    const outputPre = document.getElementById('gsc-output');
+    
+    resultsDiv.style.display = 'block';
+    outputPre.textContent = 'Finding quick wins...';
+    
+    try {
+        const response = await fetch('/api/gsc-quick-wins', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ siteUrl: 'https://instantautotraders.com.au' })
+        });
+        
+        const data = await response.json();
+        outputPre.textContent = JSON.stringify(data, null, 2);
+    } catch (error) {
+        outputPre.textContent = 'Error: ' + error.message;
+    }
+}
+
+async function fetchGSCMetrics() {
+    const resultsDiv = document.getElementById('gsc-results');
+    const outputPre = document.getElementById('gsc-output');
+    
+    resultsDiv.style.display = 'block';
+    outputPre.textContent = 'Fetching metrics...';
+    
+    try {
+        const response = await fetch('/api/gsc-metrics', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ siteUrl: 'https://instantautotraders.com.au' })
+        });
+        
+        const data = await response.json();
+        outputPre.textContent = JSON.stringify(data, null, 2);
+    } catch (error) {
+        outputPre.textContent = 'Error: ' + error.message;
+    }
+}
+
+async function fetchPositionChanges() {
+    const resultsDiv = document.getElementById('gsc-results');
+    const outputPre = document.getElementById('gsc-output');
+    
+    resultsDiv.style.display = 'block';
+    outputPre.textContent = 'Tracking position changes... (Coming soon)';
+}

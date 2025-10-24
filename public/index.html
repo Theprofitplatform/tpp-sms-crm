@@ -36,6 +36,10 @@
                     <span class="icon">📍</span>
                     Position Tracking
                 </a>
+                <a href="#" class="nav-link" data-page="gsc">
+                    <span class="icon">🔍</span>
+                    GSC Analytics
+                </a>
                 <a href="#" class="nav-link" data-page="docs">
                     <span class="icon">📚</span>
                     Documentation
@@ -264,6 +268,58 @@
                             <div id="ai-overview" class="keyword-list"></div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- GSC Analytics Page -->
+            <div id="gsc-page" class="page">
+                <header class="page-header">
+                    <h2>🔍 Google Search Console Analytics</h2>
+                    <p>Real-time keyword rankings and performance metrics from GSC API</p>
+                </header>
+
+                <div class="gsc-setup-notice">
+                    <h3>📋 Setup Required</h3>
+                    <p>To use GSC features, you need to configure your Google Service Account:</p>
+                    <ol>
+                        <li>Create a service account in <a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a></li>
+                        <li>Enable Search Console API</li>
+                        <li>Download JSON credentials</li>
+                        <li>Add to Cloudflare Pages environment: <code>GSC_SERVICE_ACCOUNT</code></li>
+                        <li>Grant access in <a href="https://search.google.com/search-console" target="_blank">Google Search Console</a></li>
+                    </ol>
+                    <button class="btn-primary" onclick="testGSCSetup()">Test GSC Connection</button>
+                </div>
+
+                <div class="gsc-features">
+                    <div class="feature-card">
+                        <h3>📊 Keyword Rankings</h3>
+                        <p>Get real rankings data directly from Google Search Console (FREE alternative to SEMrush/Ahrefs)</p>
+                        <button class="btn" onclick="fetchGSCRankings()">Fetch Rankings</button>
+                    </div>
+
+                    <div class="feature-card">
+                        <h3>🎯 Quick Wins</h3>
+                        <p>Find keywords ranking 11-20 (page 2) - easiest to improve to page 1</p>
+                        <button class="btn" onclick="fetchQuickWins()">Find Quick Wins</button>
+                    </div>
+
+                    <div class="feature-card">
+                        <h3>📈 Site Metrics</h3>
+                        <p>Overall clicks, impressions, CTR, and average position</p>
+                        <button class="btn" onclick="fetchGSCMetrics()">Get Metrics</button>
+                    </div>
+
+                    <div class="feature-card">
+                        <h3>📉 Position Changes</h3>
+                        <p>Track ranking improvements and declines over time</p>
+                        <button class="btn" onclick="fetchPositionChanges()">Track Changes</button>
+                    </div>
+                </div>
+
+                <div id="gsc-results" class="gsc-results" style="display: none;">
+                    <h3>Results</h3>
+                    <pre id="gsc-output"></pre>
                 </div>
             </div>
 
