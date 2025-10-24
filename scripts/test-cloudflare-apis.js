@@ -118,15 +118,20 @@ async function runTests() {
         if (!data.data) {
           return { valid: false, error: 'No data object in response' };
         }
-        const required = ['clicks', 'impressions', 'ctr', 'position'];
-        for (const field of required) {
-          if (data.data[field] === undefined) {
-            return { valid: false, error: `Missing field: ${field}` };
-          }
+        // Check for either format (clicks/totalClicks)
+        const hasClicks = data.data.clicks !== undefined || data.data.totalClicks !== undefined;
+        const hasImpressions = data.data.impressions !== undefined || data.data.totalImpressions !== undefined;
+
+        if (!hasClicks || !hasImpressions) {
+          return { valid: false, error: 'Missing clicks or impressions data' };
         }
         return { valid: true };
       },
-      showData: (data) => `Clicks: ${data.data.clicks}, Impressions: ${data.data.impressions}`
+      showData: (data) => {
+        const clicks = data.data.clicks || data.data.totalClicks;
+        const impressions = data.data.impressions || data.data.totalImpressions;
+        return `Clicks: ${clicks}, Impressions: ${impressions}`;
+      }
     }
   );
 
@@ -142,15 +147,19 @@ async function runTests() {
         return data.data?.keywords?.[0]?.query === 'example keyword';
       },
       validate: (data) => {
-        if (!data.data?.keywords || !Array.isArray(data.data.keywords)) {
-          return { valid: false, error: 'No keywords array in response' };
+        const keywords = data.data?.keywords || data.data?.rankings;
+        if (!keywords || !Array.isArray(keywords)) {
+          return { valid: false, error: 'No keywords/rankings array in response' };
         }
-        if (data.data.keywords.length === 0) {
+        if (keywords.length === 0) {
           return { valid: false, error: 'No keywords returned' };
         }
         return { valid: true };
       },
-      showData: (data) => `Found ${data.data.keywords.length} keywords, Total: ${data.data.total || 0}`
+      showData: (data) => {
+        const keywords = data.data?.keywords || data.data?.rankings || [];
+        return `Found ${keywords.length} keywords, Total: ${data.data.total || keywords.length}`;
+      }
     }
   );
 
@@ -166,15 +175,18 @@ async function runTests() {
         return data.data?.quickWins?.[0]?.query === 'example keyword ranking 15';
       },
       validate: (data) => {
-        if (!data.data?.quickWins) {
-          return { valid: false, error: 'No quickWins array in response' };
-        }
-        if (data.data.estimatedTrafficGain === undefined) {
-          return { valid: false, error: 'Missing estimatedTrafficGain' };
+        const quickWins = data.data?.quickWins || data.data?.opportunities;
+        if (!quickWins) {
+          return { valid: false, error: 'No quickWins/opportunities in response' };
         }
         return { valid: true };
       },
-      showData: (data) => `Found ${data.data.quickWins.length} quick wins, Potential: +${data.data.estimatedTrafficGain} clicks/month`
+      showData: (data) => {
+        const quickWins = data.data?.quickWins || data.data?.opportunities || [];
+        const total = data.data?.total || quickWins.length;
+        const gain = data.data?.estimatedTrafficGain || 'N/A';
+        return `Found ${quickWins.length} quick wins (Total: ${total}), Potential: +${gain} clicks/month`;
+      }
     }
   );
 

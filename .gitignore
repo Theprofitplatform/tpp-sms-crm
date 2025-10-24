@@ -89,3 +89,4 @@ _analysis/
 *.tmp
 *.cache
 web-dist/
+config/google/service-account.json

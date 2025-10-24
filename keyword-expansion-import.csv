@@ -1,0 +1,289 @@
+Keyword,Search Volume,Tags,Priority,Device,Location,Category,Notes
+quick car sale,40,core-service,high,both,Sydney NSW,Core Service,Alternative to instant
+fast cash for cars,110,core-service,high,both,Sydney NSW,Core Service,High conversion term
+same day car sale,50,core-service,high,both,Sydney NSW,Core Service,Urgency intent
+immediate car purchase,30,core-service,medium,both,Sydney NSW,Core Service,Purchase angle
+rapid car valuation,20,core-service,medium,both,Sydney NSW,Core Service,Valuation focus
+express car sale sydney,70,core-service location,high,both,Sydney NSW,Core Service,Location specific
+urgent car sale,90,core-service,high,both,Sydney NSW,Core Service,High intent
+emergency car sale,40,core-service,high,both,Sydney NSW,Core Service,Emergency situations
+fastest way to sell car,110,core-service,high,both,Sydney NSW,Core Service,Speed focused
+quickest car buyer sydney,60,core-service location,high,both,Sydney NSW,Core Service,Local + speed
+
+cash for SUV sydney,90,vehicle-type location,high,both,Sydney NSW,Vehicle Type,Popular segment
+sell my sedan sydney,70,vehicle-type location,high,both,Sydney NSW,Vehicle Type,High volume
+cash for trucks sydney,50,vehicle-type location,high,both,Sydney NSW,Vehicle Type,Commercial
+sell van sydney,110,vehicle-type location,high,both,Sydney NSW,Vehicle Type,Trade vehicles
+commercial vehicle buyers sydney,140,vehicle-type location,high,both,Sydney NSW,Vehicle Type,B2B opportunity
+cash for hatchback,40,vehicle-type,medium,both,Sydney NSW,Vehicle Type,Popular segment
+sell luxury car sydney,170,vehicle-type location,high,both,Sydney NSW,Vehicle Type,High value
+cash for sports car sydney,50,vehicle-type location,medium,both,Sydney NSW,Vehicle Type,Niche segment
+sell family car sydney,60,vehicle-type location,high,both,Sydney NSW,Vehicle Type,Family focused
+cash for wagon sydney,30,vehicle-type location,medium,both,Sydney NSW,Vehicle Type,Niche segment
+
+sell toyota hilux sydney,590,model location,critical,both,Sydney NSW,Specific Model,Top selling ute
+cash for ford ranger,480,model,critical,both,Sydney NSW,Specific Model,Top selling ute
+sell mazda cx5 sydney,320,model location,critical,both,Sydney NSW,Specific Model,Top selling SUV
+cash for toyota camry,390,model,critical,both,Sydney NSW,Specific Model,Top selling sedan
+sell nissan navara sydney,260,model location,high,both,Sydney NSW,Specific Model,Popular ute
+cash for mitsubishi triton,210,model,high,both,Sydney NSW,Specific Model,Popular ute
+sell honda crv sydney,280,model location,high,both,Sydney NSW,Specific Model,Popular SUV
+cash for toyota corolla,440,model,critical,both,Sydney NSW,Specific Model,Best seller
+sell hyundai i30 sydney,170,model location,high,both,Sydney NSW,Specific Model,Popular hatch
+cash for subaru forester,140,model,medium,both,Sydney NSW,Specific Model,AWD SUV
+
+sell BMW sydney,210,premium location,high,both,Sydney NSW,Premium Brand,High value
+cash for mercedes sydney,170,premium location,high,both,Sydney NSW,Premium Brand,High value
+sell audi sydney,150,premium location,high,both,Sydney NSW,Premium Brand,High value
+cash for lexus sydney,90,premium location,medium,both,Sydney NSW,Premium Brand,Reliable luxury
+sell porsche sydney,70,premium location,medium,both,Sydney NSW,Premium Brand,High value
+
+sell damaged car sydney,590,condition location,critical,both,Sydney NSW,Condition,High intent
+cash for broken cars,480,condition,critical,both,Sydney NSW,Condition,High conversion
+sell non running car sydney,320,condition location,critical,both,Sydney NSW,Condition,Specific condition
+cash for accident cars,390,condition,critical,both,Sydney NSW,Condition,Insurance writeoffs
+sell old car sydney,880,condition location,critical,both,Sydney NSW,Condition,High volume
+cash for scrap cars sydney,390,condition location,critical,both,Sydney NSW,Condition,End of life
+sell junk car sydney,260,condition location,high,both,Sydney NSW,Condition,Scrap value
+cash for cars any condition,720,condition,critical,both,Sydney NSW,Condition,USP keyword
+sell unregistered car sydney,260,condition location,high,both,Sydney NSW,Condition,Common issue
+cash for cars not running,480,condition,critical,both,Sydney NSW,Condition,Mechanical issues
+sell car with mechanical problems,320,condition,high,both,Sydney NSW,Condition,Repair costs
+cash for hail damaged cars,140,condition,high,both,Sydney NSW,Condition,Weather damage
+sell car with blown engine,210,condition,high,both,Sydney NSW,Condition,Major repair
+cash for written off cars,390,condition,critical,both,Sydney NSW,Condition,Insurance claims
+sell flooded car sydney,90,condition location,medium,both,Sydney NSW,Condition,Weather damage
+cash for rusty cars,70,condition,low,both,Sydney NSW,Condition,Age/condition
+sell car needing repairs,260,condition,high,both,Sydney NSW,Condition,Repair avoidance
+cash for cars no rego,320,condition,critical,both,Sydney NSW,Condition,Registration expired
+sell car without roadworthy,170,condition,high,both,Sydney NSW,Condition,Safety certificate
+cash for used cars any condition,590,condition,critical,both,Sydney NSW,Condition,Wide net
+
+car buyers parramatta,260,location,critical,both,Parramatta NSW,Geographic,Major suburb
+cash for cars liverpool,210,location,critical,both,Liverpool NSW,Geographic,Major suburb
+sell car penrith,170,location,critical,both,Penrith NSW,Geographic,Major suburb
+car buyers blacktown,140,location,high,both,Blacktown NSW,Geographic,Major suburb
+cash for cars campbelltown,110,location,high,both,Campbelltown NSW,Geographic,Major suburb
+sell car bankstown,90,location,high,both,Bankstown NSW,Geographic,Major suburb
+car buyers castle hill,70,location,high,both,Castle Hill NSW,Geographic,Affluent area
+cash for cars ryde,60,location,medium,both,Ryde NSW,Geographic,Inner suburb
+sell car chatswood,90,location,high,both,Chatswood NSW,Geographic,North shore
+car buyers hornsby,70,location,high,both,Hornsby NSW,Geographic,North
+cash for cars manly,50,location,medium,both,Manly NSW,Geographic,Northern beaches
+sell car bondi,60,location,medium,both,Bondi NSW,Geographic,Eastern suburbs
+car buyers auburn,50,location,medium,both,Auburn NSW,Geographic,West
+cash for cars hurstville,60,location,medium,both,Hurstville NSW,Geographic,South
+sell car cronulla,50,location,medium,both,Cronulla NSW,Geographic,Shire
+car buyers miranda,50,location,medium,both,Miranda NSW,Geographic,South
+cash for cars newtown,40,location,medium,both,Newtown NSW,Geographic,Inner west
+sell car marrickville,40,location,low,both,Marrickville NSW,Geographic,Inner west
+car buyers strathfield,40,location,medium,both,Strathfield NSW,Geographic,Inner west
+cash for cars burwood,40,location,medium,both,Burwood NSW,Geographic,Inner west
+
+car buyers newcastle,480,location-regional,critical,both,Newcastle NSW,Regional,Major city
+cash for cars central coast,390,location-regional,critical,both,Central Coast NSW,Regional,Growth area
+sell car wollongong,320,location-regional,critical,both,Wollongong NSW,Regional,Major city
+car buyers blue mountains,90,location-regional,high,both,Blue Mountains NSW,Regional,Tourist area
+cash for cars gosford,170,location-regional,high,both,Gosford NSW,Regional,Central coast
+sell car wyong,70,location-regional,medium,both,Wyong NSW,Regional,Central coast
+car buyers maitland,110,location-regional,high,both,Maitland NSW,Regional,Hunter
+cash for cars port macquarie,140,location-regional,high,both,Port Macquarie NSW,Regional,Mid north coast
+sell car coffs harbour,110,location-regional,high,both,Coffs Harbour NSW,Regional,North coast
+car buyers orange,70,location-regional,medium,both,Orange NSW,Regional,Central west
+
+how to sell car quickly sydney,260,process question,high,both,Sydney NSW,Process,Featured snippet
+what is my car worth sydney,880,process question,critical,both,Sydney NSW,Process,Valuation intent
+where can i sell my car today,320,process question,high,both,Sydney NSW,Process,Urgency
+how much is my car worth instant quote,590,process question,critical,both,Sydney NSW,Process,Quote intent
+who buys cars for cash sydney,260,process question,high,both,Sydney NSW,Process,Buyer research
+how long to sell car sydney,140,process question,medium,both,Sydney NSW,Process,Timeline
+what documents needed to sell car nsw,480,process question,high,both,Sydney NSW,Process,Legal requirements
+can i sell unregistered car nsw,210,process question,high,both,Sydney NSW,Process,Registration query
+how to get best price for used car,390,process question,high,both,Sydney NSW,Process,Pricing strategy
+where to sell damaged car sydney,170,process question,high,both,Sydney NSW,Process,Condition + location
+
+car valuation sydney,720,process,critical,both,Sydney NSW,Process,Service keyword
+free car appraisal sydney,170,process,high,both,Sydney NSW,Process,Free service angle
+car inspection before selling,140,process,medium,both,Sydney NSW,Process,Pre-sale process
+sell car same day payment,260,process,critical,both,Sydney NSW,Process,Payment speed
+car removal sydney,1900,process,critical,both,Sydney NSW,Process,Removal service
+free car removal sydney,880,process,critical,both,Sydney NSW,Process,Free service
+sell car without inspection,110,process,high,both,Sydney NSW,Process,Convenience
+sell car online sydney,480,process,critical,both,Sydney NSW,Process,Online channel
+trade in vs sell car sydney,170,process,high,both,Sydney NSW,Process,Comparison
+car buying service sydney,320,process,critical,both,Sydney NSW,Process,Service category
+
+carsales instant offer,1300,competitor,critical,both,Sydney NSW,Competitor,Major competitor
+carsales vs private sale,210,competitor,high,both,Sydney NSW,Competitor,Comparison
+pickles car buyers,590,competitor,high,both,Sydney NSW,Competitor,Auction competitor
+grays car buyers,390,competitor,high,both,Sydney NSW,Competitor,Auction competitor
+cash converters cars,720,competitor,high,both,Sydney NSW,Competitor,Retail competitor
+redbook instant quote,480,competitor,high,both,Sydney NSW,Competitor,Valuation tool
+car buyers near me,3600,competitor,critical,both,Sydney NSW,Competitor,Local search
+best car buying service sydney,260,competitor,high,both,Sydney NSW,Competitor,Quality signal
+top car buyers sydney,170,competitor,high,both,Sydney NSW,Competitor,Rankings intent
+car buyers reviews sydney,140,competitor,high,both,Sydney NSW,Competitor,Social proof
+
+instant vs traditional car sale,90,comparison,medium,both,Sydney NSW,Comparison,Educational
+online vs dealership car sale,110,comparison,medium,both,Sydney NSW,Comparison,Channel comparison
+private sale vs car buyer,260,comparison,high,both,Sydney NSW,Comparison,Method comparison
+auction vs instant sale,70,comparison,medium,both,Sydney NSW,Comparison,Speed comparison
+fastest car sale option,110,comparison,high,both,Sydney NSW,Comparison,Speed focused
+most convenient car sale,90,comparison,medium,both,Sydney NSW,Comparison,Convenience
+hassle free car sale sydney,170,comparison,high,both,Sydney NSW,Comparison,USP
+no negotiation car sale,70,comparison,medium,both,Sydney NSW,Comparison,Fixed price angle
+guaranteed car sale sydney,110,comparison,high,both,Sydney NSW,Comparison,Certainty
+reliable car buyers sydney,140,comparison,high,both,Sydney NSW,Comparison,Trust signal
+
+instant auto traders reviews,110,brand,critical,both,Sydney NSW,Brand Protection,Reputation
+instant auto traders sydney,170,brand,critical,both,Sydney NSW,Brand Protection,Location + brand
+instant auto traders nsw,70,brand,critical,both,Sydney NSW,Brand Protection,State + brand
+instantautotraders,90,brand,critical,both,Sydney NSW,Brand Protection,Domain name
+instant car traders,50,brand,high,both,Sydney NSW,Brand Protection,Variation
+instant auto quote sydney,90,brand,critical,both,Sydney NSW,Brand Protection,Service + brand
+instant car buyers sydney,480,brand,critical,both,Sydney NSW,Brand Protection,Category + location
+instant car valuation sydney,210,brand,critical,both,Sydney NSW,Brand Protection,Service + location
+instant car purchase sydney,140,brand,high,both,Sydney NSW,Brand Protection,Action + location
+instant cash for cars sydney,720,brand,critical,both,Sydney NSW,Brand Protection,Money + location
+instant auto sales sydney,90,brand,high,both,Sydney NSW,Brand Protection,Sales + location
+instant vehicle buyers,50,brand,medium,both,Sydney NSW,Brand Protection,Vehicle focus
+instant car removal sydney,390,brand,critical,both,Sydney NSW,Brand Protection,Service + location
+
+sell car before moving overseas,170,longtail,high,both,Sydney NSW,Long-Tail,Specific situation
+sell deceased estate car sydney,90,longtail,high,both,Sydney NSW,Long-Tail,Estate sales
+sell car divorce settlement,70,longtail,medium,both,Sydney NSW,Long-Tail,Legal situation
+urgent need to sell car sydney,110,longtail,high,both,Sydney NSW,Long-Tail,Urgency
+sell car without title nsw,140,longtail,high,both,Sydney NSW,Long-Tail,Documentation issue
+sell financed car sydney,260,longtail,critical,both,Sydney NSW,Long-Tail,Finance situation
+sell car with loan owing,320,longtail,critical,both,Sydney NSW,Long-Tail,Finance issue
+sell company car sydney,90,longtail,medium,both,Sydney NSW,Long-Tail,Business sale
+sell inherited car sydney,110,longtail,high,both,Sydney NSW,Long-Tail,Estate situation
+sell car quick house deposit,70,longtail,medium,both,Sydney NSW,Long-Tail,Financial need
+
+sell car over 10 years old,260,longtail age,high,both,Sydney NSW,Age Specific,Old vehicles
+sell high mileage car sydney,170,longtail condition,high,both,Sydney NSW,Mileage,High km
+sell car under 5 years,140,longtail age,high,both,Sydney NSW,Age Specific,Newer vehicles
+sell new car sydney,480,longtail age,high,both,Sydney NSW,Age Specific,Nearly new
+sell car low km sydney,110,longtail condition,medium,both,Sydney NSW,Mileage,Low km
+
+sell car today sydney,320,longtail urgent,critical,both,Sydney NSW,Time-Sensitive,Same day
+sell car this weekend,110,longtail urgent,high,both,Sydney NSW,Time-Sensitive,Weekend
+sell car within 24 hours,170,longtail urgent,critical,both,Sydney NSW,Time-Sensitive,24 hour
+sell car before rego expires,140,longtail urgent,high,both,Sydney NSW,Time-Sensitive,Registration
+sell car end of month sydney,70,longtail urgent,medium,both,Sydney NSW,Time-Sensitive,Month end
+
+sell mazda 3 sydney,210,model location,high,both,Sydney NSW,Specific Model,Popular hatch
+cash for volkswagen golf,140,model,medium,both,Sydney NSW,Specific Model,Popular hatch
+sell kia sportage sydney,170,model location,high,both,Sydney NSW,Specific Model,SUV
+cash for holden commodore,320,model,high,both,Sydney NSW,Specific Model,Australian icon
+sell mitsubishi outlander sydney,140,model location,medium,both,Sydney NSW,Specific Model,Family SUV
+cash for toyota rav4,280,model,critical,both,Sydney NSW,Specific Model,Top SUV
+sell hyundai tucson sydney,170,model location,high,both,Sydney NSW,Specific Model,Popular SUV
+cash for nissan qashqai,110,model,medium,both,Sydney NSW,Specific Model,Small SUV
+sell ford focus sydney,90,model location,medium,both,Sydney NSW,Specific Model,Hatch
+cash for mazda cx3,90,model,medium,both,Sydney NSW,Specific Model,Small SUV
+
+cash for european cars sydney,140,category location,high,both,Sydney NSW,Vehicle Category,European makes
+sell japanese car sydney,110,category location,high,both,Sydney NSW,Vehicle Category,Japanese makes
+cash for american cars sydney,50,category location,medium,both,Sydney NSW,Vehicle Category,American makes
+sell diesel car sydney,260,category location,high,both,Sydney NSW,Vehicle Category,Fuel type
+cash for petrol cars,140,category,medium,both,Sydney NSW,Vehicle Category,Fuel type
+sell hybrid car sydney,210,category location,high,both,Sydney NSW,Vehicle Category,Fuel type
+cash for electric cars sydney,170,category location,high,both,Sydney NSW,Vehicle Category,EV market
+sell manual car sydney,90,category location,medium,both,Sydney NSW,Vehicle Category,Transmission
+cash for automatic cars,140,category,medium,both,Sydney NSW,Vehicle Category,Transmission
+sell AWD car sydney,110,category location,medium,both,Sydney NSW,Vehicle Category,Drivetrain
+
+car buyers western sydney,260,location-region,critical,both,Western Sydney NSW,Region,Western suburbs
+cash for cars northern beaches,170,location-region,high,both,Northern Beaches NSW,Region,Northern beaches
+sell car eastern suburbs,140,location-region,high,both,Eastern Suburbs NSW,Region,Eastern suburbs
+car buyers inner west sydney,110,location-region,high,both,Inner West NSW,Region,Inner west
+cash for cars north shore,140,location-region,high,both,North Shore NSW,Region,North shore
+sell car southern sydney,90,location-region,medium,both,Southern Sydney NSW,Region,Southern suburbs
+car buyers southwest sydney,110,location-region,high,both,Southwest Sydney NSW,Region,Southwest
+cash for cars northwest sydney,90,location-region,medium,both,Northwest Sydney NSW,Region,Northwest
+sell car sutherland shire,70,location-region,medium,both,Sutherland Shire NSW,Region,Shire
+car buyers macarthur region,70,location-region,medium,both,Macarthur NSW,Region,Macarthur
+
+sell car bad credit,140,situation,high,both,Sydney NSW,Financial Situation,Credit issues
+cash for cars no paperwork,110,situation,high,both,Sydney NSW,Documentation,Missing docs
+sell car without keys,70,situation,medium,both,Sydney NSW,Documentation,Lost keys
+cash for cars towing included,170,situation,high,both,Sydney NSW,Service Feature,Free towing
+sell car without pink slip,140,situation,high,both,Sydney NSW,Documentation,Inspection cert
+cash for cars instant cash,260,situation,critical,both,Sydney NSW,Payment,Payment method
+sell car cash on spot,170,situation,critical,both,Sydney NSW,Payment,Immediate payment
+car buyers pickup same day,110,situation,high,both,Sydney NSW,Service Feature,Speed
+cash for cars weekend service,70,situation,medium,both,Sydney NSW,Service Feature,Weekend hours
+sell car no time wasters,90,situation,medium,both,Sydney NSW,Seller Pain Point,Serious buyers
+
+sell car for parts sydney,260,situation,high,both,Sydney NSW,End of Life,Parts value
+cash for car wreckers sydney,390,situation,critical,both,Sydney NSW,End of Life,Wrecking
+sell car to wreckers,320,situation,critical,both,Sydney NSW,End of Life,Wrecking service
+car removal for cash sydney,480,situation,critical,both,Sydney NSW,Service Type,Removal + payment
+cash for scrap metal cars,140,situation,high,both,Sydney NSW,End of Life,Scrap value
+sell car no rwc sydney,90,situation,medium,both,NSW,Documentation,No roadworthy
+cash for cars expired rego,170,situation,high,both,Sydney NSW,Documentation,Expired registration
+sell car missing log book,70,situation,medium,both,Sydney NSW,Documentation,Lost logbook
+car buyers instant payment,260,situation,critical,both,Sydney NSW,Payment,Payment speed
+sell car secure transaction,50,situation,low,both,Sydney NSW,Trust,Security
+
+best time to sell car sydney,140,timing,medium,both,Sydney NSW,Timing,Seasonal
+sell car tax time,90,timing,medium,both,Sydney NSW,Timing,Tax season
+sell car christmas sydney,50,timing,low,both,Sydney NSW,Timing,Holiday season
+cash for cars end of year,70,timing,low,both,Sydney NSW,Timing,Year end
+sell car school holidays,40,timing,low,both,Sydney NSW,Timing,School break
+
+sell car get instant quote,260,action,critical,both,Sydney NSW,CTA,Quote action
+cash for cars free valuation,170,action,high,both,Sydney NSW,CTA,Valuation CTA
+sell car book appointment,70,action,medium,both,Sydney NSW,CTA,Booking
+car buyers call now,110,action,high,both,Sydney NSW,CTA,Phone CTA
+cash for cars submit details,50,action,low,both,Sydney NSW,CTA,Form CTA
+sell car request callback,70,action,medium,both,Sydney NSW,CTA,Callback
+car valuation online sydney,390,action,critical,both,Sydney NSW,CTA,Online tool
+instant car quote calculator,210,action,critical,both,Sydney NSW,CTA,Calculator tool
+sell car get offer today,140,action,high,both,Sydney NSW,CTA,Speed promise
+cash for cars compare quotes,90,action,medium,both,Sydney NSW,CTA,Comparison
+
+sell car fair price sydney,170,value,high,both,Sydney NSW,Value Prop,Fair pricing
+cash for cars best price,260,value,critical,both,Sydney NSW,Value Prop,Best price
+sell car market value,140,value,high,both,Sydney NSW,Value Prop,Market rate
+car buyers top dollar sydney,110,value,high,both,Sydney NSW,Value Prop,Maximum value
+cash for cars competitive rates,70,value,medium,both,Sydney NSW,Value Prop,Competitive
+sell car highest offer,140,value,high,both,Sydney NSW,Value Prop,Best offer
+car valuation guaranteed,90,value,medium,both,Sydney NSW,Value Prop,Guarantee
+cash for cars no hidden fees,110,value,high,both,Sydney NSW,Value Prop,Transparency
+sell car honest appraisal,70,value,medium,both,Sydney NSW,Value Prop,Honesty
+car buyers fair assessment,50,value,low,both,Sydney NSW,Value Prop,Fair dealing
+
+sell car without haggling,110,benefit,high,both,Sydney NSW,Benefit,No negotiation
+cash for cars no obligation,170,benefit,high,both,Sydney NSW,Benefit,No commitment
+sell car stress free,90,benefit,medium,both,Sydney NSW,Benefit,Easy process
+car buyers simple process,70,benefit,medium,both,Sydney NSW,Benefit,Simplicity
+cash for cars fast service,140,benefit,high,both,Sydney NSW,Benefit,Speed
+sell car safe secure,50,benefit,low,both,Sydney NSW,Benefit,Security
+car buyers trusted sydney,110,benefit,high,both,Sydney NSW,Benefit,Trust
+cash for cars professional service,70,benefit,medium,both,Sydney NSW,Benefit,Professional
+sell car family business,40,benefit,low,both,Sydney NSW,Benefit,Family owned
+car buyers local sydney,170,benefit,high,both,Sydney NSW,Benefit,Local business
+
+sell commercial van sydney,210,commercial,high,both,Sydney NSW,Commercial,Business vehicles
+cash for delivery trucks,140,commercial,high,both,Sydney NSW,Commercial,Commercial trucks
+sell work ute sydney,170,commercial,high,both,Sydney NSW,Commercial,Trade vehicles
+car buyers fleet vehicles,110,commercial,medium,both,Sydney NSW,Commercial,Fleet sales
+cash for company fleet,90,commercial,medium,both,Sydney NSW,Commercial,Corporate
+sell taxi sydney,70,commercial,medium,both,Sydney NSW,Commercial,Taxi vehicles
+cash for uber cars,110,commercial,high,both,Sydney NSW,Commercial,Rideshare
+sell shuttle bus sydney,50,commercial,low,both,Sydney NSW,Commercial,Passenger vehicles
+car buyers business vehicles,90,commercial,medium,both,Sydney NSW,Commercial,Business sales
+cash for rental cars,70,commercial,medium,both,Sydney NSW,Commercial,Ex-rental
+
+sell prestige car sydney,170,premium,high,both,Sydney NSW,Premium,High-end
+cash for luxury vehicles sydney,140,premium,high,both,Sydney NSW,Premium,Luxury
+sell exotic car sydney,70,premium,medium,both,Sydney NSW,Premium,Exotic
+car buyers supercar sydney,50,premium,low,both,Sydney NSW,Premium,Supercar
+cash for classic cars sydney,210,premium,high,both,Sydney NSW,Premium,Classic
+sell vintage car sydney,140,premium,high,both,Sydney NSW,Premium,Vintage
+car buyers performance vehicles,90,premium,medium,both,Sydney NSW,Premium,Performance
+cash for modified cars,110,premium,medium,both,Sydney NSW,Premium,Modified
+sell imported car sydney,90,premium,medium,both,Sydney NSW,Premium,Imported
+car buyers rare vehicles,50,premium,low,both,Sydney NSW,Premium,Rare
