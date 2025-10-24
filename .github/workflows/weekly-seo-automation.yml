@@ -67,7 +67,7 @@ jobs:
           SADC_WP_USER: ${{ secrets.SADC_WP_USER }}
           SADC_WP_PASSWORD: ${{ secrets.SADC_WP_PASSWORD }}
         run: |
-          cat > .env <<EOF
+          cat > config/env/.env <<EOF
           ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
           OPENAI_API_KEY=$OPENAI_API_KEY
           IAT_WP_USER=$IAT_WP_USER
@@ -125,7 +125,7 @@ jobs:
       - name: Clean up sensitive files
         if: always()
         run: |
-          rm -f .env
+          rm -f config/env/.env
           rm -f config/google/service-account.json
 
       - name: Notify on failure
