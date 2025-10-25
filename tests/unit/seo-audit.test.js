@@ -13,6 +13,18 @@ jest.unstable_mockModule('../../src/audit/logger.js', () => ({
   logger: mockLogger
 }));
 
+// Mock config
+jest.unstable_mockModule('../../config/env/config.js', () => ({
+  config: {
+    wordpress: {
+      url: 'https://instantautotraders.com.au'
+    },
+    automation: {
+      minContentLength: 300
+    }
+  }
+}));
+
 // Dynamic import after mocking
 const { SEOAuditor, auditPosts } = await import('../../src/audit/seo-audit.js');
 
