@@ -3212,6 +3212,264 @@ app.get('/api/email/stats', (req, res) => {
   }
 });
 
+// ============================================
+// Client Email Communication API
+// ============================================
+
+/**
+ * POST /api/email/client/:clientId/send
+ * Send email to existing client
+ */
+app.post('/api/email/client/:clientId/send', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { eventType, customData = {} } = req.body;
+
+    if (!eventType) {
+      return res.status(400).json({
+        success: false,
+        error: 'eventType is required'
+      });
+    }
+
+    const { EmailAutomation } = await import('./src/automation/email-automation.js');
+
+    const automation = new EmailAutomation({
+      fromEmail: process.env.FROM_EMAIL,
+      fromName: process.env.FROM_NAME || 'SEO Expert',
+      replyTo: process.env.REPLY_TO_EMAIL,
+      companyName: process.env.COMPANY_NAME || 'SEO Expert'
+    });
+
+    const queuedEmails = await automation.sendClientEmail(clientId, eventType, customData);
+
+    res.json({
+      success: true,
+      clientId,
+      eventType,
+      queuedEmails
+    });
+
+  } catch (error) {
+    console.error('❌ Client email send error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/email/client/:clientId/monthly-report
+ * Send monthly performance report to client
+ */
+app.post('/api/email/client/:clientId/monthly-report', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    const { EmailAutomation } = await import('./src/automation/email-automation.js');
+
+    const automation = new EmailAutomation({
+      fromEmail: process.env.FROM_EMAIL,
+      fromName: process.env.FROM_NAME || 'SEO Expert',
+      replyTo: process.env.REPLY_TO_EMAIL,
+      companyName: process.env.COMPANY_NAME || 'SEO Expert'
+    });
+
+    const queuedEmails = await automation.sendClientEmail(clientId, 'monthly_report', req.body);
+
+    res.json({
+      success: true,
+      clientId,
+      message: 'Monthly report email queued',
+      queuedEmails
+    });
+
+  } catch (error) {
+    console.error('❌ Monthly report email error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/email/client/:clientId/ranking-alert
+ * Send ranking drop alert to client
+ */
+app.post('/api/email/client/:clientId/ranking-alert', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { keyword, oldPosition, newPosition, searchVolume } = req.body;
+
+    if (!keyword || !oldPosition || !newPosition) {
+      return res.status(400).json({
+        success: false,
+        error: 'keyword, oldPosition, and newPosition are required'
+      });
+    }
+
+    const { EmailAutomation } = await import('./src/automation/email-automation.js');
+
+    const automation = new EmailAutomation({
+      fromEmail: process.env.FROM_EMAIL,
+      fromName: process.env.FROM_NAME || 'SEO Expert',
+      replyTo: process.env.REPLY_TO_EMAIL,
+      companyName: process.env.COMPANY_NAME || 'SEO Expert'
+    });
+
+    const positionDrop = newPosition - oldPosition;
+    const detectedDate = new Date().toLocaleDateString();
+
+    const queuedEmails = await automation.sendClientEmail(clientId, 'ranking_drop', {
+      keyword,
+      oldPosition,
+      newPosition,
+      positionDrop,
+      searchVolume: searchVolume || 'Unknown',
+      detectedDate
+    });
+
+    res.json({
+      success: true,
+      clientId,
+      message: 'Ranking alert email queued',
+      queuedEmails
+    });
+
+  } catch (error) {
+    console.error('❌ Ranking alert email error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/email/client/:clientId/check-in
+ * Send monthly check-in to client
+ */
+app.post('/api/email/client/:clientId/check-in', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    const { EmailAutomation } = await import('./src/automation/email-automation.js');
+
+    const automation = new EmailAutomation({
+      fromEmail: process.env.FROM_EMAIL,
+      fromName: process.env.FROM_NAME || 'SEO Expert',
+      replyTo: process.env.REPLY_TO_EMAIL,
+      companyName: process.env.COMPANY_NAME || 'SEO Expert'
+    });
+
+    const queuedEmails = await automation.sendClientEmail(clientId, 'monthly_checkin', req.body);
+
+    res.json({
+      success: true,
+      clientId,
+      message: 'Check-in email queued',
+      queuedEmails
+    });
+
+  } catch (error) {
+    console.error('❌ Check-in email error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/email/client/:clientId/onboard
+ * Send onboarding welcome email to new client
+ */
+app.post('/api/email/client/:clientId/onboard', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { temporaryPassword, clientEmail } = req.body;
+
+    const { EmailAutomation } = await import('./src/automation/email-automation.js');
+
+    const automation = new EmailAutomation({
+      fromEmail: process.env.FROM_EMAIL,
+      fromName: process.env.FROM_NAME || 'SEO Expert',
+      replyTo: process.env.REPLY_TO_EMAIL,
+      companyName: process.env.COMPANY_NAME || 'SEO Expert'
+    });
+
+    const queuedEmails = await automation.sendClientEmail(clientId, 'client_added', {
+      ...req.body,
+      temporaryPassword: temporaryPassword || 'ChangeMe123!',
+      clientEmail: clientEmail || '',
+      portalLink: process.env.DASHBOARD_URL || 'https://app.seoexpert.com/portal'
+    });
+
+    res.json({
+      success: true,
+      clientId,
+      message: 'Onboarding email queued',
+      queuedEmails
+    });
+
+  } catch (error) {
+    console.error('❌ Onboarding email error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/email/client/:clientId/milestone
+ * Send milestone celebration email
+ */
+app.post('/api/email/client/:clientId/milestone', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { milestone, milestoneDescription } = req.body;
+
+    if (!milestone || !milestoneDescription) {
+      return res.status(400).json({
+        success: false,
+        error: 'milestone and milestoneDescription are required'
+      });
+    }
+
+    const { EmailAutomation } = await import('./src/automation/email-automation.js');
+
+    const automation = new EmailAutomation({
+      fromEmail: process.env.FROM_EMAIL,
+      fromName: process.env.FROM_NAME || 'SEO Expert',
+      replyTo: process.env.REPLY_TO_EMAIL,
+      companyName: process.env.COMPANY_NAME || 'SEO Expert'
+    });
+
+    const queuedEmails = await automation.sendClientEmail(clientId, 'milestone_reached', {
+      ...req.body,
+      milestone,
+      milestoneDescription
+    });
+
+    res.json({
+      success: true,
+      clientId,
+      message: 'Milestone email queued',
+      queuedEmails
+    });
+
+  } catch (error) {
+    console.error('❌ Milestone email error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Serve Local SEO reports
 app.use('/reports/local-seo', express.static(path.join(__dirname, 'logs', 'local-seo')));
 

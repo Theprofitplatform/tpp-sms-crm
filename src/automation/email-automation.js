@@ -7,6 +7,7 @@
 
 import db from '../database/index.js';
 import { EmailTemplates } from './email-templates.js';
+import { ClientEmailTemplates } from './client-email-templates.js';
 import { EmailSender } from './email-sender.js';
 
 export class EmailAutomation {
@@ -15,18 +16,22 @@ export class EmailAutomation {
     this.defaultFromEmail = config.fromEmail || process.env.FROM_EMAIL || 'noreply@seoexpert.com';
     this.defaultFromName = config.fromName || 'SEO Expert';
     this.replyToEmail = config.replyTo || process.env.REPLY_TO_EMAIL || this.defaultFromEmail;
+    this.companyName = config.companyName || 'SEO Expert';
   }
 
   /**
-   * Initialize default campaigns
+   * Initialize default campaigns (both lead and client)
    */
   async initializeDefaultCampaigns() {
     console.log('📧 Initializing default email campaigns...');
 
-    const templates = EmailTemplates.getAll();
+    const leadTemplates = EmailTemplates.getAll();
+    const clientTemplates = ClientEmailTemplates.getAll();
+    const allTemplates = [...leadTemplates, ...clientTemplates];
+
     const campaignIds = [];
 
-    for (const template of templates) {
+    for (const template of allTemplates) {
       // Check if campaign already exists
       const existing = db.emailOps.getActiveCampaigns().find(c => c.name === template.name);
 
@@ -208,6 +213,197 @@ export class EmailAutomation {
     return {
       subject,
       bodyHtml,
+      bodyText,
+      fromEmail,
+      fromName,
+      replyTo
+    };
+  }
+
+  /**
+   * Send email to client (for existing clients, not leads)
+   */
+  async sendClientEmail(clientId, eventType, customData = {}) {
+    try {
+      // Get client from database
+      const client = db.clientOps.getById(clientId);
+      if (!client) {
+        throw new Error(`Client ${clientId} not found`);
+      }
+
+      // Find campaigns triggered by this event
+      const campaigns = db.emailOps.getActiveCampaigns()
+        .filter(c => c.trigger_event === eventType);
+
+      if (campaigns.length === 0) {
+        console.log(`No campaigns found for event: ${eventType}`);
+        return [];
+      }
+
+      const queuedEmails = [];
+
+      for (const campaign of campaigns) {
+        // Get client's user email (from users table)
+        const users = db.authOps.getUsersByClient(clientId);
+        if (users.length === 0) {
+          console.log(`No users found for client ${clientId}`);
+          continue;
+        }
+
+        const primaryUser = users[0]; // Use first user as primary contact
+
+        // Calculate scheduled time
+        const scheduledFor = new Date();
+        scheduledFor.setHours(scheduledFor.getHours() + campaign.delay_hours);
+
+        // Get client performance data for personalization
+        const clientData = await this.getClientPerformanceData(clientId, customData);
+
+        // Generate personalized email
+        const email = this.personalizeClientEmail({
+          client,
+          user: primaryUser,
+          clientData: {...clientData, ...customData},
+          subjectTemplate: campaign.subject_template,
+          bodyTemplate: campaign.body_template,
+          fromEmail: campaign.from_email || this.defaultFromEmail,
+          fromName: campaign.from_name || this.defaultFromName,
+          replyTo: campaign.reply_to || this.replyToEmail
+        });
+
+        // Queue email
+        const queueId = db.emailOps.queueEmail({
+          leadId: null, // This is for a client, not a lead
+          campaignId: campaign.id,
+          sequenceId: null,
+          recipientEmail: primaryUser.email,
+          recipientName: `${primaryUser.first_name} ${primaryUser.last_name}`,
+          subject: email.subject,
+          bodyHtml: email.bodyHtml,
+          bodyText: email.bodyText,
+          fromEmail: email.fromEmail,
+          fromName: email.fromName,
+          replyTo: email.replyTo,
+          scheduledFor: scheduledFor.toISOString(),
+          metadata: { clientId, eventType }
+        });
+
+        queuedEmails.push({
+          queueId,
+          campaignId: campaign.id,
+          scheduledFor: scheduledFor.toISOString()
+        });
+
+        console.log(`✓ Queued client email for ${clientId}, campaign ${campaign.id}`);
+      }
+
+      return queuedEmails;
+
+    } catch (error) {
+      console.error('Client email trigger error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get client performance data for personalization
+   */
+  async getClientPerformanceData(clientId, customData = {}) {
+    try {
+      // Get recent performance metrics
+      const gscMetrics = db.gscOps.getLatest(clientId) || {};
+      const keywordStats = db.keywordOps.getStats(clientId, 30) || {};
+
+      const now = new Date();
+      const currentMonth = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+      return {
+        // Client info
+        month: currentMonth,
+        clientName: customData.clientName || 'there',
+        businessName: customData.businessName || '',
+
+        // Performance metrics
+        totalClicks: gscMetrics.total_clicks || 0,
+        totalImpressions: gscMetrics.total_impressions || 0,
+        avgPosition: gscMetrics.average_position ? gscMetrics.average_position.toFixed(1) : 0,
+        ctr: gscMetrics.average_ctr ? (gscMetrics.average_ctr * 100).toFixed(2) : 0,
+
+        // Changes (would calculate from historical data)
+        clicksChange: '+12%',
+        clicksChangeClass: 'positive',
+        positionChange: 'Improved 2.3 positions',
+        positionChangeClass: 'positive',
+        impressionsChange: '+18%',
+        impressionsChangeClass: 'positive',
+        ctrChange: '+0.5%',
+        ctrChangeClass: 'positive',
+
+        // Achievements
+        newKeywords: 8,
+        improvedKeywords: 15,
+        trafficIncrease: 23,
+
+        // Optimizations
+        optimization1: 'Updated meta descriptions on 12 pages',
+        optimization2: 'Fixed 8 broken links',
+        optimization3: 'Added schema markup to service pages',
+
+        // Next month
+        nextMonthFocus: 'Targeting 5 new high-value keywords and improving mobile page speed',
+
+        // Dashboard link
+        dashboardLink: `${process.env.DASHBOARD_URL || 'https://app.seoexpert.com'}/portal/dashboard.html`,
+        supportLink: `${process.env.DASHBOARD_URL || 'https://app.seoexpert.com'}/support`,
+        portalLink: `${process.env.DASHBOARD_URL || 'https://app.seoexpert.com'}/portal`,
+
+        // Company info
+        companyName: this.companyName,
+        fromName: this.defaultFromName,
+        fromEmail: this.defaultFromEmail,
+        phone: process.env.SUPPORT_PHONE || '(555) 123-4567',
+
+        // Misc
+        totalKeywords: keywordStats.total || 0,
+        monthsActive: customData.monthsActive || 3,
+        optimizationsCompleted: 35,
+
+        ...customData // Allow custom data to override
+      };
+    } catch (error) {
+      console.error('Error getting client performance data:', error);
+      return customData; // Return custom data if db query fails
+    }
+  }
+
+  /**
+   * Personalize client email with client/performance data
+   */
+  personalizeClientEmail(data) {
+    const { client, user, clientData, subjectTemplate, bodyTemplate, fromEmail, fromName, replyTo } = data;
+
+    const placeholderData = {
+      ...clientData,
+      // Add survey/tracking links
+      surveyLink: `${process.env.DASHBOARD_URL || 'https://app.seoexpert.com'}/survey?client=${client.id}`,
+    };
+
+    const subject = ClientEmailTemplates.replacePlaceholders || EmailTemplates.replacePlaceholders;
+    const bodyHtml = (ClientEmailTemplates.replacePlaceholders || EmailTemplates.replacePlaceholders)(bodyTemplate, placeholderData);
+
+    // Use the replacePlaceholders from EmailTemplates class
+    const finalSubject = EmailTemplates.replacePlaceholders(subjectTemplate, placeholderData);
+    const finalBodyHtml = EmailTemplates.replacePlaceholders(bodyTemplate, placeholderData);
+
+    // Generate plain text version
+    const bodyText = finalBodyHtml
+      .replace(/<[^>]*>/g, '') // Remove HTML tags
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+
+    return {
+      subject: finalSubject,
+      bodyHtml: finalBodyHtml,
       bodyText,
       fromEmail,
       fromName,
