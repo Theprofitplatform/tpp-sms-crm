@@ -1,0 +1,692 @@
+/**
+ * Email Automation Engine
+ *
+ * Orchestrates automated email campaigns and sequences
+ * Handles triggering, scheduling, sending, and tracking
+ */
+
+import db from '../database/index.js';
+import { EmailTemplates } from './email-templates.js';
+import { ClientEmailTemplates } from './client-email-templates.js';
+import { EmailSender } from './email-sender.js';
+import { whiteLabelService } from '../white-label/white-label-service.js';
+
+export class EmailAutomation {
+  constructor(config = {}) {
+    // Load white-label configuration
+    this.whiteLabelConfig = whiteLabelService.getConfig();
+    const emailConfig = whiteLabelService.getEmailConfig();
+
+    this.emailSender = new EmailSender(config.smtp);
+    this.defaultFromEmail = config.fromEmail || emailConfig.fromEmail || process.env.FROM_EMAIL || 'noreply@seoexpert.com';
+    this.defaultFromName = config.fromName || emailConfig.fromName || this.whiteLabelConfig.companyName || 'SEO Expert';
+    this.replyToEmail = config.replyTo || emailConfig.replyTo || process.env.REPLY_TO_EMAIL || this.defaultFromEmail;
+    this.companyName = config.companyName || this.whiteLabelConfig.companyName || 'SEO Expert';
+  }
+
+  /**
+   * Initialize default campaigns (both lead and client)
+   */
+  async initializeDefaultCampaigns() {
+    console.log('📧 Initializing default email campaigns...');
+
+    const leadTemplates = EmailTemplates.getAll();
+    const clientTemplates = ClientEmailTemplates.getAll();
+    const allTemplates = [...leadTemplates, ...clientTemplates];
+
+    const campaignIds = [];
+
+    for (const template of allTemplates) {
+      // Check if campaign already exists
+      const existing = db.emailOps.getActiveCampaigns().find(c => c.name === template.name);
+
+      if (!existing) {
+        const campaignId = db.emailOps.createCampaign({
+          name: template.name,
+          type: template.type,
+          triggerEvent: template.triggerEvent,
+          delayHours: template.delayHours,
+          subjectTemplate: template.subject,
+          bodyTemplate: template.bodyHtml,
+          fromName: this.defaultFromName,
+          fromEmail: this.defaultFromEmail,
+          replyTo: this.replyToEmail
+        });
+
+        campaignIds.push(campaignId);
+        console.log(`   ✓ Created campaign: ${template.name}`);
+      } else {
+        console.log(`   - Campaign already exists: ${template.name}`);
+      }
+    }
+
+    return campaignIds;
+  }
+
+  /**
+   * Trigger email campaign for a lead
+   */
+  async triggerCampaign(leadId, eventType) {
+    try {
+      const lead = db.leadOps.getLeadById(leadId);
+      if (!lead) {
+        throw new Error(`Lead ${leadId} not found`);
+      }
+
+      // Find campaigns triggered by this event
+      const campaigns = db.emailOps.getActiveCampaigns()
+        .filter(c => c.trigger_event === eventType);
+
+      if (campaigns.length === 0) {
+        console.log(`No campaigns found for event: ${eventType}`);
+        return [];
+      }
+
+      const queuedEmails = [];
+
+      for (const campaign of campaigns) {
+        // Check if lead already received this campaign
+        const existingEmails = db.emailOps.getLeadEmails(leadId);
+        const alreadySent = existingEmails.some(e => e.campaign_id === campaign.id);
+
+        if (alreadySent) {
+          console.log(`Lead ${leadId} already received campaign ${campaign.id}`);
+          continue;
+        }
+
+        // Calculate scheduled time
+        const scheduledFor = new Date();
+        scheduledFor.setHours(scheduledFor.getHours() + campaign.delay_hours);
+
+        // Get lead audit data for personalization
+        const auditData = await this.getLeadAuditData(lead);
+
+        // Generate personalized email
+        const email = this.personalizeEmail({
+          lead,
+          auditData,
+          subjectTemplate: campaign.subject_template,
+          bodyTemplate: campaign.body_template,
+          fromEmail: campaign.from_email || this.defaultFromEmail,
+          fromName: campaign.from_name || this.defaultFromName,
+          replyTo: campaign.reply_to || this.replyToEmail
+        });
+
+        // Queue email
+        const queueId = db.emailOps.queueEmail({
+          leadId,
+          campaignId: campaign.id,
+          sequenceId: null,
+          recipientEmail: lead.email,
+          recipientName: lead.name,
+          subject: email.subject,
+          bodyHtml: email.bodyHtml,
+          bodyText: email.bodyText,
+          fromEmail: email.fromEmail,
+          fromName: email.fromName,
+          replyTo: email.replyTo,
+          scheduledFor: scheduledFor.toISOString()
+        });
+
+        queuedEmails.push({
+          queueId,
+          campaignId: campaign.id,
+          scheduledFor: scheduledFor.toISOString()
+        });
+
+        console.log(`✓ Queued email for lead ${leadId}, campaign ${campaign.id}`);
+      }
+
+      return queuedEmails;
+
+    } catch (error) {
+      console.error('Email trigger error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get lead audit data for personalization
+   */
+  async getLeadAuditData(lead) {
+    // This would normally fetch the actual audit data
+    // For now, return mock data based on lead info
+    return {
+      seoScore: lead.audit_score || 65,
+      technicalSummary: 'We found issues with page speed, mobile optimization, and missing sitemap.',
+      onPageSummary: 'Missing meta descriptions on 8 pages and suboptimal title tags.',
+      competitorSummary: 'Your competitors are ranking for 47 keywords you\'re missing.',
+      keywordCount: Math.floor(Math.random() * 30) + 20,
+      competitorCount: Math.floor(Math.random() * 3) + 2,
+      trafficIncrease: Math.floor(Math.random() * 500) + 300
+    };
+  }
+
+  /**
+   * Personalize email with lead data
+   */
+  personalizeEmail(data) {
+    const { lead, auditData, subjectTemplate, bodyTemplate, fromEmail, fromName, replyTo } = data;
+
+    const now = new Date();
+    const currentMonth = now.toLocaleString('default', { month: 'long' });
+    const deadline = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000); // 3 days from now
+
+    // Get white-label configuration
+    const wlConfig = whiteLabelService.getConfig();
+
+    const placeholderData = {
+      // Lead info
+      name: lead.name,
+      email: lead.email,
+      businessName: lead.business_name,
+      website: lead.website,
+      industry: lead.industry || 'your industry',
+      phone: lead.phone || '',
+
+      // Audit data
+      seoScore: auditData.seoScore,
+      technicalSummary: auditData.technicalSummary,
+      onPageSummary: auditData.onPageSummary,
+      competitorSummary: auditData.competitorSummary,
+      keywordCount: auditData.keywordCount,
+      competitorCount: auditData.competitorCount,
+      trafficIncrease: auditData.trafficIncrease,
+
+      // Case study data (would be dynamic in production)
+      similarBusiness: 'Sydney Auto Repairs',
+
+      // Contact info
+      fromEmail,
+      fromName,
+
+      // Company branding
+      companyName: wlConfig.companyName,
+
+      // Company address (CAN-SPAM compliance)
+      companyAddress: process.env.COMPANY_ADDRESS || '123 Main Street',
+      companyCity: process.env.COMPANY_CITY || 'San Francisco',
+      companyState: process.env.COMPANY_STATE || 'CA',
+      companyZip: process.env.COMPANY_ZIP || '94102',
+
+      // Dynamic dates
+      currentMonth,
+      deadline: deadline.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }),
+
+      // Links
+      calendarLink: `https://calendly.com/seoexpert/strategy?email=${encodeURIComponent(lead.email)}`,
+      unsubscribeLink: `${process.env.DASHBOARD_URL || 'http://localhost:3000'}/unsubscribe.html?email=${encodeURIComponent(lead.email)}&leadId=${lead.id}`,
+      privacyPolicyUrl: wlConfig.privacyPolicyUrl || `${process.env.DASHBOARD_URL || 'http://localhost:3000'}/privacy.html`
+    };
+
+    const subject = EmailTemplates.replacePlaceholders(subjectTemplate, placeholderData);
+    let bodyHtml = EmailTemplates.replacePlaceholders(bodyTemplate, placeholderData);
+
+    // Generate plain text version
+    let bodyText = bodyHtml
+      .replace(/<[^>]*>/g, '') // Remove HTML tags
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+
+    // Apply white-label branding
+    const branded = whiteLabelService.applyBrandingToEmail(bodyHtml, bodyText);
+    bodyHtml = branded.html;
+    bodyText = branded.text || bodyText;
+
+    return {
+      subject,
+      bodyHtml,
+      bodyText,
+      fromEmail,
+      fromName,
+      replyTo
+    };
+  }
+
+  /**
+   * Send email to client (for existing clients, not leads)
+   */
+  async sendClientEmail(clientId, eventType, customData = {}) {
+    try {
+      // Get client from database
+      const client = db.clientOps.getById(clientId);
+      if (!client) {
+        throw new Error(`Client ${clientId} not found`);
+      }
+
+      // Find campaigns triggered by this event
+      const campaigns = db.emailOps.getActiveCampaigns()
+        .filter(c => c.trigger_event === eventType);
+
+      if (campaigns.length === 0) {
+        console.log(`No campaigns found for event: ${eventType}`);
+        return [];
+      }
+
+      const queuedEmails = [];
+
+      for (const campaign of campaigns) {
+        // Get client's user email (from users table)
+        const users = db.authOps.getUsersByClient(clientId);
+        if (users.length === 0) {
+          console.log(`No users found for client ${clientId}`);
+          continue;
+        }
+
+        const primaryUser = users[0]; // Use first user as primary contact
+
+        // Calculate scheduled time
+        const scheduledFor = new Date();
+        scheduledFor.setHours(scheduledFor.getHours() + campaign.delay_hours);
+
+        // Get client performance data for personalization
+        const clientData = await this.getClientPerformanceData(clientId, customData);
+
+        // Generate personalized email
+        const email = this.personalizeClientEmail({
+          client,
+          user: primaryUser,
+          clientData: {...clientData, ...customData},
+          subjectTemplate: campaign.subject_template,
+          bodyTemplate: campaign.body_template,
+          fromEmail: campaign.from_email || this.defaultFromEmail,
+          fromName: campaign.from_name || this.defaultFromName,
+          replyTo: campaign.reply_to || this.replyToEmail
+        });
+
+        // Queue email
+        const queueId = db.emailOps.queueEmail({
+          leadId: null, // This is for a client, not a lead
+          campaignId: campaign.id,
+          sequenceId: null,
+          recipientEmail: primaryUser.email,
+          recipientName: `${primaryUser.first_name} ${primaryUser.last_name}`,
+          subject: email.subject,
+          bodyHtml: email.bodyHtml,
+          bodyText: email.bodyText,
+          fromEmail: email.fromEmail,
+          fromName: email.fromName,
+          replyTo: email.replyTo,
+          scheduledFor: scheduledFor.toISOString(),
+          metadata: { clientId, eventType }
+        });
+
+        queuedEmails.push({
+          queueId,
+          campaignId: campaign.id,
+          scheduledFor: scheduledFor.toISOString()
+        });
+
+        console.log(`✓ Queued client email for ${clientId}, campaign ${campaign.id}`);
+      }
+
+      return queuedEmails;
+
+    } catch (error) {
+      console.error('Client email trigger error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get client performance data for personalization
+   */
+  async getClientPerformanceData(clientId, customData = {}) {
+    try {
+      // Get recent performance metrics
+      const gscMetrics = db.gscOps.getLatest(clientId) || {};
+      const keywordStats = db.keywordOps.getStats(clientId, 30) || {};
+
+      const now = new Date();
+      const currentMonth = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+      return {
+        // Client info
+        month: currentMonth,
+        clientName: customData.clientName || 'there',
+        businessName: customData.businessName || '',
+
+        // Performance metrics
+        totalClicks: gscMetrics.total_clicks || 0,
+        totalImpressions: gscMetrics.total_impressions || 0,
+        avgPosition: gscMetrics.average_position ? gscMetrics.average_position.toFixed(1) : 0,
+        ctr: gscMetrics.average_ctr ? (gscMetrics.average_ctr * 100).toFixed(2) : 0,
+
+        // Changes (would calculate from historical data)
+        clicksChange: '+12%',
+        clicksChangeClass: 'positive',
+        positionChange: 'Improved 2.3 positions',
+        positionChangeClass: 'positive',
+        impressionsChange: '+18%',
+        impressionsChangeClass: 'positive',
+        ctrChange: '+0.5%',
+        ctrChangeClass: 'positive',
+
+        // Achievements
+        newKeywords: 8,
+        improvedKeywords: 15,
+        trafficIncrease: 23,
+
+        // Optimizations
+        optimization1: 'Updated meta descriptions on 12 pages',
+        optimization2: 'Fixed 8 broken links',
+        optimization3: 'Added schema markup to service pages',
+
+        // Next month
+        nextMonthFocus: 'Targeting 5 new high-value keywords and improving mobile page speed',
+
+        // Dashboard link
+        dashboardLink: `${process.env.DASHBOARD_URL || 'https://app.seoexpert.com'}/portal/dashboard.html`,
+        supportLink: `${process.env.DASHBOARD_URL || 'https://app.seoexpert.com'}/support`,
+        portalLink: `${process.env.DASHBOARD_URL || 'https://app.seoexpert.com'}/portal`,
+
+        // Company info
+        companyName: whiteLabelService.getConfig().companyName,
+        fromName: this.defaultFromName,
+        fromEmail: this.defaultFromEmail,
+        phone: process.env.SUPPORT_PHONE || '(555) 123-4567',
+
+        // Company address (CAN-SPAM compliance)
+        companyAddress: process.env.COMPANY_ADDRESS || '123 Main Street',
+        companyCity: process.env.COMPANY_CITY || 'San Francisco',
+        companyState: process.env.COMPANY_STATE || 'CA',
+        companyZip: process.env.COMPANY_ZIP || '94102',
+
+        // Misc
+        totalKeywords: keywordStats.total || 0,
+        monthsActive: customData.monthsActive || 3,
+        optimizationsCompleted: 35,
+
+        ...customData // Allow custom data to override
+      };
+    } catch (error) {
+      console.error('Error getting client performance data:', error);
+      return customData; // Return custom data if db query fails
+    }
+  }
+
+  /**
+   * Personalize client email with client/performance data
+   */
+  personalizeClientEmail(data) {
+    const { client, user, clientData, subjectTemplate, bodyTemplate, fromEmail, fromName, replyTo } = data;
+
+    const wlConfig = whiteLabelService.getConfig();
+
+    const placeholderData = {
+      ...clientData,
+      // Add survey/tracking links
+      surveyLink: `${process.env.DASHBOARD_URL || 'https://app.seoexpert.com'}/survey?client=${client.id}`,
+      unsubscribeLink: `${process.env.DASHBOARD_URL || 'http://localhost:3000'}/unsubscribe.html?email=${encodeURIComponent(user.email)}&userId=${user.id}`,
+      privacyPolicyUrl: wlConfig.privacyPolicyUrl || `${process.env.DASHBOARD_URL || 'http://localhost:3000'}/privacy.html`
+    };
+
+    const subject = ClientEmailTemplates.replacePlaceholders || EmailTemplates.replacePlaceholders;
+    const bodyHtml = (ClientEmailTemplates.replacePlaceholders || EmailTemplates.replacePlaceholders)(bodyTemplate, placeholderData);
+
+    // Use the replacePlaceholders from EmailTemplates class
+    const finalSubject = EmailTemplates.replacePlaceholders(subjectTemplate, placeholderData);
+    let finalBodyHtml = EmailTemplates.replacePlaceholders(bodyTemplate, placeholderData);
+
+    // Generate plain text version
+    let bodyText = finalBodyHtml
+      .replace(/<[^>]*>/g, '') // Remove HTML tags
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+
+    // Apply white-label branding
+    const branded = whiteLabelService.applyBrandingToEmail(finalBodyHtml, bodyText);
+    finalBodyHtml = branded.html;
+    bodyText = branded.text || bodyText;
+
+    return {
+      subject: finalSubject,
+      bodyHtml: finalBodyHtml,
+      bodyText,
+      fromEmail,
+      fromName,
+      replyTo
+    };
+  }
+
+  /**
+   * Process email queue (send pending emails)
+   */
+  async processQueue(options = {}) {
+    const { limit = 50, dryRun = false } = options;
+
+    console.log(`📬 Processing email queue (limit: ${limit}, dryRun: ${dryRun})`);
+
+    // Get pending emails
+    const pendingEmails = db.emailOps.getPendingEmails(limit);
+
+    if (pendingEmails.length === 0) {
+      console.log('   No pending emails');
+      return { sent: 0, failed: 0, results: [] };
+    }
+
+    console.log(`   Found ${pendingEmails.length} pending emails`);
+
+    const results = [];
+    let sent = 0;
+    let failed = 0;
+
+    for (const email of pendingEmails) {
+      try {
+        console.log(`   Sending email ${email.id} to ${email.recipient_email}...`);
+
+        if (dryRun) {
+          console.log(`   [DRY RUN] Would send: ${email.subject}`);
+          results.push({
+            emailId: email.id,
+            success: true,
+            dryRun: true
+          });
+          continue;
+        }
+
+        // Update status to 'sending'
+        db.emailOps.updateEmailStatus(email.id, 'sending');
+
+        // Send email
+        const result = await this.emailSender.send({
+          to: email.recipient_email,
+          toName: email.recipient_name,
+          from: email.from_email,
+          fromName: email.from_name,
+          replyTo: email.reply_to,
+          subject: email.subject,
+          html: email.body_html,
+          text: email.body_text
+        });
+
+        if (result.success) {
+          // Update status to 'sent'
+          db.emailOps.updateEmailStatus(email.id, 'sent');
+
+          // Track send event
+          db.emailOps.trackEvent({
+            queueId: email.id,
+            leadId: email.lead_id,
+            eventType: 'sent',
+            eventData: { messageId: result.messageId }
+          });
+
+          // Track in lead events
+          db.leadOps.trackEvent(email.lead_id, 'email_sent', {
+            queueId: email.id,
+            subject: email.subject
+          });
+
+          // Send Discord notification for email campaign (async, don't wait)
+          if (process.env.DISCORD_NOTIFICATIONS_ENABLED === 'true') {
+            try {
+              const { discordNotifier } = await import('../audit/discord-notifier.js');
+              const campaign = db.emailOps.getCampaign(email.campaign_id);
+
+              // Determine email type based on campaign name
+              let emailType = 'email';
+              if (campaign && campaign.name) {
+                if (campaign.name.includes('Welcome')) emailType = 'welcome';
+                else if (campaign.name.includes('Follow')) emailType = 'follow_up';
+                else if (campaign.name.includes('Report')) emailType = 'client_report';
+                else if (campaign.name.includes('Alert')) emailType = 'client_alert';
+              }
+
+              discordNotifier.sendEmailCampaign({
+                campaignName: campaign?.name || 'Email Campaign',
+                recipientEmail: email.recipient_email,
+                recipientName: email.recipient_name,
+                scheduledFor: email.scheduled_for,
+                emailType
+              }).catch(err => {
+                console.error('Warning: Failed to send Discord notification:', err.message);
+              });
+            } catch (err) {
+              console.error('Warning: Discord notification error:', err.message);
+            }
+          }
+
+          sent++;
+          results.push({
+            emailId: email.id,
+            success: true,
+            messageId: result.messageId,
+            preview: result.preview
+          });
+
+          console.log(`   ✓ Sent email ${email.id}`);
+        } else {
+          // Handle failure
+          db.emailOps.incrementRetryCount(email.id);
+
+          const retryCount = email.retry_count + 1;
+          const maxRetries = 3;
+
+          if (retryCount >= maxRetries) {
+            // Mark as failed after max retries
+            db.emailOps.updateEmailStatus(email.id, 'failed', result.error);
+            failed++;
+            console.error(`   ✗ Email ${email.id} failed (max retries): ${result.error}`);
+          } else {
+            // Reschedule for retry (exponential backoff)
+            const retryDelay = Math.pow(2, retryCount) * 60; // 2min, 4min, 8min
+            const newScheduledFor = new Date();
+            newScheduledFor.setMinutes(newScheduledFor.getMinutes() + retryDelay);
+
+            db.emailOps.updateEmailStatus(email.id, 'pending');
+
+            console.warn(`   ⚠ Email ${email.id} failed, retry ${retryCount}/${maxRetries} in ${retryDelay}min`);
+          }
+
+          results.push({
+            emailId: email.id,
+            success: false,
+            error: result.error,
+            retries: retryCount
+          });
+        }
+
+      } catch (error) {
+        console.error(`   ✗ Error processing email ${email.id}:`, error);
+        db.emailOps.updateEmailStatus(email.id, 'failed', error.message);
+        failed++;
+
+        results.push({
+          emailId: email.id,
+          success: false,
+          error: error.message
+        });
+      }
+
+      // Small delay between emails to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    console.log(`📨 Queue processed: ${sent} sent, ${failed} failed`);
+
+    return { sent, failed, results };
+  }
+
+  /**
+   * Start automated email processing (runs continuously)
+   */
+  startAutomation(intervalMinutes = 5) {
+    console.log(`🤖 Starting email automation (checking every ${intervalMinutes} minutes)`);
+
+    // Process queue immediately
+    this.processQueue();
+
+    // Then process every N minutes
+    this.intervalId = setInterval(() => {
+      this.processQueue();
+    }, intervalMinutes * 60 * 1000);
+
+    return this.intervalId;
+  }
+
+  /**
+   * Stop automated email processing
+   */
+  stopAutomation() {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+      console.log('⏹️  Email automation stopped');
+    }
+  }
+
+  /**
+   * Get campaign analytics
+   */
+  getCampaignAnalytics(campaignId) {
+    const campaign = db.emailOps.getCampaign(campaignId);
+    if (!campaign) {
+      throw new Error(`Campaign ${campaignId} not found`);
+    }
+
+    const stats = db.emailOps.getCampaignStats(campaignId);
+
+    return {
+      campaign: {
+        id: campaign.id,
+        name: campaign.name,
+        type: campaign.type,
+        status: campaign.status
+      },
+      stats
+    };
+  }
+
+  /**
+   * Get lead email engagement
+   */
+  getLeadEngagement(leadId) {
+    const stats = db.emailOps.getLeadEmailStats(leadId);
+    const emails = db.emailOps.getLeadEmails(leadId);
+
+    return {
+      leadId,
+      stats,
+      emails,
+      engagementScore: this.calculateEngagementScore(stats)
+    };
+  }
+
+  /**
+   * Calculate lead engagement score (0-100)
+   */
+  calculateEngagementScore(stats) {
+    if (stats.sent === 0) return 0;
+
+    const openRate = stats.opened / stats.sent;
+    const clickRate = stats.clicked / stats.sent;
+
+    // Weight: opens 60%, clicks 40%
+    const score = (openRate * 60) + (clickRate * 40);
+
+    return Math.round(score * 100);
+  }
+}
+
+export default EmailAutomation;

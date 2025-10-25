@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Unsubscribe - SEO Automation</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      max-width: 500px;
+      width: 100%;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      padding: 40px;
+      text-align: center;
+    }
+
+    h1 {
+      color: #333;
+      font-size: 28px;
+      margin-bottom: 20px;
+    }
+
+    .icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+    }
+
+    .success {
+      color: #10b981;
+    }
+
+    .error {
+      color: #ef4444;
+    }
+
+    p {
+      color: #666;
+      line-height: 1.6;
+      margin-bottom: 20px;
+      font-size: 16px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+      text-align: left;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #333;
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      transition: border-color 0.3s;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 14px 32px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      width: 100%;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .message {
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+
+    .message.success {
+      background: #ecfdf5;
+      border: 1px solid #10b981;
+      color: #065f46;
+    }
+
+    .message.error {
+      background: #fef2f2;
+      border: 1px solid #ef4444;
+      color: #991b1b;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Loading State -->
+    <div id="loading" class="hidden">
+      <div class="icon">⏳</div>
+      <h1>Processing...</h1>
+      <p>Please wait while we process your request.</p>
+    </div>
+
+    <!-- Unsubscribe Form -->
+    <div id="unsubscribeForm">
+      <div class="icon">📧</div>
+      <h1>Unsubscribe from Emails</h1>
+      <p>We're sorry to see you go. Please enter your email address to unsubscribe from all future emails.</p>
+
+      <form id="form">
+        <div class="form-group">
+          <label for="email">Email Address *</label>
+          <input type="email" id="email" name="email" required placeholder="your@email.com">
+        </div>
+
+        <div class="form-group">
+          <label for="reason">Reason for unsubscribing (optional)</label>
+          <select id="reason" name="reason">
+            <option value="">Select a reason</option>
+            <option value="too_many_emails">Too many emails</option>
+            <option value="not_relevant">Content not relevant</option>
+            <option value="no_longer_interested">No longer interested</option>
+            <option value="privacy_concerns">Privacy concerns</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="feedback">Additional feedback (optional)</label>
+          <textarea id="feedback" name="feedback" placeholder="Help us improve..."></textarea>
+        </div>
+
+        <button type="submit">Unsubscribe</button>
+      </form>
+    </div>
+
+    <!-- Success State -->
+    <div id="success" class="hidden">
+      <div class="icon success">✅</div>
+      <h1>Successfully Unsubscribed</h1>
+      <p>You have been removed from our email list and will no longer receive emails from us.</p>
+      <p>If you change your mind, you can always resubscribe from our website.</p>
+      <p style="margin-top: 30px; font-size: 14px; color: #999;">Thank you for your time with us!</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="error" class="hidden">
+      <div class="icon error">❌</div>
+      <h1>Oops! Something went wrong</h1>
+      <p id="errorMessage">We couldn't process your request. Please try again later.</p>
+      <button onclick="location.reload()">Try Again</button>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = '';
+    const form = document.getElementById('form');
+    const emailInput = document.getElementById('email');
+    const reasonSelect = document.getElementById('reason');
+    const feedbackInput = document.getElementById('feedback');
+
+    // Check URL parameters for email
+    const urlParams = new URLSearchParams(window.location.search);
+    const emailParam = urlParams.get('email');
+    if (emailParam) {
+      emailInput.value = decodeURIComponent(emailParam);
+    }
+
+    // Show/hide sections
+    function showSection(sectionId) {
+      const sections = ['loading', 'unsubscribeForm', 'success', 'error'];
+      sections.forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+      document.getElementById(sectionId).classList.remove('hidden');
+    }
+
+    // Handle form submission
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const email = emailInput.value.trim();
+      const reason = reasonSelect.value;
+      const feedback = feedbackInput.value.trim();
+
+      if (!email) {
+        alert('Please enter your email address');
+        return;
+      }
+
+      showSection('loading');
+
+      try {
+        const response = await fetch(`${API_BASE}/api/email/unsubscribe`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email,
+            reason: reason || feedback || null,
+            source: 'web_form'
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          showSection('success');
+        } else {
+          document.getElementById('errorMessage').textContent = data.error || 'Failed to unsubscribe';
+          showSection('error');
+        }
+
+      } catch (error) {
+        console.error('Unsubscribe error:', error);
+        document.getElementById('errorMessage').textContent = 'Network error. Please check your connection and try again.';
+        showSection('error');
+      }
+    });
+  </script>
+</body>
+</html>

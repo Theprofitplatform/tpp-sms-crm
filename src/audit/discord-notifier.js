@@ -334,6 +334,239 @@ export class DiscordNotifier {
 
     return await this.sendEmbed(embed);
   }
+
+  /**
+   * Send new lead notification
+   */
+  async sendNewLead(leadData) {
+    const { name, businessName, email, website, industry, seoScore } = leadData;
+
+    const scoreColor = seoScore >= 70 ? '🟢' : seoScore >= 50 ? '🟡' : '🔴';
+
+    const embed = {
+      title: '🎯 New Lead Captured!',
+      description: `**${businessName}** just requested a FREE SEO audit`,
+      color: 0x00ff00, // Green
+      fields: [
+        {
+          name: '👤 Contact',
+          value: `**${name}**\n${email}`,
+          inline: true
+        },
+        {
+          name: '🏢 Business',
+          value: `**${businessName}**\n${industry}`,
+          inline: true
+        },
+        {
+          name: '🌐 Website',
+          value: website,
+          inline: false
+        },
+        {
+          name: `${scoreColor} SEO Score`,
+          value: `**${seoScore}/100**`,
+          inline: true
+        }
+      ],
+      timestamp: new Date().toISOString(),
+      footer: {
+        text: 'Lead Magnet System'
+      }
+    };
+
+    return await this.sendEmbed(embed);
+  }
+
+  /**
+   * Send email campaign triggered notification
+   */
+  async sendEmailCampaign(campaignData) {
+    const { campaignName, recipientEmail, recipientName, scheduledFor, emailType } = campaignData;
+
+    const typeEmoji = emailType === 'welcome' ? '👋' :
+                      emailType === 'follow_up' ? '📧' :
+                      emailType === 'client_report' ? '📊' :
+                      emailType === 'client_alert' ? '⚠️' : '📨';
+
+    const embed = {
+      title: `${typeEmoji} Email Campaign Triggered`,
+      description: `**${campaignName}**`,
+      color: 0x0099ff, // Blue
+      fields: [
+        {
+          name: '📬 Recipient',
+          value: `**${recipientName}**\n${recipientEmail}`,
+          inline: true
+        },
+        {
+          name: '📅 Scheduled',
+          value: new Date(scheduledFor).toLocaleString('en-US', {
+            dateStyle: 'medium',
+            timeStyle: 'short'
+          }),
+          inline: true
+        }
+      ],
+      timestamp: new Date().toISOString(),
+      footer: {
+        text: 'Email Automation System'
+      }
+    };
+
+    return await this.sendEmbed(embed);
+  }
+
+  /**
+   * Send local SEO alert
+   */
+  async sendLocalSEOAlert(alertData) {
+    const { clientName, issueType, severity, message, score } = alertData;
+
+    const colorMap = {
+      HIGH: 0xff0000,    // Red
+      MEDIUM: 0xffa500,  // Orange
+      LOW: 0xffff00      // Yellow
+    };
+
+    const severityEmoji = severity === 'HIGH' ? '🔴' :
+                         severity === 'MEDIUM' ? '🟡' : '🟢';
+
+    const embed = {
+      title: '🗺️ Local SEO Alert',
+      description: `**${clientName}**`,
+      color: colorMap[severity] || 0xffa500,
+      fields: [
+        {
+          name: `${severityEmoji} Issue Type`,
+          value: issueType,
+          inline: true
+        },
+        {
+          name: '📊 Current Score',
+          value: `${score}/100`,
+          inline: true
+        },
+        {
+          name: '📝 Details',
+          value: message,
+          inline: false
+        }
+      ],
+      timestamp: new Date().toISOString(),
+      footer: {
+        text: 'Local SEO Automation'
+      }
+    };
+
+    return await this.sendEmbed(embed);
+  }
+
+  /**
+   * Send client milestone notification
+   */
+  async sendMilestone(milestoneData) {
+    const { clientName, milestone, description, achievement } = milestoneData;
+
+    const embed = {
+      title: '🎉 Client Milestone Achieved!',
+      description: `**${clientName}** just hit a major goal!`,
+      color: 0xffd700, // Gold
+      fields: [
+        {
+          name: '🏆 Milestone',
+          value: milestone,
+          inline: false
+        },
+        {
+          name: '📈 Achievement',
+          value: achievement,
+          inline: false
+        },
+        {
+          name: '💡 What This Means',
+          value: description,
+          inline: false
+        }
+      ],
+      timestamp: new Date().toISOString(),
+      footer: {
+        text: 'Client Success Tracker'
+      }
+    };
+
+    return await this.sendEmbed(embed);
+  }
+
+  /**
+   * Send optimization completed notification
+   */
+  async sendOptimizationComplete(optimizationData) {
+    const { clientName, optimizationType, itemsFixed, beforeScore, afterScore } = optimizationData;
+
+    const improvement = afterScore - beforeScore;
+    const improvementText = improvement > 0 ? `+${improvement}` : `${improvement}`;
+
+    const embed = {
+      title: '✅ Optimization Complete',
+      description: `**${clientName}**`,
+      color: 0x00ff00, // Green
+      fields: [
+        {
+          name: '🔧 Optimization Type',
+          value: optimizationType,
+          inline: true
+        },
+        {
+          name: '📊 Items Fixed',
+          value: `${itemsFixed}`,
+          inline: true
+        },
+        {
+          name: '📈 Score Change',
+          value: `${beforeScore} → ${afterScore} (${improvementText})`,
+          inline: false
+        }
+      ],
+      timestamp: new Date().toISOString(),
+      footer: {
+        text: 'SEO Automation System'
+      }
+    };
+
+    return await this.sendEmbed(embed);
+  }
+
+  /**
+   * Send PDF report generated notification
+   */
+  async sendReportGenerated(reportData) {
+    const { clientName, reportType, period, downloadUrl } = reportData;
+
+    const embed = {
+      title: '📊 PDF Report Generated',
+      description: `**${clientName}** - ${reportType}`,
+      color: 0x0099ff, // Blue
+      fields: [
+        {
+          name: '📅 Period',
+          value: period,
+          inline: true
+        },
+        {
+          name: '📥 Download',
+          value: `[Click to Download](${downloadUrl})`,
+          inline: false
+        }
+      ],
+      timestamp: new Date().toISOString(),
+      footer: {
+        text: 'Report Generation System'
+      }
+    };
+
+    return await this.sendEmbed(embed);
+  }
 }
 
 // Export singleton
