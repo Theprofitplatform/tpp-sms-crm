@@ -112,11 +112,16 @@ export class EmailTemplates {
     </div>
 
     <div class="footer">
-      <p>SEO Expert - AI-Powered SEO Automation<br>
+      <p>{{companyName}} - AI-Powered SEO Automation<br>
       Helping businesses dominate local search</p>
       <p style="font-size: 12px; margin-top: 20px;">
+        {{companyAddress}}<br>
+        {{companyCity}}, {{companyState}} {{companyZip}}
+      </p>
+      <p style="font-size: 12px; margin-top: 10px;">
         You're receiving this because you requested a FREE SEO audit at {{website}}.<br>
-        <a href="{{unsubscribeLink}}" style="color: #999999;">Unsubscribe</a>
+        <a href="{{unsubscribeLink}}" style="color: #999999;">Unsubscribe</a> |
+        <a href="{{privacyPolicyUrl}}" style="color: #999999;">Privacy Policy</a>
       </p>
     </div>
   </div>
@@ -157,6 +162,13 @@ Talk soon!
 The SEO Expert Team
 {{fromEmail}}
 {{phone}}
+
+---
+{{companyName}}
+{{companyAddress}}, {{companyCity}}, {{companyState}} {{companyZip}}
+
+To unsubscribe: {{unsubscribeLink}}
+Privacy Policy: {{privacyPolicyUrl}}
       `.trim()
     };
   }
@@ -233,7 +245,14 @@ The SEO Expert Team
     </div>
 
     <div class="footer">
-      <p><a href="{{unsubscribeLink}}" style="color: #999999;">Unsubscribe</a></p>
+      <p style="font-size: 12px; color: #999999;">
+        {{companyName}}<br>
+        {{companyAddress}}, {{companyCity}}, {{companyState}} {{companyZip}}
+      </p>
+      <p style="font-size: 12px; margin-top: 10px;">
+        <a href="{{unsubscribeLink}}" style="color: #999999;">Unsubscribe</a> |
+        <a href="{{privacyPolicyUrl}}" style="color: #999999;">Privacy Policy</a>
+      </p>
     </div>
   </div>
 </body>
@@ -265,6 +284,13 @@ BOOK YOUR STRATEGY CALL:
 Best,
 {{fromName}}
 SEO Expert
+
+---
+{{companyName}}
+{{companyAddress}}, {{companyCity}}, {{companyState}} {{companyZip}}
+
+To unsubscribe: {{unsubscribeLink}}
+Privacy Policy: {{privacyPolicyUrl}}
       `.trim()
     };
   }
@@ -333,7 +359,14 @@ SEO Expert
     </div>
 
     <div class="footer">
-      <p><a href="{{unsubscribeLink}}" style="color: #999999;">Unsubscribe</a></p>
+      <p style="font-size: 12px; color: #999999;">
+        {{companyName}}<br>
+        {{companyAddress}}, {{companyCity}}, {{companyState}} {{companyZip}}
+      </p>
+      <p style="font-size: 12px; margin-top: 10px;">
+        <a href="{{unsubscribeLink}}" style="color: #999999;">Unsubscribe</a> |
+        <a href="{{privacyPolicyUrl}}" style="color: #999999;">Privacy Policy</a>
+      </p>
     </div>
   </div>
 </body>
@@ -363,6 +396,13 @@ Want the full roadmap? Let's talk:
 
 Cheers,
 {{fromName}}
+
+---
+{{companyName}}
+{{companyAddress}}, {{companyCity}}, {{companyState}} {{companyZip}}
+
+To unsubscribe: {{unsubscribeLink}}
+Privacy Policy: {{privacyPolicyUrl}}
       `.trim()
     };
   }
@@ -432,7 +472,14 @@ Cheers,
     </div>
 
     <div class="footer">
-      <p><a href="{{unsubscribeLink}}" style="color: #999999;">Unsubscribe</a></p>
+      <p style="font-size: 12px; color: #999999;">
+        {{companyName}}<br>
+        {{companyAddress}}, {{companyCity}}, {{companyState}} {{companyZip}}
+      </p>
+      <p style="font-size: 12px; margin-top: 10px;">
+        <a href="{{unsubscribeLink}}" style="color: #999999;">Unsubscribe</a> |
+        <a href="{{privacyPolicyUrl}}" style="color: #999999;">Privacy Policy</a>
+      </p>
     </div>
   </div>
 </body>

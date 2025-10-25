@@ -123,9 +123,17 @@ export class ClientEmailTemplates {
     </div>
 
     <div class="footer">
-      <p>{{companyName}} - Your SEO Partner<br>
-      <a href="{{dashboardLink}}" style="color: #667eea;">View Dashboard</a> |
-      <a href="{{supportLink}}" style="color: #667eea;">Contact Support</a></p>
+      <p>{{companyName}} - Your SEO Partner</p>
+      <p style="font-size: 12px; margin-top: 15px;">
+        {{companyAddress}}<br>
+        {{companyCity}}, {{companyState}} {{companyZip}}
+      </p>
+      <p style="font-size: 12px; margin-top: 10px;">
+        <a href="{{dashboardLink}}" style="color: #667eea;">View Dashboard</a> |
+        <a href="{{supportLink}}" style="color: #667eea;">Contact Support</a> |
+        <a href="{{unsubscribeLink}}" style="color: #999999;">Unsubscribe</a> |
+        <a href="{{privacyPolicyUrl}}" style="color: #999999;">Privacy Policy</a>
+      </p>
     </div>
   </div>
 </body>
@@ -162,6 +170,15 @@ View your full report: {{dashboardLink}}
 Best regards,
 {{fromName}}
 {{fromEmail}}
+
+---
+{{companyName}}
+{{companyAddress}}, {{companyCity}}, {{companyState}} {{companyZip}}
+
+View Dashboard: {{dashboardLink}}
+Contact Support: {{supportLink}}
+Unsubscribe: {{unsubscribeLink}}
+Privacy Policy: {{privacyPolicyUrl}}
       `.trim()
     };
   }
@@ -284,6 +301,15 @@ No action needed from your side - we're on it!
 
 Best regards,
 {{fromName}}
+
+---
+{{companyName}}
+{{companyAddress}}, {{companyCity}}, {{companyState}} {{companyZip}}
+
+View Dashboard: {{dashboardLink}}
+Contact Support: {{supportLink}}
+Unsubscribe: {{unsubscribeLink}}
+Privacy Policy: {{privacyPolicyUrl}}
       `.trim()
     };
   }
@@ -387,6 +413,15 @@ Best regards,
 {{fromName}}
 {{fromEmail}}
 {{phone}}
+
+---
+{{companyName}}
+{{companyAddress}}, {{companyCity}}, {{companyState}} {{companyZip}}
+
+View Dashboard: {{dashboardLink}}
+Contact Support: {{supportLink}}
+Unsubscribe: {{unsubscribeLink}}
+Privacy Policy: {{privacyPolicyUrl}}
       `.trim()
     };
   }
@@ -539,6 +574,14 @@ I'll be in touch within 24 hours to schedule our strategy call.
 Welcome aboard,
 {{fromName}}
 {{companyName}}
+
+---
+{{companyAddress}}, {{companyCity}}, {{companyState}} {{companyZip}}
+
+View Dashboard: {{dashboardLink}}
+Contact Support: {{supportLink}}
+Unsubscribe: {{unsubscribeLink}}
+Privacy Policy: {{privacyPolicyUrl}}
       `.trim()
     };
   }
@@ -647,6 +690,15 @@ Here's to many more wins! 🚀
 
 Best regards,
 {{fromName}}
+
+---
+{{companyName}}
+{{companyAddress}}, {{companyCity}}, {{companyState}} {{companyZip}}
+
+View Dashboard: {{dashboardLink}}
+Contact Support: {{supportLink}}
+Unsubscribe: {{unsubscribeLink}}
+Privacy Policy: {{privacyPolicyUrl}}
       `.trim()
     };
   }

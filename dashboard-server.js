@@ -3471,6 +3471,87 @@ app.post('/api/email/client/:clientId/milestone', async (req, res) => {
 });
 
 /**
+ * POST /api/email/unsubscribe
+ * Unsubscribe an email address from all communications
+ */
+app.post('/api/email/unsubscribe', async (req, res) => {
+  try {
+    const { email, leadId, userId, reason, source } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email is required'
+      });
+    }
+
+    // Check if already unsubscribed
+    const existing = db.emailOps.getUnsubscribe(email);
+    if (existing) {
+      return res.json({
+        success: true,
+        message: 'Email already unsubscribed',
+        unsubscribed: true
+      });
+    }
+
+    // Add to unsubscribe list
+    const id = db.emailOps.unsubscribe({
+      email,
+      leadId: leadId || null,
+      userId: userId || null,
+      reason: reason || null,
+      source: source || 'user_request'
+    });
+
+    // Cancel any pending emails for this email address
+    if (leadId) {
+      db.emailOps.cancelPendingEmails(leadId);
+    }
+
+    res.json({
+      success: true,
+      message: 'Successfully unsubscribed',
+      unsubscribed: true,
+      id
+    });
+
+  } catch (error) {
+    console.error('❌ Unsubscribe error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/email/unsubscribe/:email
+ * Check if email is unsubscribed
+ */
+app.get('/api/email/unsubscribe/:email', (req, res) => {
+  try {
+    const { email } = req.params;
+    const isUnsubscribed = db.emailOps.isUnsubscribed(email);
+    const record = isUnsubscribed ? db.emailOps.getUnsubscribe(email) : null;
+
+    res.json({
+      success: true,
+      email,
+      unsubscribed: isUnsubscribed,
+      record
+    });
+
+  } catch (error) {
+    console.error('❌ Check unsubscribe error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
  * =================================================================
  * ADMIN API ENDPOINTS
  * =================================================================

@@ -378,6 +378,21 @@ CREATE TABLE IF NOT EXISTS email_tracking (
 CREATE INDEX IF NOT EXISTS idx_tracking_queue ON email_tracking(queue_id);
 CREATE INDEX IF NOT EXISTS idx_tracking_lead_event ON email_tracking(lead_id, event_type);
 
+-- Email unsubscribes
+CREATE TABLE IF NOT EXISTS email_unsubscribes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL UNIQUE,
+  lead_id INTEGER,
+  user_id INTEGER,
+  reason TEXT,
+  source TEXT, -- 'lead_email', 'client_email'
+  unsubscribed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (lead_id) REFERENCES leads(id),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_unsubscribe_email ON email_unsubscribes(email);
+CREATE INDEX IF NOT EXISTS idx_unsubscribe_lead ON email_unsubscribes(lead_id);
+
 -- White-label branding configuration
 CREATE TABLE IF NOT EXISTS white_label_config (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1866,6 +1881,60 @@ export const emailOps = {
 
     const result = stmt.run(leadId);
     return result.changes;
+  },
+
+  /**
+   * Unsubscribe email address
+   */
+  unsubscribe(unsubscribeData) {
+    const stmt = db.prepare(`
+      INSERT INTO email_unsubscribes (email, lead_id, user_id, reason, source)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    try {
+      const result = stmt.run(
+        unsubscribeData.email,
+        unsubscribeData.leadId || null,
+        unsubscribeData.userId || null,
+        unsubscribeData.reason || null,
+        unsubscribeData.source || 'unknown'
+      );
+      return result.lastInsertRowid;
+    } catch (error) {
+      // Email already unsubscribed - return existing record
+      if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        const existing = db.prepare('SELECT id FROM email_unsubscribes WHERE email = ?').get(unsubscribeData.email);
+        return existing?.id;
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Check if email is unsubscribed
+   */
+  isUnsubscribed(email) {
+    const stmt = db.prepare('SELECT COUNT(*) as count FROM email_unsubscribes WHERE email = ?');
+    const result = stmt.get(email);
+    return result.count > 0;
+  },
+
+  /**
+   * Get unsubscribe record
+   */
+  getUnsubscribe(email) {
+    const stmt = db.prepare('SELECT * FROM email_unsubscribes WHERE email = ?');
+    return stmt.get(email);
+  },
+
+  /**
+   * Resubscribe email address
+   */
+  resubscribe(email) {
+    const stmt = db.prepare('DELETE FROM email_unsubscribes WHERE email = ?');
+    const result = stmt.run(email);
+    return result.changes > 0;
   }
 };
 

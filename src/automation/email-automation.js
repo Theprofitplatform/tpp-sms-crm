@@ -172,6 +172,9 @@ export class EmailAutomation {
     const currentMonth = now.toLocaleString('default', { month: 'long' });
     const deadline = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000); // 3 days from now
 
+    // Get white-label configuration
+    const wlConfig = whiteLabelService.getConfig();
+
     const placeholderData = {
       // Lead info
       name: lead.name,
@@ -197,13 +200,23 @@ export class EmailAutomation {
       fromEmail,
       fromName,
 
+      // Company branding
+      companyName: wlConfig.companyName,
+
+      // Company address (CAN-SPAM compliance)
+      companyAddress: process.env.COMPANY_ADDRESS || '123 Main Street',
+      companyCity: process.env.COMPANY_CITY || 'San Francisco',
+      companyState: process.env.COMPANY_STATE || 'CA',
+      companyZip: process.env.COMPANY_ZIP || '94102',
+
       // Dynamic dates
       currentMonth,
       deadline: deadline.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }),
 
       // Links
       calendarLink: `https://calendly.com/seoexpert/strategy?email=${encodeURIComponent(lead.email)}`,
-      unsubscribeLink: `https://seoexpert.com/unsubscribe?email=${encodeURIComponent(lead.email)}`
+      unsubscribeLink: `${process.env.DASHBOARD_URL || 'http://localhost:3000'}/unsubscribe.html?email=${encodeURIComponent(lead.email)}&leadId=${lead.id}`,
+      privacyPolicyUrl: wlConfig.privacyPolicyUrl || `${process.env.DASHBOARD_URL || 'http://localhost:3000'}/privacy.html`
     };
 
     const subject = EmailTemplates.replacePlaceholders(subjectTemplate, placeholderData);
@@ -368,10 +381,16 @@ export class EmailAutomation {
         portalLink: `${process.env.DASHBOARD_URL || 'https://app.seoexpert.com'}/portal`,
 
         // Company info
-        companyName: this.companyName,
+        companyName: whiteLabelService.getConfig().companyName,
         fromName: this.defaultFromName,
         fromEmail: this.defaultFromEmail,
         phone: process.env.SUPPORT_PHONE || '(555) 123-4567',
+
+        // Company address (CAN-SPAM compliance)
+        companyAddress: process.env.COMPANY_ADDRESS || '123 Main Street',
+        companyCity: process.env.COMPANY_CITY || 'San Francisco',
+        companyState: process.env.COMPANY_STATE || 'CA',
+        companyZip: process.env.COMPANY_ZIP || '94102',
 
         // Misc
         totalKeywords: keywordStats.total || 0,
@@ -392,10 +411,14 @@ export class EmailAutomation {
   personalizeClientEmail(data) {
     const { client, user, clientData, subjectTemplate, bodyTemplate, fromEmail, fromName, replyTo } = data;
 
+    const wlConfig = whiteLabelService.getConfig();
+
     const placeholderData = {
       ...clientData,
       // Add survey/tracking links
       surveyLink: `${process.env.DASHBOARD_URL || 'https://app.seoexpert.com'}/survey?client=${client.id}`,
+      unsubscribeLink: `${process.env.DASHBOARD_URL || 'http://localhost:3000'}/unsubscribe.html?email=${encodeURIComponent(user.email)}&userId=${user.id}`,
+      privacyPolicyUrl: wlConfig.privacyPolicyUrl || `${process.env.DASHBOARD_URL || 'http://localhost:3000'}/privacy.html`
     };
 
     const subject = ClientEmailTemplates.replacePlaceholders || EmailTemplates.replacePlaceholders;
