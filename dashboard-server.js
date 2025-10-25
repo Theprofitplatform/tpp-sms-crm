@@ -1601,6 +1601,167 @@ app.get('/api/auto-fix/title-meta/:clientId/history', (req, res) => {
 });
 
 // ============================================
+// Content Optimizer API
+// ============================================
+
+/**
+ * POST /api/auto-fix/content/:clientId/analyze
+ * Analyze content quality (dry run)
+ */
+app.post('/api/auto-fix/content/:clientId/analyze', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    const { ContentOptimizer } = await import('./src/automation/auto-fixers/content-optimizer.js');
+
+    const config = {
+      id: clientId,
+      businessName: req.body.businessName || 'Client',
+      siteUrl: req.body.siteUrl,
+      wpUser: req.body.wpUser,
+      wpPassword: req.body.wpPassword
+    };
+
+    const optimizer = new ContentOptimizer(config);
+    const results = await optimizer.runOptimization({
+      dryRun: true,
+      limit: parseInt(req.body.limit) || 10
+    });
+
+    res.json({
+      success: results.success,
+      clientId,
+      data: results
+    });
+
+  } catch (error) {
+    console.error('❌ Content analysis error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/auto-fix/content/:clientId/optimize
+ * Run content optimization with auto-fixes
+ */
+app.post('/api/auto-fix/content/:clientId/optimize', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    const { ContentOptimizer } = await import('./src/automation/auto-fixers/content-optimizer.js');
+
+    const config = {
+      id: clientId,
+      businessName: req.body.businessName || 'Client',
+      siteUrl: req.body.siteUrl,
+      wpUser: req.body.wpUser,
+      wpPassword: req.body.wpPassword
+    };
+
+    const optimizer = new ContentOptimizer(config);
+    const results = await optimizer.runOptimization({
+      dryRun: false,
+      limit: parseInt(req.body.limit) || 10
+    });
+
+    res.json({
+      success: results.success,
+      clientId,
+      data: results
+    });
+
+  } catch (error) {
+    console.error('❌ Content optimization error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/auto-fix/content/:clientId/rollback
+ * Rollback content changes using backup
+ */
+app.post('/api/auto-fix/content/:clientId/rollback', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { backupId, ...config } = req.body;
+
+    if (!backupId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Backup ID is required'
+      });
+    }
+
+    const { ContentOptimizer } = await import('./src/automation/auto-fixers/content-optimizer.js');
+
+    const optimizerConfig = {
+      id: clientId,
+      businessName: config.businessName || 'Client',
+      siteUrl: config.siteUrl,
+      wpUser: config.wpUser,
+      wpPassword: config.wpPassword,
+      ...config
+    };
+
+    const optimizer = new ContentOptimizer(optimizerConfig);
+    const result = await optimizer.rollback(backupId);
+
+    res.json({
+      success: result.success,
+      clientId,
+      backupId,
+      data: result
+    });
+
+  } catch (error) {
+    console.error('❌ Content rollback error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/auto-fix/content/:clientId/history
+ * Get content optimization history for a client
+ */
+app.get('/api/auto-fix/content/:clientId/history', (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const limit = parseInt(req.query.limit) || 20;
+
+    const stmt = db.db.prepare(`
+      SELECT * FROM auto_fix_actions
+      WHERE client_id = ? AND fix_type = 'content_optimization'
+      ORDER BY created_at DESC
+      LIMIT ?
+    `);
+
+    const history = stmt.all(clientId, limit);
+
+    res.json({
+      success: true,
+      clientId,
+      data: history,
+      count: history.length
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================
 // Bridge API - Connect SEO Expert ↔ SEO Analyst
 // ============================================
 
@@ -1834,13 +1995,14 @@ app.listen(PORT, () => {
   console.log('   → NAP Auto-Fix: /api/auto-fix/nap/:clientId/run');
   console.log('   → Schema Inject: /api/auto-fix/schema/:clientId/inject');
   console.log('   → Title/Meta AI: /api/auto-fix/title-meta/:clientId/optimize');
+  console.log('   → Content Optimize: /api/auto-fix/content/:clientId/optimize');
   console.log('   → Complete Dashboard: /api/dashboard/:clientId/complete');
   console.log('   → Bridge API: /api/bridge/send-results (POST)');
   console.log('   → Unified View: /api/bridge/:clientId/unified');
   console.log('   → ROI Metrics: /api/bridge/:clientId/roi');
   console.log('');
   console.log('🔗 SEO Expert ↔ SEO Analyst Bridge Active');
-  console.log('🤖 AI-Powered Auto-Fix Engines Ready');
+  console.log('🤖 4 AI-Powered Auto-Fix Engines Ready');
   console.log('');
   console.log('Open your browser and navigate to the URL above');
   console.log('');
