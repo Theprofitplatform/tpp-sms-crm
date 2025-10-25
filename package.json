@@ -52,7 +52,10 @@
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.10",
     "openai": "^6.6.0",
-    "pdfkit": "^0.17.2"
+    "pdfkit": "^0.17.2",
+    "socket.io": "^4.7.5",
+    "winston": "^3.14.2",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@jest/globals": "^30.2.0",
