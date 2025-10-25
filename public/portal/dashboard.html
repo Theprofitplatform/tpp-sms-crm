@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - SEO Expert Portal</title>
+    <link rel="stylesheet" href="css/portal.css">
+</head>
+<body class="dashboard-body">
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <h1>🎯 SEO Expert</h1>
+        </div>
+        <div class="nav-menu">
+            <a href="#overview" class="nav-link active">Overview</a>
+            <a href="#competitors" class="nav-link">Competitors</a>
+            <a href="#optimizations" class="nav-link">Optimizations</a>
+            <a href="#reports" class="nav-link">Reports</a>
+        </div>
+        <div class="nav-user">
+            <span id="user-name">Loading...</span>
+            <button id="logout-btn" class="btn-secondary">Logout</button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="dashboard-container">
+        <!-- Loading State -->
+        <div id="loading-state" class="loading-state">
+            <div class="spinner-large"></div>
+            <p>Loading your dashboard...</p>
+        </div>
+
+        <!-- Dashboard Content -->
+        <div id="dashboard-content" style="display: none;">
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">📈</div>
+                    <div class="stat-info">
+                        <h3 id="stat-keywords">--</h3>
+                        <p>Keywords Tracked</p>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">🎯</div>
+                    <div class="stat-info">
+                        <h3 id="stat-top10">--</h3>
+                        <p>Top 10 Rankings</p>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">🔧</div>
+                    <div class="stat-info">
+                        <h3 id="stat-fixes">--</h3>
+                        <p>Auto-Fixes Applied</p>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">⚡</div>
+                    <div class="stat-info">
+                        <h3 id="stat-score">--</h3>
+                        <p>SEO Score</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content Grid -->
+            <div class="content-grid">
+                <!-- Left Column -->
+                <div class="content-left">
+                    <!-- Performance Overview -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>📊 Performance Overview</h2>
+                            <select id="timeframe-select" class="select-input">
+                                <option value="7">Last 7 days</option>
+                                <option value="30" selected>Last 30 days</option>
+                                <option value="90">Last 90 days</option>
+                            </select>
+                        </div>
+                        <div class="card-body">
+                            <div id="performance-chart" class="chart-container">
+                                <!-- Chart will be rendered here -->
+                                <div class="chart-placeholder">
+                                    <p>Performance metrics will appear here</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Competitor Insights -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>🎯 Competitive Insights</h2>
+                        </div>
+                        <div class="card-body">
+                            <div id="competitor-threats" class="insights-list">
+                                <!-- Threats will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Optimizations -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>🔧 Recent Optimizations</h2>
+                        </div>
+                        <div class="card-body">
+                            <div id="recent-optimizations" class="optimization-list">
+                                <!-- Optimizations will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column -->
+                <div class="content-right">
+                    <!-- Quick Actions -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>⚡ Quick Actions</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="action-buttons">
+                                <button class="action-btn" onclick="viewReports()">
+                                    📄 View Reports
+                                </button>
+                                <button class="action-btn" onclick="runCompetitorAnalysis()">
+                                    🔍 Analyze Competitors
+                                </button>
+                                <button class="action-btn" onclick="viewOpportunities()">
+                                    💡 View Opportunities
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Keyword Rankings -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>🏆 Top Performing Keywords</h2>
+                        </div>
+                        <div class="card-body">
+                            <div id="top-keywords" class="keyword-list">
+                                <!-- Keywords will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Activity Log -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>📋 Recent Activity</h2>
+                        </div>
+                        <div class="card-body">
+                            <div id="activity-log" class="activity-list">
+                                <!-- Activity will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error State -->
+        <div id="error-state" class="error-state" style="display: none;">
+            <h2>⚠️ Unable to load dashboard</h2>
+            <p id="error-message"></p>
+            <button onclick="location.reload()" class="btn-primary">Retry</button>
+        </div>
+    </div>
+
+    <script src="js/portal.js"></script>
+    <script src="js/dashboard.js"></script>
+</body>
+</html>

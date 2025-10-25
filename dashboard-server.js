@@ -329,6 +329,130 @@ app.get('/api/auth/activity', async (req, res) => {
 });
 
 // ============================================
+// Client Portal API (Protected Routes)
+// ============================================
+
+import { authMiddleware } from './src/auth/auth-middleware.js';
+
+/**
+ * GET /api/portal/:clientId/dashboard
+ * Get complete dashboard data for client portal
+ */
+app.get('/api/portal/:clientId/dashboard',
+  authMiddleware.authenticate,
+  authMiddleware.checkClientAccess,
+  async (req, res) => {
+    try {
+      const { clientId } = req.params;
+      const days = parseInt(req.query.days) || 30;
+
+      // Get comprehensive dashboard data
+      const dashboardData = db.analytics.getClientDashboard(clientId, days);
+
+      // Get competitive threats
+      const threats = db.competitorOps.getOpenAlerts(clientId);
+
+      // Get recent optimizations
+      const optimizations = db.clientOps.getOptimizationHistory(clientId, days);
+
+      // Get top keywords
+      const keywords = db.keywordOps.getTopPerforming(clientId, 10);
+
+      // Get recent activity
+      const activity = db.autoFixOps.getRecentActions(clientId, 10);
+
+      // Calculate stats
+      const stats = {
+        keywordsTracked: dashboardData.keywords?.totalKeywords || 0,
+        top10Rankings: dashboardData.keywords?.top10Count || 0,
+        autoFixesApplied: activity.length,
+        seoScore: dashboardData.localSeo?.latestScore?.nap_score || null
+      };
+
+      res.json({
+        success: true,
+        data: {
+          stats,
+          threats: threats.slice(0, 5),
+          optimizations: optimizations.slice(0, 5),
+          keywords: keywords,
+          activity: activity
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Portal dashboard error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/portal/:clientId/performance
+ * Get performance metrics for charts
+ */
+app.get('/api/portal/:clientId/performance',
+  authMiddleware.authenticate,
+  authMiddleware.checkClientAccess,
+  async (req, res) => {
+    try {
+      const { clientId } = req.params;
+      const days = parseInt(req.query.days) || 30;
+
+      // Get GSC metrics trend
+      const gscTrend = db.gscOps.getTrend(clientId, days);
+
+      // Get local SEO score trend
+      const localSeoTrend = db.localSeoOps.getTrend(clientId, days);
+
+      res.json({
+        success: true,
+        data: {
+          gscMetrics: gscTrend,
+          localSeoScores: localSeoTrend
+        }
+      });
+
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/portal/:clientId/reports
+ * Get available reports for client
+ */
+app.get('/api/portal/:clientId/reports',
+  authMiddleware.authenticate,
+  authMiddleware.checkClientAccess,
+  async (req, res) => {
+    try {
+      const { clientId } = req.params;
+
+      const reports = db.reportsOps.getReports(clientId, 20);
+
+      res.json({
+        success: true,
+        data: reports
+      });
+
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+// ============================================
 // Public Dashboard API
 // ============================================
 
