@@ -31,6 +31,7 @@ import { CompetitorTracker } from './src/automation/competitor-tracker.js';
 import { GoogleSearchConsole } from './src/automation/google-search-console.js';
 import { pdfGenerator } from './src/reports/pdf-generator.js';
 import { discordNotifier } from './src/audit/discord-notifier.js';
+import { rankScheduler } from './src/automation/rank-scheduler.js';
 import db from './src/database/index.js';
 
 const execAsync = promisify(exec);
@@ -4093,6 +4094,135 @@ app.get('/api/reports/:clientId', (req, res) => {
   }
 });
 
+/**
+ * =================================
+ * AUTOMATION ENDPOINTS
+ * =================================
+ */
+
+/**
+ * POST /api/automation/rank-tracking/run
+ * Manually trigger rank tracking for all clients
+ */
+app.post('/api/automation/rank-tracking/run', async (req, res) => {
+  try {
+    const { rankTracker } = await import('./src/automation/rank-tracker.js');
+
+    console.log('🔍 Manual rank tracking triggered via API');
+    const startTime = Date.now();
+
+    const results = await rankTracker.runForAllClients();
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+
+    res.json({
+      success: true,
+      duration: parseFloat(duration),
+      clientsChecked: results.clientsChecked,
+      totalKeywords: results.totalKeywords,
+      alertsTriggered: results.alerts,
+      errors: results.errors
+    });
+
+  } catch (error) {
+    console.error('❌ Manual rank tracking error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/automation/rank-tracking/:clientId
+ * Check rankings for a specific client
+ */
+app.post('/api/automation/rank-tracking/:clientId', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { rankTracker } = await import('./src/automation/rank-tracker.js');
+
+    console.log(`🔍 Manual rank check for client ${clientId}`);
+    const startTime = Date.now();
+
+    const result = await rankTracker.trackClient(clientId);
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+
+    res.json({
+      success: true,
+      duration: parseFloat(duration),
+      keywordsChecked: result.keywordsChecked,
+      alertsTriggered: result.alertsTriggered,
+      alerts: result.alerts
+    });
+
+  } catch (error) {
+    console.error('❌ Client rank tracking error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/automation/rank-tracking/:clientId/summary
+ * Get ranking summary for a client
+ */
+app.get('/api/automation/rank-tracking/:clientId/summary', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { days = 30 } = req.query;
+    const { rankTracker } = await import('./src/automation/rank-tracker.js');
+
+    const summary = rankTracker.getRankingSummary(clientId, parseInt(days));
+
+    res.json({
+      success: true,
+      clientId,
+      period: `${days} days`,
+      summary
+    });
+
+  } catch (error) {
+    console.error('❌ Ranking summary error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/automation/schedule
+ * Get automation schedule status
+ */
+app.get('/api/automation/schedule', async (req, res) => {
+  try {
+    const { rankScheduler } = await import('./src/automation/rank-scheduler.js');
+
+    const status = rankScheduler.getStatus();
+
+    res.json({
+      success: true,
+      scheduler: status,
+      environment: {
+        rankTrackingEnabled: process.env.RANK_TRACKING_ENABLED === 'true',
+        rankTrackingSchedule: process.env.RANK_TRACKING_SCHEDULE || '0 6 * * *',
+        localSeoEnabled: process.env.LOCAL_SEO_ENABLED === 'true',
+        localSeoSchedule: process.env.LOCAL_SEO_SCHEDULE || '0 7 * * *',
+        discordEnabled: process.env.DISCORD_NOTIFICATIONS_ENABLED === 'true'
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Schedule status error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Serve Local SEO reports
 app.use('/reports/local-seo', express.static(path.join(__dirname, 'logs', 'local-seo')));
 
@@ -4113,6 +4243,10 @@ app.listen(PORT, () => {
   console.log('   → GET /api/auth/me');
   console.log('');
   console.log('   Automation:');
+  console.log('   → Rank Tracking: /api/automation/rank-tracking/run');
+  console.log('   → Rank Client: /api/automation/rank-tracking/:clientId');
+  console.log('   → Rank Summary: /api/automation/rank-tracking/:clientId/summary');
+  console.log('   → Schedule Status: /api/automation/schedule');
   console.log('   → Local SEO: /api/local-seo/:clientId/run');
   console.log('   → Competitors: /api/competitors/:clientId/run');
   console.log('   → Competitor Response: /api/competitor-response/:clientId/analyze');
@@ -4122,6 +4256,9 @@ app.listen(PORT, () => {
   console.log('   → Content Optimize: /api/auto-fix/content/:clientId/optimize');
   console.log('');
   console.log('   Reporting:');
+  console.log('   → Generate PDF: /api/reports/generate/:clientId');
+  console.log('   → Download PDF: /api/reports/:reportId/download');
+  console.log('   → List Reports: /api/reports/:clientId');
   console.log('   → Complete Dashboard: /api/dashboard/:clientId/complete');
   console.log('   → Bridge API: /api/bridge/send-results (POST)');
   console.log('   → Unified View: /api/bridge/:clientId/unified');
@@ -4135,5 +4272,17 @@ app.listen(PORT, () => {
   console.log('Open your browser and navigate to the URL above');
   console.log('');
   console.log('Press Ctrl+C to stop the server');
+  console.log('');
+
+  // Start automation schedulers
+  console.log('🤖 Starting automation schedulers...');
+  console.log('');
+
+  try {
+    rankScheduler.start();
+  } catch (error) {
+    console.error('⚠️  Failed to start rank tracking scheduler:', error.message);
+  }
+
   console.log('');
 });

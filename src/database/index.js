@@ -971,6 +971,97 @@ export const keywordOps = {
       ORDER BY positionChange ASC
     `);
     return stmt.all(clientId, days);
+  },
+
+  /**
+   * Get keyword history for ranking comparison
+   */
+  getKeywordHistory(clientId, keyword, daysAgo = 7) {
+    const stmt = db.prepare(`
+      SELECT position, date
+      FROM keyword_performance
+      WHERE client_id = ? AND keyword = ?
+        AND date = date('now', '-' || ? || ' days')
+      ORDER BY date DESC
+      LIMIT 1
+    `);
+    return stmt.all(clientId, keyword, daysAgo);
+  },
+
+  /**
+   * Get keyword stats for summary
+   */
+  getStats(clientId, days = 30) {
+    const stmt = db.prepare(`
+      SELECT
+        COUNT(DISTINCT keyword) as total,
+        AVG(position) as avgPosition,
+        json_group_array(
+          json_object(
+            'keyword', keyword,
+            'position', position,
+            'clicks', clicks
+          )
+        ) as topKeywords
+      FROM (
+        SELECT keyword, AVG(position) as position, SUM(clicks) as clicks
+        FROM keyword_performance
+        WHERE client_id = ?
+          AND date >= date('now', '-' || ? || ' days')
+          AND position IS NOT NULL
+        GROUP BY keyword
+        ORDER BY clicks DESC
+        LIMIT 10
+      )
+    `);
+
+    const result = stmt.get(clientId, days);
+
+    if (result && result.topKeywords) {
+      try {
+        result.topKeywords = JSON.parse(result.topKeywords);
+      } catch (e) {
+        result.topKeywords = [];
+      }
+    }
+
+    return result || { total: 0, avgPosition: 0, topKeywords: [] };
+  },
+
+  /**
+   * Get recent ranking changes
+   */
+  getRecentChanges(clientId, days = 7) {
+    const stmt = db.prepare(`
+      WITH latest AS (
+        SELECT keyword, position, date,
+          ROW_NUMBER() OVER (PARTITION BY keyword ORDER BY date DESC) as rn
+        FROM keyword_performance
+        WHERE client_id = ?
+          AND date >= date('now', '-' || ? || ' days')
+          AND position IS NOT NULL
+      ),
+      previous AS (
+        SELECT keyword, position,
+          ROW_NUMBER() OVER (PARTITION BY keyword ORDER BY date DESC) as rn
+        FROM keyword_performance
+        WHERE client_id = ?
+          AND date < date('now', '-' || ? || ' days')
+          AND position IS NOT NULL
+      )
+      SELECT
+        latest.keyword,
+        latest.position as currentPosition,
+        previous.position as previousPosition,
+        (previous.position - latest.position) as change
+      FROM latest
+      LEFT JOIN previous ON latest.keyword = previous.keyword AND previous.rn = 1
+      WHERE latest.rn = 1
+        AND previous.position IS NOT NULL
+      ORDER BY ABS(previous.position - latest.position) DESC
+    `);
+
+    return stmt.all(clientId, days, clientId, days);
   }
 };
 
