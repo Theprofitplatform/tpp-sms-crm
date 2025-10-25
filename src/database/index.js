@@ -377,6 +377,54 @@ CREATE TABLE IF NOT EXISTS email_tracking (
 );
 CREATE INDEX IF NOT EXISTS idx_tracking_queue ON email_tracking(queue_id);
 CREATE INDEX IF NOT EXISTS idx_tracking_lead_event ON email_tracking(lead_id, event_type);
+
+-- White-label branding configuration
+CREATE TABLE IF NOT EXISTS white_label_config (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  config_name TEXT NOT NULL UNIQUE,
+  is_active BOOLEAN DEFAULT 0,
+
+  -- Company branding
+  company_name TEXT NOT NULL,
+  company_logo_url TEXT,
+  company_website TEXT,
+
+  -- Color scheme
+  primary_color TEXT DEFAULT '#667eea',
+  secondary_color TEXT DEFAULT '#764ba2',
+  accent_color TEXT DEFAULT '#10b981',
+
+  -- Email branding
+  email_from_name TEXT NOT NULL,
+  email_from_email TEXT NOT NULL,
+  email_reply_to TEXT,
+  email_header_logo TEXT,
+  email_footer_text TEXT,
+
+  -- URLs and links
+  dashboard_url TEXT,
+  support_email TEXT,
+  support_phone TEXT,
+  social_facebook TEXT,
+  social_twitter TEXT,
+  social_linkedin TEXT,
+
+  -- Portal customization
+  portal_title TEXT,
+  portal_welcome_text TEXT,
+
+  -- Legal
+  privacy_policy_url TEXT,
+  terms_of_service_url TEXT,
+
+  -- Additional customization (JSON)
+  custom_css TEXT,
+  custom_metadata TEXT,
+
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_white_label_active ON white_label_config(is_active);
 `;
 
 /**
@@ -1821,6 +1869,221 @@ export const emailOps = {
   }
 };
 
+/**
+ * White-Label Configuration Operations
+ */
+export const whiteLabelOps = {
+  /**
+   * Create white-label configuration
+   */
+  createConfig(configData) {
+    const stmt = db.prepare(`
+      INSERT INTO white_label_config (
+        config_name, is_active, company_name, company_logo_url, company_website,
+        primary_color, secondary_color, accent_color,
+        email_from_name, email_from_email, email_reply_to, email_header_logo, email_footer_text,
+        dashboard_url, support_email, support_phone,
+        social_facebook, social_twitter, social_linkedin,
+        portal_title, portal_welcome_text,
+        privacy_policy_url, terms_of_service_url,
+        custom_css, custom_metadata
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const result = stmt.run(
+      configData.configName,
+      configData.isActive ? 1 : 0,
+      configData.companyName,
+      configData.companyLogoUrl || null,
+      configData.companyWebsite || null,
+      configData.primaryColor || '#667eea',
+      configData.secondaryColor || '#764ba2',
+      configData.accentColor || '#10b981',
+      configData.emailFromName,
+      configData.emailFromEmail,
+      configData.emailReplyTo || null,
+      configData.emailHeaderLogo || null,
+      configData.emailFooterText || null,
+      configData.dashboardUrl || null,
+      configData.supportEmail || null,
+      configData.supportPhone || null,
+      configData.socialFacebook || null,
+      configData.socialTwitter || null,
+      configData.socialLinkedin || null,
+      configData.portalTitle || null,
+      configData.portalWelcomeText || null,
+      configData.privacyPolicyUrl || null,
+      configData.termsOfServiceUrl || null,
+      configData.customCss || null,
+      configData.customMetadata ? JSON.stringify(configData.customMetadata) : null
+    );
+
+    return result.lastInsertRowid;
+  },
+
+  /**
+   * Get white-label configuration by ID
+   */
+  getConfig(configId) {
+    const stmt = db.prepare('SELECT * FROM white_label_config WHERE id = ?');
+    const config = stmt.get(configId);
+
+    if (config && config.custom_metadata) {
+      config.custom_metadata = JSON.parse(config.custom_metadata);
+    }
+
+    return config;
+  },
+
+  /**
+   * Get active white-label configuration
+   */
+  getActiveConfig() {
+    const stmt = db.prepare('SELECT * FROM white_label_config WHERE is_active = 1 LIMIT 1');
+    const config = stmt.get();
+
+    if (config && config.custom_metadata) {
+      config.custom_metadata = JSON.parse(config.custom_metadata);
+    }
+
+    return config;
+  },
+
+  /**
+   * Get all white-label configurations
+   */
+  getAllConfigs() {
+    const stmt = db.prepare('SELECT * FROM white_label_config ORDER BY created_at DESC');
+    const configs = stmt.all();
+
+    return configs.map(c => {
+      if (c.custom_metadata) c.custom_metadata = JSON.parse(c.custom_metadata);
+      return c;
+    });
+  },
+
+  /**
+   * Update white-label configuration
+   */
+  updateConfig(configId, configData) {
+    const updates = [];
+    const values = [];
+
+    // Build dynamic update query
+    const fields = {
+      configName: 'config_name',
+      isActive: 'is_active',
+      companyName: 'company_name',
+      companyLogoUrl: 'company_logo_url',
+      companyWebsite: 'company_website',
+      primaryColor: 'primary_color',
+      secondaryColor: 'secondary_color',
+      accentColor: 'accent_color',
+      emailFromName: 'email_from_name',
+      emailFromEmail: 'email_from_email',
+      emailReplyTo: 'email_reply_to',
+      emailHeaderLogo: 'email_header_logo',
+      emailFooterText: 'email_footer_text',
+      dashboardUrl: 'dashboard_url',
+      supportEmail: 'support_email',
+      supportPhone: 'support_phone',
+      socialFacebook: 'social_facebook',
+      socialTwitter: 'social_twitter',
+      socialLinkedin: 'social_linkedin',
+      portalTitle: 'portal_title',
+      portalWelcomeText: 'portal_welcome_text',
+      privacyPolicyUrl: 'privacy_policy_url',
+      termsOfServiceUrl: 'terms_of_service_url',
+      customCss: 'custom_css',
+      customMetadata: 'custom_metadata'
+    };
+
+    Object.keys(fields).forEach(key => {
+      if (configData[key] !== undefined) {
+        updates.push(`${fields[key]} = ?`);
+        let value = configData[key];
+
+        // Special handling for boolean and JSON fields
+        if (key === 'isActive') {
+          value = value ? 1 : 0;
+        } else if (key === 'customMetadata' && value) {
+          value = JSON.stringify(value);
+        }
+
+        values.push(value);
+      }
+    });
+
+    if (updates.length === 0) {
+      return false;
+    }
+
+    updates.push('updated_at = datetime(\'now\')');
+    values.push(configId);
+
+    const query = `
+      UPDATE white_label_config
+      SET ${updates.join(', ')}
+      WHERE id = ?
+    `;
+
+    const stmt = db.prepare(query);
+    const result = stmt.run(...values);
+
+    return result.changes > 0;
+  },
+
+  /**
+   * Set configuration as active (deactivates all others)
+   */
+  setActive(configId) {
+    // First deactivate all configs
+    const deactivateStmt = db.prepare('UPDATE white_label_config SET is_active = 0');
+    deactivateStmt.run();
+
+    // Then activate the specified one
+    const activateStmt = db.prepare(`
+      UPDATE white_label_config
+      SET is_active = 1, updated_at = datetime('now')
+      WHERE id = ?
+    `);
+
+    const result = activateStmt.run(configId);
+    return result.changes > 0;
+  },
+
+  /**
+   * Delete white-label configuration
+   */
+  deleteConfig(configId) {
+    // Don't allow deleting the active configuration
+    const activeConfig = this.getActiveConfig();
+    if (activeConfig && activeConfig.id === configId) {
+      throw new Error('Cannot delete the active configuration');
+    }
+
+    const stmt = db.prepare('DELETE FROM white_label_config WHERE id = ?');
+    const result = stmt.run(configId);
+
+    return result.changes > 0;
+  },
+
+  /**
+   * Get configuration by name
+   */
+  getConfigByName(configName) {
+    const stmt = db.prepare('SELECT * FROM white_label_config WHERE config_name = ?');
+    const config = stmt.get(configName);
+
+    if (config && config.custom_metadata) {
+      config.custom_metadata = JSON.parse(config.custom_metadata);
+    }
+
+    return config;
+  }
+};
+
 // Initialize on import
 initializeDatabase();
 
@@ -1843,5 +2106,6 @@ export default {
   authOps,
   leadOps,
   emailOps,
+  whiteLabelOps,
   db
 };

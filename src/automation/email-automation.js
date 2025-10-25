@@ -9,14 +9,19 @@ import db from '../database/index.js';
 import { EmailTemplates } from './email-templates.js';
 import { ClientEmailTemplates } from './client-email-templates.js';
 import { EmailSender } from './email-sender.js';
+import { whiteLabelService } from '../white-label/white-label-service.js';
 
 export class EmailAutomation {
   constructor(config = {}) {
+    // Load white-label configuration
+    this.whiteLabelConfig = whiteLabelService.getConfig();
+    const emailConfig = whiteLabelService.getEmailConfig();
+
     this.emailSender = new EmailSender(config.smtp);
-    this.defaultFromEmail = config.fromEmail || process.env.FROM_EMAIL || 'noreply@seoexpert.com';
-    this.defaultFromName = config.fromName || 'SEO Expert';
-    this.replyToEmail = config.replyTo || process.env.REPLY_TO_EMAIL || this.defaultFromEmail;
-    this.companyName = config.companyName || 'SEO Expert';
+    this.defaultFromEmail = config.fromEmail || emailConfig.fromEmail || process.env.FROM_EMAIL || 'noreply@seoexpert.com';
+    this.defaultFromName = config.fromName || emailConfig.fromName || this.whiteLabelConfig.companyName || 'SEO Expert';
+    this.replyToEmail = config.replyTo || emailConfig.replyTo || process.env.REPLY_TO_EMAIL || this.defaultFromEmail;
+    this.companyName = config.companyName || this.whiteLabelConfig.companyName || 'SEO Expert';
   }
 
   /**
@@ -202,13 +207,18 @@ export class EmailAutomation {
     };
 
     const subject = EmailTemplates.replacePlaceholders(subjectTemplate, placeholderData);
-    const bodyHtml = EmailTemplates.replacePlaceholders(bodyTemplate, placeholderData);
+    let bodyHtml = EmailTemplates.replacePlaceholders(bodyTemplate, placeholderData);
 
     // Generate plain text version
-    const bodyText = bodyHtml
+    let bodyText = bodyHtml
       .replace(/<[^>]*>/g, '') // Remove HTML tags
       .replace(/\s+/g, ' ') // Normalize whitespace
       .trim();
+
+    // Apply white-label branding
+    const branded = whiteLabelService.applyBrandingToEmail(bodyHtml, bodyText);
+    bodyHtml = branded.html;
+    bodyText = branded.text || bodyText;
 
     return {
       subject,
@@ -393,13 +403,18 @@ export class EmailAutomation {
 
     // Use the replacePlaceholders from EmailTemplates class
     const finalSubject = EmailTemplates.replacePlaceholders(subjectTemplate, placeholderData);
-    const finalBodyHtml = EmailTemplates.replacePlaceholders(bodyTemplate, placeholderData);
+    let finalBodyHtml = EmailTemplates.replacePlaceholders(bodyTemplate, placeholderData);
 
     // Generate plain text version
-    const bodyText = finalBodyHtml
+    let bodyText = finalBodyHtml
       .replace(/<[^>]*>/g, '') // Remove HTML tags
       .replace(/\s+/g, ' ') // Normalize whitespace
       .trim();
+
+    // Apply white-label branding
+    const branded = whiteLabelService.applyBrandingToEmail(finalBodyHtml, bodyText);
+    finalBodyHtml = branded.html;
+    bodyText = branded.text || bodyText;
 
     return {
       subject: finalSubject,

@@ -3470,6 +3470,307 @@ app.post('/api/email/client/:clientId/milestone', async (req, res) => {
   }
 });
 
+/**
+ * =================================================================
+ * WHITE-LABEL BRANDING API ENDPOINTS
+ * =================================================================
+ */
+
+/**
+ * GET /api/white-label/config
+ * Get active white-label configuration
+ */
+app.get('/api/white-label/config', async (req, res) => {
+  try {
+    const { whiteLabelService } = await import('./src/white-label/white-label-service.js');
+    const config = whiteLabelService.getConfig();
+
+    res.json({
+      success: true,
+      config
+    });
+
+  } catch (error) {
+    console.error('❌ Get white-label config error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/white-label/portal-config
+ * Get portal branding configuration (public endpoint)
+ */
+app.get('/api/white-label/portal-config', async (req, res) => {
+  try {
+    const { whiteLabelService } = await import('./src/white-label/white-label-service.js');
+    const config = whiteLabelService.getPublicConfig();
+
+    res.json({
+      success: true,
+      config
+    });
+
+  } catch (error) {
+    console.error('❌ Get portal config error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/white-label/configs
+ * Get all white-label configurations (admin only)
+ */
+app.get('/api/white-label/configs', async (req, res) => {
+  try {
+    const configs = db.whiteLabelOps.getAllConfigs();
+
+    res.json({
+      success: true,
+      count: configs.length,
+      configs
+    });
+
+  } catch (error) {
+    console.error('❌ Get configs error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/white-label/config/:configId
+ * Get specific white-label configuration
+ */
+app.get('/api/white-label/config/:configId', async (req, res) => {
+  try {
+    const { configId } = req.params;
+    const config = db.whiteLabelOps.getConfig(parseInt(configId));
+
+    if (!config) {
+      return res.status(404).json({
+        success: false,
+        error: 'Configuration not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      config
+    });
+
+  } catch (error) {
+    console.error('❌ Get config error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/white-label/config
+ * Create new white-label configuration
+ */
+app.post('/api/white-label/config', async (req, res) => {
+  try {
+    const {
+      configName,
+      isActive,
+      companyName,
+      companyLogoUrl,
+      companyWebsite,
+      primaryColor,
+      secondaryColor,
+      accentColor,
+      emailFromName,
+      emailFromEmail,
+      emailReplyTo,
+      emailHeaderLogo,
+      emailFooterText,
+      dashboardUrl,
+      supportEmail,
+      supportPhone,
+      socialFacebook,
+      socialTwitter,
+      socialLinkedin,
+      portalTitle,
+      portalWelcomeText,
+      privacyPolicyUrl,
+      termsOfServiceUrl,
+      customCss,
+      customMetadata
+    } = req.body;
+
+    // Validate required fields
+    if (!configName || !companyName || !emailFromName || !emailFromEmail) {
+      return res.status(400).json({
+        success: false,
+        error: 'configName, companyName, emailFromName, and emailFromEmail are required'
+      });
+    }
+
+    // Create configuration
+    const configId = db.whiteLabelOps.createConfig({
+      configName,
+      isActive: isActive || false,
+      companyName,
+      companyLogoUrl,
+      companyWebsite,
+      primaryColor,
+      secondaryColor,
+      accentColor,
+      emailFromName,
+      emailFromEmail,
+      emailReplyTo,
+      emailHeaderLogo,
+      emailFooterText,
+      dashboardUrl,
+      supportEmail,
+      supportPhone,
+      socialFacebook,
+      socialTwitter,
+      socialLinkedin,
+      portalTitle,
+      portalWelcomeText,
+      privacyPolicyUrl,
+      termsOfServiceUrl,
+      customCss,
+      customMetadata
+    });
+
+    // If this config is set as active, reload the white-label service
+    if (isActive) {
+      const { whiteLabelService } = await import('./src/white-label/white-label-service.js');
+      whiteLabelService.loadActiveConfig();
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'White-label configuration created',
+      configId
+    });
+
+  } catch (error) {
+    console.error('❌ Create config error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/white-label/config/:configId
+ * Update white-label configuration
+ */
+app.put('/api/white-label/config/:configId', async (req, res) => {
+  try {
+    const { configId } = req.params;
+
+    const updated = db.whiteLabelOps.updateConfig(parseInt(configId), req.body);
+
+    if (!updated) {
+      return res.status(404).json({
+        success: false,
+        error: 'Configuration not found or no changes made'
+      });
+    }
+
+    // Reload white-label service if this is the active config
+    const config = db.whiteLabelOps.getConfig(parseInt(configId));
+    if (config && config.is_active) {
+      const { whiteLabelService } = await import('./src/white-label/white-label-service.js');
+      whiteLabelService.loadActiveConfig();
+    }
+
+    res.json({
+      success: true,
+      message: 'Configuration updated'
+    });
+
+  } catch (error) {
+    console.error('❌ Update config error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/white-label/config/:configId/activate
+ * Set configuration as active
+ */
+app.post('/api/white-label/config/:configId/activate', async (req, res) => {
+  try {
+    const { configId } = req.params;
+
+    const activated = db.whiteLabelOps.setActive(parseInt(configId));
+
+    if (!activated) {
+      return res.status(404).json({
+        success: false,
+        error: 'Configuration not found'
+      });
+    }
+
+    // Reload white-label service with new active config
+    const { whiteLabelService } = await import('./src/white-label/white-label-service.js');
+    whiteLabelService.loadActiveConfig();
+
+    res.json({
+      success: true,
+      message: 'Configuration activated'
+    });
+
+  } catch (error) {
+    console.error('❌ Activate config error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * DELETE /api/white-label/config/:configId
+ * Delete white-label configuration
+ */
+app.delete('/api/white-label/config/:configId', async (req, res) => {
+  try {
+    const { configId } = req.params;
+
+    const deleted = db.whiteLabelOps.deleteConfig(parseInt(configId));
+
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        error: 'Configuration not found or cannot be deleted (active config cannot be deleted)'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Configuration deleted'
+    });
+
+  } catch (error) {
+    console.error('❌ Delete config error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Serve Local SEO reports
 app.use('/reports/local-seo', express.static(path.join(__dirname, 'logs', 'local-seo')));
 
