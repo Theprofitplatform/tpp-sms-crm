@@ -2512,6 +2512,306 @@ app.get('/api/bridge/:clientId/unified', async (req, res) => {
   }
 });
 
+// ============================================
+// Lead Magnet API
+// ============================================
+
+/**
+ * POST /api/leads/capture
+ * Capture a new lead from the lead magnet landing page
+ */
+app.post('/api/leads/capture', async (req, res) => {
+  try {
+    const { businessName, website, name, email, phone, industry } = req.body;
+
+    // Validate required fields
+    if (!businessName || !website || !name || !email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: businessName, website, name, email'
+      });
+    }
+
+    // Check if lead already exists
+    const existingLead = db.leadOps.getLeadByEmail(email);
+    if (existingLead) {
+      // Update existing lead and return
+      return res.json({
+        success: true,
+        leadId: existingLead.id,
+        message: 'Welcome back! We\'ll generate a fresh audit for you.',
+        existing: true
+      });
+    }
+
+    // Create new lead
+    const leadId = db.leadOps.createLead({
+      businessName,
+      website,
+      name,
+      email,
+      phone: phone || null,
+      industry: industry || null,
+      source: 'lead_magnet'
+    });
+
+    // Track the form submission event
+    db.leadOps.trackEvent(leadId, 'form_submitted', {
+      industry,
+      hasPhone: !!phone
+    });
+
+    // Log to system
+    db.systemOps.log('info', 'lead_magnet', `New lead captured: ${email}`, {
+      leadId,
+      businessName,
+      website
+    });
+
+    res.json({
+      success: true,
+      leadId,
+      message: 'Lead captured successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Lead capture error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/leads/:leadId/audit
+ * Generate automated SEO audit for a lead
+ */
+app.post('/api/leads/:leadId/audit', async (req, res) => {
+  try {
+    const { leadId } = req.params;
+
+    // Get lead from database
+    const lead = db.leadOps.getLeadById(parseInt(leadId));
+    if (!lead) {
+      return res.status(404).json({
+        success: false,
+        error: 'Lead not found'
+      });
+    }
+
+    // Import audit generator
+    const { LeadAuditGenerator } = await import('./src/automation/lead-audit-generator.js');
+
+    // Generate audit
+    const generator = new LeadAuditGenerator();
+    const audit = await generator.generateAudit(lead.website);
+
+    // Calculate score
+    const score = generator.calculateScore(audit);
+
+    // Mark audit as completed
+    db.leadOps.markAuditCompleted(parseInt(leadId), score);
+
+    // Track audit generation
+    db.leadOps.trackEvent(parseInt(leadId), 'audit_generated', {
+      score,
+      websiteAccessible: !audit.error
+    });
+
+    // Log to system
+    db.systemOps.log('info', 'lead_magnet', `Audit generated for lead ${leadId}`, {
+      email: lead.email,
+      score
+    });
+
+    res.json({
+      success: true,
+      leadId,
+      audit
+    });
+
+  } catch (error) {
+    console.error('❌ Audit generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/leads/:leadId/track
+ * Track a lead event (audit viewed, call booked, etc.)
+ */
+app.post('/api/leads/:leadId/track', async (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const { event } = req.body;
+
+    if (!event) {
+      return res.status(400).json({
+        success: false,
+        error: 'Event type is required'
+      });
+    }
+
+    // Get lead to verify it exists
+    const lead = db.leadOps.getLeadById(parseInt(leadId));
+    if (!lead) {
+      return res.status(404).json({
+        success: false,
+        error: 'Lead not found'
+      });
+    }
+
+    // Track the event
+    db.leadOps.trackEvent(parseInt(leadId), event);
+
+    res.json({
+      success: true,
+      leadId,
+      event
+    });
+
+  } catch (error) {
+    console.error('❌ Lead tracking error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/leads
+ * Get all leads (admin only - for now no auth check)
+ */
+app.get('/api/leads', (req, res) => {
+  try {
+    const { status, limit = 100 } = req.query;
+
+    const filters = {
+      limit: parseInt(limit)
+    };
+
+    if (status) {
+      filters.status = status;
+    }
+
+    const leads = db.leadOps.getAllLeads(filters);
+
+    res.json({
+      success: true,
+      data: leads,
+      count: leads.length
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/leads/stats
+ * Get lead statistics
+ */
+app.get('/api/leads/stats', (req, res) => {
+  try {
+    const stats = db.leadOps.getStats();
+
+    res.json({
+      success: true,
+      data: stats
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/leads/:leadId/status
+ * Update lead status (admin only - for now no auth check)
+ */
+app.put('/api/leads/:leadId/status', (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const { status, notes } = req.body;
+
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        error: 'Status is required'
+      });
+    }
+
+    // Validate status
+    const validStatuses = ['new', 'contacted', 'qualified', 'converted', 'lost'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+      });
+    }
+
+    // Update status
+    db.leadOps.updateStatus(parseInt(leadId), status);
+
+    // Update notes if provided
+    if (notes) {
+      db.leadOps.updateNotes(parseInt(leadId), notes);
+    }
+
+    // Track status change
+    db.leadOps.trackEvent(parseInt(leadId), 'status_changed', { status, notes });
+
+    res.json({
+      success: true,
+      leadId,
+      status
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/leads/:leadId/events
+ * Get all events for a lead
+ */
+app.get('/api/leads/:leadId/events', (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const { limit = 50 } = req.query;
+
+    const events = db.leadOps.getEvents(parseInt(leadId), parseInt(limit));
+
+    res.json({
+      success: true,
+      leadId,
+      data: events,
+      count: events.length
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Serve Local SEO reports
 app.use('/reports/local-seo', express.static(path.join(__dirname, 'logs', 'local-seo')));
 

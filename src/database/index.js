@@ -261,6 +261,42 @@ CREATE TABLE IF NOT EXISTS auth_activity_log (
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
 CREATE INDEX IF NOT EXISTS idx_auth_activity_user_date ON auth_activity_log(user_id, created_at);
+
+-- Leads (from lead magnet)
+CREATE TABLE IF NOT EXISTS leads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  business_name TEXT NOT NULL,
+  website TEXT NOT NULL,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT,
+  industry TEXT,
+  status TEXT DEFAULT 'new', -- 'new', 'contacted', 'qualified', 'converted', 'lost'
+  audit_completed BOOLEAN DEFAULT 0,
+  audit_score INTEGER,
+  conversion_status TEXT DEFAULT 'pending', -- 'pending', 'converted', 'declined'
+  source TEXT DEFAULT 'lead_magnet',
+  notes TEXT,
+  metadata TEXT, -- JSON string
+  contacted_at DATETIME,
+  converted_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_leads_email ON leads(email);
+CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
+CREATE INDEX IF NOT EXISTS idx_leads_created ON leads(created_at);
+
+-- Lead tracking events
+CREATE TABLE IF NOT EXISTS lead_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  lead_id INTEGER NOT NULL,
+  event_type TEXT NOT NULL, -- 'audit_viewed', 'book_call_clicked', 'email_sent', 'contacted', etc.
+  metadata TEXT, -- JSON string
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (lead_id) REFERENCES leads(id)
+);
+CREATE INDEX IF NOT EXISTS idx_lead_events_lead_date ON lead_events(lead_id, created_at);
 `;
 
 /**
@@ -1195,6 +1231,232 @@ export const authOps = {
   }
 };
 
+/**
+ * Lead Operations
+ */
+export const leadOps = {
+  /**
+   * Create a new lead
+   */
+  createLead(leadData) {
+    const stmt = db.prepare(`
+      INSERT INTO leads (business_name, website, name, email, phone, industry, source, metadata)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const result = stmt.run(
+      leadData.businessName,
+      leadData.website,
+      leadData.name,
+      leadData.email,
+      leadData.phone || null,
+      leadData.industry || null,
+      leadData.source || 'lead_magnet',
+      leadData.metadata ? JSON.stringify(leadData.metadata) : null
+    );
+
+    return result.lastInsertRowid;
+  },
+
+  /**
+   * Get lead by ID
+   */
+  getLeadById(leadId) {
+    const stmt = db.prepare('SELECT * FROM leads WHERE id = ?');
+    const lead = stmt.get(leadId);
+
+    if (lead && lead.metadata) {
+      lead.metadata = JSON.parse(lead.metadata);
+    }
+
+    return lead;
+  },
+
+  /**
+   * Get lead by email
+   */
+  getLeadByEmail(email) {
+    const stmt = db.prepare('SELECT * FROM leads WHERE email = ?');
+    const lead = stmt.get(email);
+
+    if (lead && lead.metadata) {
+      lead.metadata = JSON.parse(lead.metadata);
+    }
+
+    return lead;
+  },
+
+  /**
+   * Update lead status
+   */
+  updateStatus(leadId, status) {
+    const stmt = db.prepare(`
+      UPDATE leads
+      SET status = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `);
+
+    stmt.run(status, leadId);
+  },
+
+  /**
+   * Mark audit as completed
+   */
+  markAuditCompleted(leadId, auditScore) {
+    const stmt = db.prepare(`
+      UPDATE leads
+      SET audit_completed = 1, audit_score = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `);
+
+    stmt.run(auditScore, leadId);
+  },
+
+  /**
+   * Mark lead as contacted
+   */
+  markContacted(leadId, notes = null) {
+    const stmt = db.prepare(`
+      UPDATE leads
+      SET status = 'contacted', contacted_at = datetime('now'), notes = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `);
+
+    stmt.run(notes, leadId);
+  },
+
+  /**
+   * Mark lead as converted
+   */
+  markConverted(leadId, clientId = null) {
+    const stmt = db.prepare(`
+      UPDATE leads
+      SET status = 'converted', conversion_status = 'converted', converted_at = datetime('now'), updated_at = datetime('now')
+      WHERE id = ?
+    `);
+
+    stmt.run(leadId);
+
+    // If clientId is provided, we can link the lead to a client
+    if (clientId) {
+      const updateMetadata = db.prepare(`
+        UPDATE leads
+        SET metadata = json_set(COALESCE(metadata, '{}'), '$.clientId', ?)
+        WHERE id = ?
+      `);
+      updateMetadata.run(clientId, leadId);
+    }
+  },
+
+  /**
+   * Track lead event
+   */
+  trackEvent(leadId, eventType, metadata = {}) {
+    const stmt = db.prepare(`
+      INSERT INTO lead_events (lead_id, event_type, metadata)
+      VALUES (?, ?, ?)
+    `);
+
+    stmt.run(leadId, eventType, JSON.stringify(metadata));
+  },
+
+  /**
+   * Get all events for a lead
+   */
+  getEvents(leadId, limit = 50) {
+    const stmt = db.prepare(`
+      SELECT * FROM lead_events
+      WHERE lead_id = ?
+      ORDER BY created_at DESC
+      LIMIT ?
+    `);
+
+    return stmt.all(leadId, limit);
+  },
+
+  /**
+   * Get all leads with filters
+   */
+  getAllLeads(filters = {}) {
+    let query = 'SELECT * FROM leads WHERE 1=1';
+    const params = [];
+
+    if (filters.status) {
+      query += ' AND status = ?';
+      params.push(filters.status);
+    }
+
+    if (filters.auditCompleted !== undefined) {
+      query += ' AND audit_completed = ?';
+      params.push(filters.auditCompleted ? 1 : 0);
+    }
+
+    if (filters.conversionStatus) {
+      query += ' AND conversion_status = ?';
+      params.push(filters.conversionStatus);
+    }
+
+    if (filters.fromDate) {
+      query += ' AND created_at >= ?';
+      params.push(filters.fromDate);
+    }
+
+    if (filters.toDate) {
+      query += ' AND created_at <= ?';
+      params.push(filters.toDate);
+    }
+
+    query += ' ORDER BY created_at DESC';
+
+    if (filters.limit) {
+      query += ' LIMIT ?';
+      params.push(filters.limit);
+    }
+
+    const stmt = db.prepare(query);
+    const leads = stmt.all(...params);
+
+    return leads.map(lead => {
+      if (lead.metadata) {
+        lead.metadata = JSON.parse(lead.metadata);
+      }
+      return lead;
+    });
+  },
+
+  /**
+   * Get lead statistics
+   */
+  getStats() {
+    const totalStmt = db.prepare('SELECT COUNT(*) as total FROM leads');
+    const newStmt = db.prepare("SELECT COUNT(*) as count FROM leads WHERE status = 'new'");
+    const contactedStmt = db.prepare("SELECT COUNT(*) as count FROM leads WHERE status = 'contacted'");
+    const convertedStmt = db.prepare("SELECT COUNT(*) as count FROM leads WHERE status = 'converted'");
+    const auditStmt = db.prepare("SELECT COUNT(*) as count FROM leads WHERE audit_completed = 1");
+
+    return {
+      total: totalStmt.get().total,
+      new: newStmt.get().count,
+      contacted: contactedStmt.get().count,
+      converted: convertedStmt.get().count,
+      auditCompleted: auditStmt.get().count
+    };
+  },
+
+  /**
+   * Update lead notes
+   */
+  updateNotes(leadId, notes) {
+    const stmt = db.prepare(`
+      UPDATE leads
+      SET notes = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `);
+
+    stmt.run(notes, leadId);
+  }
+};
+
 // Initialize on import
 initializeDatabase();
 
@@ -1215,5 +1477,6 @@ export default {
   reportsOps,
   analytics,
   authOps,
+  leadOps,
   db
 };

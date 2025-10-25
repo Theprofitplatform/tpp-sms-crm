@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your SEO Audit is Being Generated | SEO Expert</title>
+    <link rel="stylesheet" href="css/leadmagnet.css">
+    <style>
+        .audit-processing {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .processing-card {
+            background: white;
+            color: var(--text-primary);
+            padding: 3rem;
+            border-radius: 16px;
+            max-width: 600px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+        }
+
+        .processing-icon {
+            font-size: 4rem;
+            margin-bottom: 1.5rem;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        .processing-title {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+        }
+
+        .processing-subtitle {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        .progress-container {
+            background: var(--bg-light);
+            border-radius: 8px;
+            height: 12px;
+            margin: 2rem 0;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, var(--primary-color), var(--success-color));
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            animation: progress 3s ease-in-out forwards;
+        }
+
+        @keyframes progress {
+            0% { width: 0%; }
+            100% { width: 100%; }
+        }
+
+        .processing-steps {
+            text-align: left;
+            margin: 2rem 0;
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem 0;
+            opacity: 0.3;
+            transition: opacity 0.3s;
+        }
+
+        .step.active {
+            opacity: 1;
+            font-weight: 600;
+        }
+
+        .step.completed {
+            opacity: 1;
+        }
+
+        .step-icon {
+            font-size: 1.5rem;
+        }
+
+        .audit-results {
+            display: none;
+            padding: 4rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .results-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .results-header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .score-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem;
+            border-radius: 16px;
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .score-value {
+            font-size: 5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .score-label {
+            font-size: 1.5rem;
+            opacity: 0.9;
+        }
+
+        .findings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .finding-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .finding-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .finding-icon {
+            font-size: 2rem;
+        }
+
+        .finding-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .cta-box {
+            background: var(--primary-color);
+            color: white;
+            padding: 3rem;
+            border-radius: 16px;
+            text-align: center;
+        }
+
+        .cta-box h2 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .cta-box p {
+            font-size: 1.125rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+
+        .btn-cta-large {
+            display: inline-block;
+            background: white;
+            color: var(--primary-color);
+            padding: 1.25rem 3rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: transform 0.2s;
+        }
+
+        .btn-cta-large:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <!-- Processing State -->
+    <div id="processing-state" class="audit-processing">
+        <div class="processing-card">
+            <div class="processing-icon">🔍</div>
+            <h1 class="processing-title">Analyzing Your Website...</h1>
+            <p class="processing-subtitle">Our AI is performing a comprehensive SEO audit</p>
+
+            <div class="progress-container">
+                <div class="progress-bar"></div>
+            </div>
+
+            <div class="processing-steps">
+                <div class="step" id="step-1">
+                    <span class="step-icon">⏳</span>
+                    <span>Crawling your website</span>
+                </div>
+                <div class="step" id="step-2">
+                    <span class="step-icon">⏳</span>
+                    <span>Analyzing technical SEO</span>
+                </div>
+                <div class="step" id="step-3">
+                    <span class="step-icon">⏳</span>
+                    <span>Checking on-page optimization</span>
+                </div>
+                <div class="step" id="step-4">
+                    <span class="step-icon">⏳</span>
+                    <span>Comparing with competitors</span>
+                </div>
+                <div class="step" id="step-5">
+                    <span class="step-icon">⏳</span>
+                    <span>Generating recommendations</span>
+                </div>
+            </div>
+
+            <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 2rem;">
+                This usually takes 30-60 seconds
+            </p>
+        </div>
+    </div>
+
+    <!-- Results State -->
+    <div id="results-state" class="audit-results">
+        <div class="results-header">
+            <h1>🎯 Your SEO Audit Results</h1>
+            <p style="color: var(--text-secondary); font-size: 1.125rem;">
+                We've analyzed <span id="website-name"></span> and found some opportunities
+            </p>
+        </div>
+
+        <div class="score-card">
+            <div class="score-value" id="seo-score">--</div>
+            <div class="score-label">Overall SEO Score</div>
+        </div>
+
+        <div class="findings-grid">
+            <div class="finding-card">
+                <div class="finding-header">
+                    <span class="finding-icon">🔧</span>
+                    <h3 class="finding-title">Technical Issues</h3>
+                </div>
+                <p id="technical-summary" style="color: var(--text-secondary);"></p>
+            </div>
+
+            <div class="finding-card">
+                <div class="finding-header">
+                    <span class="finding-icon">📄</span>
+                    <h3 class="finding-title">On-Page SEO</h3>
+                </div>
+                <p id="onpage-summary" style="color: var(--text-secondary);"></p>
+            </div>
+
+            <div class="finding-card">
+                <div class="finding-header">
+                    <span class="finding-icon">🎯</span>
+                    <h3 class="finding-title">Competitor Gaps</h3>
+                </div>
+                <p id="competitor-summary" style="color: var(--text-secondary);"></p>
+            </div>
+
+            <div class="finding-card">
+                <div class="finding-header">
+                    <span class="finding-icon">💡</span>
+                    <h3 class="finding-title">Quick Wins</h3>
+                </div>
+                <p id="quickwins-summary" style="color: var(--text-secondary);"></p>
+            </div>
+        </div>
+
+        <div class="cta-box">
+            <h2>Want Us to Fix These Issues?</h2>
+            <p>Our team of SEO experts can implement these recommendations and get you ranking higher in just 30 days.</p>
+            <a href="#" class="btn-cta-large" id="book-call-btn">📞 Book a Free Strategy Call</a>
+        </div>
+    </div>
+
+    <script src="js/audit-results.js"></script>
+</body>
+</html>
