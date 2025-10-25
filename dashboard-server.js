@@ -2568,6 +2568,22 @@ app.post('/api/leads/capture', async (req, res) => {
       website
     });
 
+    // Trigger welcome email campaign (async, don't wait)
+    try {
+      const { EmailAutomation } = await import('./src/automation/email-automation.js');
+      const automation = new EmailAutomation({
+        fromEmail: process.env.FROM_EMAIL,
+        fromName: process.env.FROM_NAME || 'SEO Expert',
+        replyTo: process.env.REPLY_TO_EMAIL
+      });
+
+      automation.triggerCampaign(leadId, 'lead_captured').catch(err => {
+        console.error('Warning: Failed to trigger welcome email:', err.message);
+      });
+    } catch (err) {
+      console.warn('Email automation not available:', err.message);
+    }
+
     res.json({
       success: true,
       leadId,
@@ -2802,6 +2818,390 @@ app.get('/api/leads/:leadId/events', (req, res) => {
       leadId,
       data: events,
       count: events.length
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================
+// Email Automation API
+// ============================================
+
+/**
+ * POST /api/email/initialize
+ * Initialize default email campaigns
+ */
+app.post('/api/email/initialize', async (req, res) => {
+  try {
+    const { EmailAutomation } = await import('./src/automation/email-automation.js');
+
+    const automation = new EmailAutomation({
+      fromEmail: process.env.FROM_EMAIL,
+      fromName: process.env.FROM_NAME || 'SEO Expert',
+      replyTo: process.env.REPLY_TO_EMAIL,
+      smtp: {
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+
+    const campaignIds = await automation.initializeDefaultCampaigns();
+
+    res.json({
+      success: true,
+      message: 'Email campaigns initialized',
+      campaignIds
+    });
+
+  } catch (error) {
+    console.error('❌ Email initialization error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/email/trigger
+ * Trigger email campaign for a lead
+ */
+app.post('/api/email/trigger', async (req, res) => {
+  try {
+    const { leadId, eventType } = req.body;
+
+    if (!leadId || !eventType) {
+      return res.status(400).json({
+        success: false,
+        error: 'leadId and eventType are required'
+      });
+    }
+
+    const { EmailAutomation } = await import('./src/automation/email-automation.js');
+
+    const automation = new EmailAutomation({
+      fromEmail: process.env.FROM_EMAIL,
+      fromName: process.env.FROM_NAME || 'SEO Expert',
+      replyTo: process.env.REPLY_TO_EMAIL
+    });
+
+    const queuedEmails = await automation.triggerCampaign(leadId, eventType);
+
+    res.json({
+      success: true,
+      leadId,
+      eventType,
+      queuedEmails
+    });
+
+  } catch (error) {
+    console.error('❌ Email trigger error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/email/process-queue
+ * Process email queue (send pending emails)
+ */
+app.post('/api/email/process-queue', async (req, res) => {
+  try {
+    const { limit = 50, dryRun = false } = req.body;
+
+    const { EmailAutomation } = await import('./src/automation/email-automation.js');
+
+    const automation = new EmailAutomation({
+      fromEmail: process.env.FROM_EMAIL,
+      fromName: process.env.FROM_NAME || 'SEO Expert',
+      replyTo: process.env.REPLY_TO_EMAIL,
+      smtp: {
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+        testMode: process.env.EMAIL_TEST_MODE === 'true'
+      }
+    });
+
+    const result = await automation.processQueue({ limit, dryRun });
+
+    res.json({
+      success: true,
+      ...result
+    });
+
+  } catch (error) {
+    console.error('❌ Queue processing error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/email/campaigns
+ * Get all active campaigns
+ */
+app.get('/api/email/campaigns', (req, res) => {
+  try {
+    const campaigns = db.emailOps.getActiveCampaigns();
+
+    // Get stats for each campaign
+    const campaignsWithStats = campaigns.map(campaign => ({
+      ...campaign,
+      stats: db.emailOps.getCampaignStats(campaign.id)
+    }));
+
+    res.json({
+      success: true,
+      data: campaignsWithStats,
+      count: campaignsWithStats.length
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/email/campaigns/:campaignId
+ * Get campaign details with analytics
+ */
+app.get('/api/email/campaigns/:campaignId', async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+
+    const { EmailAutomation } = await import('./src/automation/email-automation.js');
+    const automation = new EmailAutomation();
+
+    const analytics = automation.getCampaignAnalytics(parseInt(campaignId));
+
+    res.json({
+      success: true,
+      data: analytics
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/email/campaigns/:campaignId/status
+ * Update campaign status (active, paused, archived)
+ */
+app.put('/api/email/campaigns/:campaignId/status', (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const { status } = req.body;
+
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        error: 'Status is required'
+      });
+    }
+
+    const validStatuses = ['active', 'paused', 'archived'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+      });
+    }
+
+    db.emailOps.updateCampaignStatus(parseInt(campaignId), status);
+
+    res.json({
+      success: true,
+      campaignId,
+      status
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/email/queue
+ * Get pending emails in queue
+ */
+app.get('/api/email/queue', (req, res) => {
+  try {
+    const { limit = 50 } = req.query;
+
+    const pending = db.emailOps.getPendingEmails(parseInt(limit));
+
+    res.json({
+      success: true,
+      data: pending,
+      count: pending.length
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/email/leads/:leadId
+ * Get email history and engagement for a lead
+ */
+app.get('/api/email/leads/:leadId', async (req, res) => {
+  try {
+    const { leadId } = req.params;
+
+    const { EmailAutomation } = await import('./src/automation/email-automation.js');
+    const automation = new EmailAutomation();
+
+    const engagement = automation.getLeadEngagement(parseInt(leadId));
+
+    res.json({
+      success: true,
+      data: engagement
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * DELETE /api/email/leads/:leadId/cancel
+ * Cancel all pending emails for a lead
+ */
+app.delete('/api/email/leads/:leadId/cancel', (req, res) => {
+  try {
+    const { leadId } = req.params;
+
+    const cancelled = db.emailOps.cancelPendingEmails(parseInt(leadId));
+
+    res.json({
+      success: true,
+      leadId,
+      cancelled
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/email/track/:queueId
+ * Track email event (open, click, bounce)
+ */
+app.post('/api/email/track/:queueId', (req, res) => {
+  try {
+    const { queueId } = req.params;
+    const { eventType, eventData, ipAddress, userAgent } = req.body;
+
+    if (!eventType) {
+      return res.status(400).json({
+        success: false,
+        error: 'eventType is required'
+      });
+    }
+
+    // Get email to find lead_id
+    const stmt = db.db.prepare('SELECT lead_id FROM email_queue WHERE id = ?');
+    const email = stmt.get(parseInt(queueId));
+
+    if (!email) {
+      return res.status(404).json({
+        success: false,
+        error: 'Email not found'
+      });
+    }
+
+    // Track event
+    db.emailOps.trackEvent({
+      queueId: parseInt(queueId),
+      leadId: email.lead_id,
+      eventType,
+      eventData,
+      ipAddress,
+      userAgent
+    });
+
+    res.json({
+      success: true,
+      queueId,
+      eventType
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/email/stats
+ * Get overall email automation statistics
+ */
+app.get('/api/email/stats', (req, res) => {
+  try {
+    const totalCampaigns = db.db.prepare('SELECT COUNT(*) as count FROM email_campaigns').get().count;
+    const activeCampaigns = db.db.prepare("SELECT COUNT(*) as count FROM email_campaigns WHERE status = 'active'").get().count;
+    const totalSent = db.db.prepare("SELECT COUNT(*) as count FROM email_queue WHERE status = 'sent'").get().count;
+    const totalPending = db.db.prepare("SELECT COUNT(*) as count FROM email_queue WHERE status = 'pending'").get().count;
+    const totalFailed = db.db.prepare("SELECT COUNT(*) as count FROM email_queue WHERE status = 'failed'").get().count;
+
+    const opens = db.db.prepare("SELECT COUNT(DISTINCT queue_id) as count FROM email_tracking WHERE event_type = 'opened'").get().count;
+    const clicks = db.db.prepare("SELECT COUNT(DISTINCT queue_id) as count FROM email_tracking WHERE event_type = 'clicked'").get().count;
+
+    res.json({
+      success: true,
+      stats: {
+        campaigns: {
+          total: totalCampaigns,
+          active: activeCampaigns
+        },
+        emails: {
+          sent: totalSent,
+          pending: totalPending,
+          failed: totalFailed
+        },
+        engagement: {
+          opens,
+          clicks,
+          openRate: totalSent > 0 ? ((opens / totalSent) * 100).toFixed(2) : 0,
+          clickRate: totalSent > 0 ? ((clicks / totalSent) * 100).toFixed(2) : 0
+        }
+      }
     });
 
   } catch (error) {

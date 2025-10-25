@@ -297,6 +297,86 @@ CREATE TABLE IF NOT EXISTS lead_events (
   FOREIGN KEY (lead_id) REFERENCES leads(id)
 );
 CREATE INDEX IF NOT EXISTS idx_lead_events_lead_date ON lead_events(lead_id, created_at);
+
+-- Email campaigns
+CREATE TABLE IF NOT EXISTS email_campaigns (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  description TEXT,
+  type TEXT NOT NULL, -- 'welcome', 'follow_up', 'nurture', 'reengagement'
+  status TEXT DEFAULT 'active', -- 'active', 'paused', 'archived'
+  trigger_event TEXT, -- 'lead_captured', 'audit_viewed', 'manual'
+  delay_hours INTEGER DEFAULT 0,
+  subject_template TEXT NOT NULL,
+  body_template TEXT NOT NULL,
+  from_name TEXT DEFAULT 'SEO Expert',
+  from_email TEXT,
+  reply_to TEXT,
+  metadata TEXT, -- JSON string
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_campaigns_status ON email_campaigns(status);
+CREATE INDEX IF NOT EXISTS idx_campaigns_trigger ON email_campaigns(trigger_event);
+
+-- Email sequences
+CREATE TABLE IF NOT EXISTS email_sequences (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  campaign_id INTEGER NOT NULL,
+  sequence_order INTEGER NOT NULL,
+  delay_hours INTEGER DEFAULT 0, -- Delay after previous email or trigger
+  subject_template TEXT NOT NULL,
+  body_template TEXT NOT NULL,
+  status TEXT DEFAULT 'active', -- 'active', 'paused'
+  metadata TEXT, -- JSON string
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (campaign_id) REFERENCES email_campaigns(id)
+);
+CREATE INDEX IF NOT EXISTS idx_sequences_campaign ON email_sequences(campaign_id, sequence_order);
+
+-- Email queue
+CREATE TABLE IF NOT EXISTS email_queue (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  lead_id INTEGER NOT NULL,
+  campaign_id INTEGER,
+  sequence_id INTEGER,
+  recipient_email TEXT NOT NULL,
+  recipient_name TEXT,
+  subject TEXT NOT NULL,
+  body_html TEXT NOT NULL,
+  body_text TEXT,
+  from_email TEXT NOT NULL,
+  from_name TEXT,
+  reply_to TEXT,
+  status TEXT DEFAULT 'pending', -- 'pending', 'sending', 'sent', 'failed', 'cancelled'
+  scheduled_for DATETIME NOT NULL,
+  sent_at DATETIME,
+  error_message TEXT,
+  retry_count INTEGER DEFAULT 0,
+  metadata TEXT, -- JSON string
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (lead_id) REFERENCES leads(id),
+  FOREIGN KEY (campaign_id) REFERENCES email_campaigns(id),
+  FOREIGN KEY (sequence_id) REFERENCES email_sequences(id)
+);
+CREATE INDEX IF NOT EXISTS idx_queue_status ON email_queue(status, scheduled_for);
+CREATE INDEX IF NOT EXISTS idx_queue_lead ON email_queue(lead_id);
+
+-- Email tracking
+CREATE TABLE IF NOT EXISTS email_tracking (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  queue_id INTEGER NOT NULL,
+  lead_id INTEGER NOT NULL,
+  event_type TEXT NOT NULL, -- 'sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained'
+  event_data TEXT, -- JSON string (click URL, bounce reason, etc.)
+  ip_address TEXT,
+  user_agent TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (queue_id) REFERENCES email_queue(id),
+  FOREIGN KEY (lead_id) REFERENCES leads(id)
+);
+CREATE INDEX IF NOT EXISTS idx_tracking_queue ON email_tracking(queue_id);
+CREATE INDEX IF NOT EXISTS idx_tracking_lead_event ON email_tracking(lead_id, event_type);
 `;
 
 /**
@@ -1457,6 +1537,290 @@ export const leadOps = {
   }
 };
 
+/**
+ * Email Automation Operations
+ */
+export const emailOps = {
+  /**
+   * Create email campaign
+   */
+  createCampaign(campaignData) {
+    const stmt = db.prepare(`
+      INSERT INTO email_campaigns (name, description, type, trigger_event, delay_hours, subject_template, body_template, from_name, from_email, reply_to, metadata)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const result = stmt.run(
+      campaignData.name,
+      campaignData.description || null,
+      campaignData.type,
+      campaignData.triggerEvent || null,
+      campaignData.delayHours || 0,
+      campaignData.subjectTemplate,
+      campaignData.bodyTemplate,
+      campaignData.fromName || 'SEO Expert',
+      campaignData.fromEmail || null,
+      campaignData.replyTo || null,
+      campaignData.metadata ? JSON.stringify(campaignData.metadata) : null
+    );
+
+    return result.lastInsertRowid;
+  },
+
+  /**
+   * Get campaign by ID
+   */
+  getCampaign(campaignId) {
+    const stmt = db.prepare('SELECT * FROM email_campaigns WHERE id = ?');
+    const campaign = stmt.get(campaignId);
+
+    if (campaign && campaign.metadata) {
+      campaign.metadata = JSON.parse(campaign.metadata);
+    }
+
+    return campaign;
+  },
+
+  /**
+   * Get all active campaigns
+   */
+  getActiveCampaigns() {
+    const stmt = db.prepare('SELECT * FROM email_campaigns WHERE status = ? ORDER BY created_at DESC');
+    const campaigns = stmt.all('active');
+
+    return campaigns.map(c => {
+      if (c.metadata) c.metadata = JSON.parse(c.metadata);
+      return c;
+    });
+  },
+
+  /**
+   * Update campaign status
+   */
+  updateCampaignStatus(campaignId, status) {
+    const stmt = db.prepare(`
+      UPDATE email_campaigns
+      SET status = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `);
+
+    stmt.run(status, campaignId);
+  },
+
+  /**
+   * Add email to sequence
+   */
+  addSequenceEmail(sequenceData) {
+    const stmt = db.prepare(`
+      INSERT INTO email_sequences (campaign_id, sequence_order, delay_hours, subject_template, body_template, metadata)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
+    const result = stmt.run(
+      sequenceData.campaignId,
+      sequenceData.sequenceOrder,
+      sequenceData.delayHours || 0,
+      sequenceData.subjectTemplate,
+      sequenceData.bodyTemplate,
+      sequenceData.metadata ? JSON.stringify(sequenceData.metadata) : null
+    );
+
+    return result.lastInsertRowid;
+  },
+
+  /**
+   * Get campaign sequences
+   */
+  getSequences(campaignId) {
+    const stmt = db.prepare(`
+      SELECT * FROM email_sequences
+      WHERE campaign_id = ? AND status = 'active'
+      ORDER BY sequence_order ASC
+    `);
+
+    const sequences = stmt.all(campaignId);
+
+    return sequences.map(s => {
+      if (s.metadata) s.metadata = JSON.parse(s.metadata);
+      return s;
+    });
+  },
+
+  /**
+   * Queue email for sending
+   */
+  queueEmail(emailData) {
+    const stmt = db.prepare(`
+      INSERT INTO email_queue (lead_id, campaign_id, sequence_id, recipient_email, recipient_name, subject, body_html, body_text, from_email, from_name, reply_to, scheduled_for, metadata)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const result = stmt.run(
+      emailData.leadId,
+      emailData.campaignId || null,
+      emailData.sequenceId || null,
+      emailData.recipientEmail,
+      emailData.recipientName || null,
+      emailData.subject,
+      emailData.bodyHtml,
+      emailData.bodyText || null,
+      emailData.fromEmail,
+      emailData.fromName || 'SEO Expert',
+      emailData.replyTo || null,
+      emailData.scheduledFor || new Date().toISOString(),
+      emailData.metadata ? JSON.stringify(emailData.metadata) : null
+    );
+
+    return result.lastInsertRowid;
+  },
+
+  /**
+   * Get pending emails ready to send
+   */
+  getPendingEmails(limit = 50) {
+    const stmt = db.prepare(`
+      SELECT * FROM email_queue
+      WHERE status = 'pending'
+        AND scheduled_for <= datetime('now')
+      ORDER BY scheduled_for ASC
+      LIMIT ?
+    `);
+
+    const emails = stmt.all(limit);
+
+    return emails.map(e => {
+      if (e.metadata) e.metadata = JSON.parse(e.metadata);
+      return e;
+    });
+  },
+
+  /**
+   * Update email status
+   */
+  updateEmailStatus(queueId, status, errorMessage = null) {
+    const stmt = db.prepare(`
+      UPDATE email_queue
+      SET status = ?, sent_at = datetime('now'), error_message = ?
+      WHERE id = ?
+    `);
+
+    stmt.run(status, errorMessage, queueId);
+  },
+
+  /**
+   * Increment retry count
+   */
+  incrementRetryCount(queueId) {
+    const stmt = db.prepare(`
+      UPDATE email_queue
+      SET retry_count = retry_count + 1
+      WHERE id = ?
+    `);
+
+    stmt.run(queueId);
+  },
+
+  /**
+   * Track email event
+   */
+  trackEvent(trackingData) {
+    const stmt = db.prepare(`
+      INSERT INTO email_tracking (queue_id, lead_id, event_type, event_data, ip_address, user_agent)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      trackingData.queueId,
+      trackingData.leadId,
+      trackingData.eventType,
+      trackingData.eventData ? JSON.stringify(trackingData.eventData) : null,
+      trackingData.ipAddress || null,
+      trackingData.userAgent || null
+    );
+  },
+
+  /**
+   * Get email statistics for lead
+   */
+  getLeadEmailStats(leadId) {
+    const sentStmt = db.prepare("SELECT COUNT(*) as count FROM email_queue WHERE lead_id = ? AND status = 'sent'");
+    const openedStmt = db.prepare("SELECT COUNT(DISTINCT queue_id) as count FROM email_tracking WHERE lead_id = ? AND event_type = 'opened'");
+    const clickedStmt = db.prepare("SELECT COUNT(DISTINCT queue_id) as count FROM email_tracking WHERE lead_id = ? AND event_type = 'clicked'");
+
+    return {
+      sent: sentStmt.get(leadId).count,
+      opened: openedStmt.get(leadId).count,
+      clicked: clickedStmt.get(leadId).count
+    };
+  },
+
+  /**
+   * Get campaign statistics
+   */
+  getCampaignStats(campaignId) {
+    const sentStmt = db.prepare("SELECT COUNT(*) as count FROM email_queue WHERE campaign_id = ? AND status = 'sent'");
+    const failedStmt = db.prepare("SELECT COUNT(*) as count FROM email_queue WHERE campaign_id = ? AND status = 'failed'");
+    const openedStmt = db.prepare(`
+      SELECT COUNT(DISTINCT et.queue_id) as count
+      FROM email_tracking et
+      JOIN email_queue eq ON et.queue_id = eq.id
+      WHERE eq.campaign_id = ? AND et.event_type = 'opened'
+    `);
+    const clickedStmt = db.prepare(`
+      SELECT COUNT(DISTINCT et.queue_id) as count
+      FROM email_tracking et
+      JOIN email_queue eq ON et.queue_id = eq.id
+      WHERE eq.campaign_id = ? AND et.event_type = 'clicked'
+    `);
+
+    const sent = sentStmt.get(campaignId).count;
+    const opened = openedStmt.get(campaignId).count;
+    const clicked = clickedStmt.get(campaignId).count;
+
+    return {
+      sent,
+      failed: failedStmt.get(campaignId).count,
+      opened,
+      clicked,
+      openRate: sent > 0 ? ((opened / sent) * 100).toFixed(2) : 0,
+      clickRate: sent > 0 ? ((clicked / sent) * 100).toFixed(2) : 0
+    };
+  },
+
+  /**
+   * Get recent emails for lead
+   */
+  getLeadEmails(leadId, limit = 20) {
+    const stmt = db.prepare(`
+      SELECT * FROM email_queue
+      WHERE lead_id = ?
+      ORDER BY created_at DESC
+      LIMIT ?
+    `);
+
+    const emails = stmt.all(leadId, limit);
+
+    return emails.map(e => {
+      if (e.metadata) e.metadata = JSON.parse(e.metadata);
+      return e;
+    });
+  },
+
+  /**
+   * Cancel pending emails for lead
+   */
+  cancelPendingEmails(leadId) {
+    const stmt = db.prepare(`
+      UPDATE email_queue
+      SET status = 'cancelled'
+      WHERE lead_id = ? AND status = 'pending'
+    `);
+
+    const result = stmt.run(leadId);
+    return result.changes;
+  }
+};
+
 // Initialize on import
 initializeDatabase();
 
@@ -1478,5 +1842,6 @@ export default {
   analytics,
   authOps,
   leadOps,
+  emailOps,
   db
 };

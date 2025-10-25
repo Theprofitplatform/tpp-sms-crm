@@ -44,10 +44,12 @@
     "dotenv": "^16.3.1",
     "express": "^5.1.0",
     "googleapis": "^164.1.0",
+    "html-to-text": "^9.0.5",
     "jsdom": "^25.0.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
     "mysql2": "^3.6.0",
+    "nodemailer": "^7.0.10",
     "openai": "^6.6.0"
   },
   "devDependencies": {
