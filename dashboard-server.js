@@ -2588,6 +2588,20 @@ app.post('/api/leads/capture', async (req, res) => {
       console.warn('Email automation not available:', err.message);
     }
 
+    // Send Discord notification for new lead (async, don't wait)
+    if (process.env.DISCORD_NOTIFICATIONS_ENABLED === 'true') {
+      discordNotifier.sendNewLead({
+        name,
+        businessName,
+        email,
+        website,
+        industry: industry || 'Not specified',
+        seoScore: 0 // Will be updated after audit
+      }).catch(err => {
+        console.error('Warning: Failed to send Discord notification:', err.message);
+      });
+    }
+
     res.json({
       success: true,
       leadId,

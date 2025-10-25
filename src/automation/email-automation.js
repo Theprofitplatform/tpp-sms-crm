@@ -518,6 +518,35 @@ export class EmailAutomation {
             subject: email.subject
           });
 
+          // Send Discord notification for email campaign (async, don't wait)
+          if (process.env.DISCORD_NOTIFICATIONS_ENABLED === 'true') {
+            try {
+              const { discordNotifier } = await import('../audit/discord-notifier.js');
+              const campaign = db.emailOps.getCampaign(email.campaign_id);
+
+              // Determine email type based on campaign name
+              let emailType = 'email';
+              if (campaign && campaign.name) {
+                if (campaign.name.includes('Welcome')) emailType = 'welcome';
+                else if (campaign.name.includes('Follow')) emailType = 'follow_up';
+                else if (campaign.name.includes('Report')) emailType = 'client_report';
+                else if (campaign.name.includes('Alert')) emailType = 'client_alert';
+              }
+
+              discordNotifier.sendEmailCampaign({
+                campaignName: campaign?.name || 'Email Campaign',
+                recipientEmail: email.recipient_email,
+                recipientName: email.recipient_name,
+                scheduledFor: email.scheduled_for,
+                emailType
+              }).catch(err => {
+                console.error('Warning: Failed to send Discord notification:', err.message);
+              });
+            } catch (err) {
+              console.error('Warning: Discord notification error:', err.message);
+            }
+          }
+
           sent++;
           results.push({
             emailId: email.id,
