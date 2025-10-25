@@ -200,6 +200,23 @@ CREATE TABLE IF NOT EXISTS portal_access_logs (
   FOREIGN KEY (client_id) REFERENCES clients(id)
 );
 CREATE INDEX IF NOT EXISTS idx_portal_client_date ON portal_access_logs(client_id, created_at);
+
+-- Competitor response performance tracking
+CREATE TABLE IF NOT EXISTS response_performance (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  client_id TEXT NOT NULL,
+  task_id TEXT NOT NULL,
+  keyword TEXT,
+  position_before INTEGER,
+  position_after INTEGER,
+  status TEXT DEFAULT 'tracking', -- 'tracking', 'success', 'failed', 'pending'
+  tracked_at DATETIME,
+  evaluated_at DATETIME,
+  metadata TEXT, -- JSON string
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (client_id) REFERENCES clients(id)
+);
+CREATE INDEX IF NOT EXISTS idx_response_client_task ON response_performance(client_id, task_id);
 `;
 
 /**

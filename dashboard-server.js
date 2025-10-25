@@ -1762,6 +1762,192 @@ app.get('/api/auto-fix/content/:clientId/history', (req, res) => {
 });
 
 // ============================================
+// Competitor Response System API
+// ============================================
+
+/**
+ * POST /api/competitor-response/:clientId/analyze
+ * Generate competitor response plan
+ */
+app.post('/api/competitor-response/:clientId/analyze', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    const { CompetitorResponseSystem } = await import('./src/automation/competitor-response-system.js');
+
+    const config = {
+      id: clientId,
+      businessName: req.body.businessName || 'Client',
+      siteUrl: req.body.siteUrl,
+      gscPropertyUrl: req.body.gscPropertyUrl
+    };
+
+    const responseSystem = new CompetitorResponseSystem(config);
+    const results = await responseSystem.generateResponsePlan({
+      autoExecute: false
+    });
+
+    res.json({
+      success: results.success,
+      clientId,
+      data: results
+    });
+
+  } catch (error) {
+    console.error('❌ Competitor response analysis error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/competitor-response/:clientId/execute
+ * Auto-execute top priority response tasks
+ */
+app.post('/api/competitor-response/:clientId/execute', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    const { CompetitorResponseSystem } = await import('./src/automation/competitor-response-system.js');
+
+    const config = {
+      id: clientId,
+      businessName: req.body.businessName || 'Client',
+      siteUrl: req.body.siteUrl,
+      gscPropertyUrl: req.body.gscPropertyUrl
+    };
+
+    const responseSystem = new CompetitorResponseSystem(config);
+    const results = await responseSystem.generateResponsePlan({
+      autoExecute: true
+    });
+
+    res.json({
+      success: results.success,
+      clientId,
+      data: results
+    });
+
+  } catch (error) {
+    console.error('❌ Competitor response execution error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/competitor-response/:clientId/track/:taskId
+ * Track performance of a response task
+ */
+app.post('/api/competitor-response/:clientId/track/:taskId', async (req, res) => {
+  try {
+    const { clientId, taskId } = req.params;
+
+    const { CompetitorResponseSystem } = await import('./src/automation/competitor-response-system.js');
+
+    const config = {
+      id: clientId,
+      businessName: req.body.businessName || 'Client',
+      siteUrl: req.body.siteUrl,
+      gscPropertyUrl: req.body.gscPropertyUrl
+    };
+
+    const responseSystem = new CompetitorResponseSystem(config);
+    const result = await responseSystem.trackResponsePerformance(taskId);
+
+    res.json({
+      success: result.success,
+      clientId,
+      taskId,
+      data: result
+    });
+
+  } catch (error) {
+    console.error('❌ Performance tracking error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/competitor-response/:clientId/threats
+ * Get current competitive threats
+ */
+app.get('/api/competitor-response/:clientId/threats', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    const { CompetitorResponseSystem } = await import('./src/automation/competitor-response-system.js');
+
+    const config = {
+      id: clientId,
+      businessName: req.body.businessName || 'Client',
+      siteUrl: req.body.siteUrl,
+      gscPropertyUrl: req.body.gscPropertyUrl
+    };
+
+    const responseSystem = new CompetitorResponseSystem(config);
+    const competitors = await responseSystem.getCompetitorData();
+    const threats = await responseSystem.identifyThreats(competitors);
+
+    res.json({
+      success: true,
+      clientId,
+      data: threats,
+      count: threats.length
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/competitor-response/:clientId/opportunities
+ * Get current opportunities
+ */
+app.get('/api/competitor-response/:clientId/opportunities', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    const { CompetitorResponseSystem } = await import('./src/automation/competitor-response-system.js');
+
+    const config = {
+      id: clientId,
+      businessName: req.body.businessName || 'Client',
+      siteUrl: req.body.siteUrl,
+      gscPropertyUrl: req.body.gscPropertyUrl
+    };
+
+    const responseSystem = new CompetitorResponseSystem(config);
+    const competitors = await responseSystem.getCompetitorData();
+    const opportunities = await responseSystem.identifyOpportunities(competitors);
+
+    res.json({
+      success: true,
+      clientId,
+      data: opportunities,
+      count: opportunities.length
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================
 // Bridge API - Connect SEO Expert ↔ SEO Analyst
 // ============================================
 
@@ -1992,6 +2178,7 @@ app.listen(PORT, () => {
   console.log('📊 API Endpoints Available:');
   console.log('   → Local SEO: /api/local-seo/:clientId/run');
   console.log('   → Competitors: /api/competitors/:clientId/run');
+  console.log('   → Competitor Response: /api/competitor-response/:clientId/analyze');
   console.log('   → NAP Auto-Fix: /api/auto-fix/nap/:clientId/run');
   console.log('   → Schema Inject: /api/auto-fix/schema/:clientId/inject');
   console.log('   → Title/Meta AI: /api/auto-fix/title-meta/:clientId/optimize');
@@ -2003,6 +2190,7 @@ app.listen(PORT, () => {
   console.log('');
   console.log('🔗 SEO Expert ↔ SEO Analyst Bridge Active');
   console.log('🤖 4 AI-Powered Auto-Fix Engines Ready');
+  console.log('🎯 Intelligent Competitor Response System Active');
   console.log('');
   console.log('Open your browser and navigate to the URL above');
   console.log('');
