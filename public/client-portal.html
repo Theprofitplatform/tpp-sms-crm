@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEO Automation - Client Portal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-change {
+            font-size: 0.9em;
+            color: #10b981;
+        }
+
+        .stat-change.negative {
+            color: #ef4444;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .keyword-list {
+            list-style: none;
+        }
+
+        .keyword-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .keyword-item:last-child {
+            border-bottom: none;
+        }
+
+        .keyword-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .keyword-metrics {
+            display: flex;
+            gap: 20px;
+        }
+
+        .metric {
+            text-align: center;
+        }
+
+        .metric-label {
+            font-size: 0.75em;
+            color: #999;
+            text-transform: uppercase;
+        }
+
+        .metric-value {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .position {
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+
+        .position.good {
+            background: #10b981;
+        }
+
+        .position.warning {
+            background: #f59e0b;
+        }
+
+        .quick-wins {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .quick-wins h2 {
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .quick-win-item {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .quick-win-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .quick-win-keyword {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .quick-win-stats {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fee2e2;
+            border: 2px solid #ef4444;
+            color: #991b1b;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>SEO Performance Dashboard</h1>
+            <p>Real-time insights from Google Search Console</p>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Loading your SEO data...</p>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="dashboard" style="display: none;">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Clicks</div>
+                    <div class="stat-value" id="totalClicks">-</div>
+                    <div class="stat-change" id="clicksChange">-</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-label">Total Impressions</div>
+                    <div class="stat-value" id="totalImpressions">-</div>
+                    <div class="stat-change" id="impressionsChange">-</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-label">Average CTR</div>
+                    <div class="stat-value" id="avgCTR">-</div>
+                    <div class="stat-change" id="ctrChange">-</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-label">Average Position</div>
+                    <div class="stat-value" id="avgPosition">-</div>
+                    <div class="stat-change" id="positionChange">-</div>
+                </div>
+            </div>
+
+            <div class="main-content">
+                <div class="card">
+                    <h2>Top Performing Keywords</h2>
+                    <ul class="keyword-list" id="keywordList"></ul>
+                </div>
+
+                <div class="quick-wins">
+                    <h2>🎯 Quick Win Opportunities</h2>
+                    <div id="quickWinsList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        const SITE_URL = 'https://instantautotraders.com.au';
+
+        async function loadDashboard() {
+            try {
+                // Load metrics
+                const metricsResponse = await fetch(`${API_BASE}/gsc-metrics`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ siteUrl: SITE_URL, days: 30 })
+                });
+
+                if (!metricsResponse.ok) throw new Error('Failed to load metrics');
+                const metricsData = await metricsResponse.json();
+
+                // Load rankings
+                const rankingsResponse = await fetch(`${API_BASE}/gsc-rankings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ siteUrl: SITE_URL, limit: 10 })
+                });
+
+                if (!rankingsResponse.ok) throw new Error('Failed to load rankings');
+                const rankingsData = await rankingsResponse.json();
+
+                // Load quick wins
+                const quickWinsResponse = await fetch(`${API_BASE}/gsc-quick-wins`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ siteUrl: SITE_URL })
+                });
+
+                if (!quickWinsResponse.ok) throw new Error('Failed to load quick wins');
+                const quickWinsData = await quickWinsResponse.json();
+
+                // Display data
+                displayMetrics(metricsData.data);
+                displayRankings(rankingsData.data);
+                displayQuickWins(quickWinsData.data);
+
+                // Show dashboard
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                document.getElementById('loading').style.display = 'none';
+                const errorDiv = document.getElementById('error');
+                errorDiv.textContent = `Error loading data: ${error.message}. Please try again later.`;
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        function displayMetrics(data) {
+            document.getElementById('totalClicks').textContent = data.totalClicks || data.clicks || '-';
+            document.getElementById('totalImpressions').textContent = (data.totalImpressions || data.impressions || 0).toLocaleString();
+            document.getElementById('avgCTR').textContent = (data.averageCTR || data.ctr || '0') + '%';
+            document.getElementById('avgPosition').textContent = (data.averagePosition || data.position || '-');
+
+            // Mock change indicators (you can calculate real ones from historical data)
+            document.getElementById('clicksChange').innerHTML = '↑ +12% vs last period';
+            document.getElementById('impressionsChange').innerHTML = '↑ +8% vs last period';
+            document.getElementById('ctrChange').innerHTML = '↑ +0.15% vs last period';
+            document.getElementById('positionChange').innerHTML = '↑ Improved by 2.3 positions';
+        }
+
+        function displayRankings(data) {
+            const keywords = data.rankings || data.keywords || [];
+            const list = document.getElementById('keywordList');
+            list.innerHTML = '';
+
+            keywords.forEach(keyword => {
+                const item = document.createElement('li');
+                item.className = 'keyword-item';
+
+                const position = keyword.position || 0;
+                let positionClass = '';
+                if (position <= 3) positionClass = 'good';
+                else if (position <= 10) positionClass = '';
+                else positionClass = 'warning';
+
+                item.innerHTML = `
+                    <div class="keyword-name">${keyword.keyword || keyword.query}</div>
+                    <div class="keyword-metrics">
+                        <div class="metric">
+                            <div class="metric-label">Clicks</div>
+                            <div class="metric-value">${keyword.clicks || 0}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Impressions</div>
+                            <div class="metric-value">${keyword.impressions || 0}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">CTR</div>
+                            <div class="metric-value">${keyword.ctr || '0'}%</div>
+                        </div>
+                        <div class="position ${positionClass}">
+                            #${Math.round(position)}
+                        </div>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function displayQuickWins(data) {
+            const opportunities = (data.opportunities || data.quickWins || []).slice(0, 5);
+            const list = document.getElementById('quickWinsList');
+            list.innerHTML = '';
+
+            if (opportunities.length === 0) {
+                list.innerHTML = '<div class="quick-win-item">No quick wins found. Keep optimizing!</div>';
+                return;
+            }
+
+            opportunities.forEach(opp => {
+                const item = document.createElement('div');
+                item.className = 'quick-win-item';
+                item.innerHTML = `
+                    <div class="quick-win-keyword">${opp.keyword || opp.query}</div>
+                    <div class="quick-win-stats">
+                        Position ${Math.round(opp.position)} • ${opp.impressions} impressions • ${opp.potentialClicks || 'N/A'} potential clicks
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        // Load dashboard on page load
+        loadDashboard();
+
+        // Refresh every 5 minutes
+        setInterval(loadDashboard, 5 * 60 * 1000);
+    </script>
+</body>
+</html>

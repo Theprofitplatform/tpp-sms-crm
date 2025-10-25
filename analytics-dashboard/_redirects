@@ -1,0 +1,7 @@
+# Cloudflare Pages Redirects
+
+# Root serves the main dashboard
+/  /index.html  200
+
+# Future: Reports routing
+/reports/*  /report/:splat  301

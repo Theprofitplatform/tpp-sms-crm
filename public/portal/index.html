@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEO Expert - Client Portal</title>
+    <link rel="stylesheet" href="css/portal.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <h1>🎯 SEO Expert</h1>
+                <p>Client Portal</p>
+            </div>
+
+            <div id="error-message" class="error-message" style="display: none;"></div>
+
+            <form id="login-form" class="login-form">
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        placeholder="your@email.com"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        placeholder="••••••••"
+                        required
+                    >
+                </div>
+
+                <button type="submit" class="btn-primary" id="login-btn">
+                    <span id="login-text">Sign In</span>
+                    <span id="login-spinner" class="spinner" style="display: none;"></span>
+                </button>
+            </form>
+
+            <div class="login-footer">
+                <a href="#" id="forgot-password">Forgot password?</a>
+            </div>
+        </div>
+
+        <div class="login-info">
+            <h2>Your SEO Command Center</h2>
+            <ul>
+                <li>✅ Real-time SEO metrics</li>
+                <li>📊 Performance analytics</li>
+                <li>🎯 Competitor insights</li>
+                <li>🤖 AI-powered optimizations</li>
+                <li>📈 Historical tracking</li>
+                <li>📄 Detailed reports</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Password Reset Modal -->
+    <div id="reset-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Reset Password</h2>
+            <p>Enter your email address and we'll send you a password reset link.</p>
+
+            <form id="reset-form">
+                <div class="form-group">
+                    <label for="reset-email">Email Address</label>
+                    <input
+                        type="email"
+                        id="reset-email"
+                        name="reset-email"
+                        placeholder="your@email.com"
+                        required
+                    >
+                </div>
+                <button type="submit" class="btn-primary">Send Reset Link</button>
+            </form>
+
+            <div id="reset-success" class="success-message" style="display: none;">
+                Reset link sent! Check your email.
+            </div>
+        </div>
+    </div>
+
+    <script src="js/portal.js"></script>
+</body>
+</html>

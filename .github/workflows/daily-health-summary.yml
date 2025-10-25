@@ -1,0 +1,57 @@
+name: Daily Health Summary Email
+
+on:
+  # Run every day at 8:00 AM UTC
+  schedule:
+    - cron: '0 8 * * *'
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  health-summary:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create config directory
+        run: mkdir -p config/google config/env
+
+      - name: Setup Google Service Account
+        env:
+          GSC_SERVICE_ACCOUNT: ${{ secrets.GSC_SERVICE_ACCOUNT }}
+        run: |
+          echo "$GSC_SERVICE_ACCOUNT" > config/google/service-account.json
+
+      - name: Setup environment variables
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          cat > config/env/.env <<EOF
+          ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
+          EOF
+
+      - name: Generate and Send Daily Summary
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          NOTIFICATION_EMAIL: abhishekmaharjan3737@gmail.com
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node src/notifications/send-daily-summary.js || echo "Daily summary failed (non-critical)"
+
+      - name: Clean up sensitive files
+        if: always()
+        run: |
+          rm -f config/env/.env
+          rm -f config/google/service-account.json

@@ -31,6 +31,7 @@ files/
 *.sql.gz
 *.sql.zip
 *.db
+data/
 
 # Backups & Archives
 *backup*/
@@ -90,4 +91,4 @@ _analysis/
 *.cache
 web-dist/
 /data/
-node_modules/
+config/google/service-account.json

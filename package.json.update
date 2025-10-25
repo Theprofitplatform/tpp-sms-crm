@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "googleapis": "^128.0.0",
+    "openai": "^4.20.0"
+  },
+  "scripts": {
+    "test:gsc": "node test-gsc-setup.js",
+    "auto-optimize": "node cli.js auto-optimize"
+  }
+}

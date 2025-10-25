@@ -1,0 +1,101 @@
+{
+  "critical": [
+    {
+      "keyword": "instant car offer",
+      "issue": "Lost 7 positions",
+      "currentPosition": 25,
+      "volume": 480,
+      "action": "Immediate investigation and recovery plan needed"
+    },
+    {
+      "keyword": "instant sell car",
+      "issue": "Lost 6 positions",
+      "currentPosition": 25,
+      "volume": 70,
+      "action": "Immediate investigation and recovery plan needed"
+    },
+    {
+      "keyword": "sell car instant offer",
+      "issue": "Lost 6 positions",
+      "currentPosition": 26,
+      "volume": 90,
+      "action": "Immediate investigation and recovery plan needed"
+    },
+    {
+      "keyword": "instant car sales",
+      "issue": "Lost 24 positions",
+      "currentPosition": 28,
+      "volume": 170,
+      "action": "Immediate investigation and recovery plan needed"
+    },
+    {
+      "keyword": "instant offer for my car",
+      "issue": "Lost 8 positions",
+      "currentPosition": 28,
+      "volume": 110,
+      "action": "Immediate investigation and recovery plan needed"
+    },
+    {
+      "keyword": "instant offer on my car",
+      "issue": "Lost 6 positions",
+      "currentPosition": 32,
+      "volume": 70,
+      "action": "Immediate investigation and recovery plan needed"
+    },
+    {
+      "keyword": "sell my car instant quote",
+      "issue": "Lost 6 positions",
+      "currentPosition": 32,
+      "volume": 590,
+      "action": "Immediate investigation and recovery plan needed"
+    },
+    {
+      "keyword": "sydney car buyers",
+      "issue": "Lost 88 positions",
+      "currentPosition": 999,
+      "volume": 50,
+      "action": "Immediate investigation and recovery plan needed"
+    }
+  ],
+  "high": [
+    {
+      "issue": "Multiple keywords targeting same URL",
+      "url": "https://instantautotraders.com.au/",
+      "keywordCount": 21,
+      "action": "Create dedicated landing pages for keyword groups"
+    },
+    {
+      "issue": "Multiple keywords targeting same URL",
+      "url": "https://instantautotraders.com.au/2025/08/11/instant-offer-for-my-car-in-sydney/",
+      "keywordCount": 10,
+      "action": "Create dedicated landing pages for keyword groups"
+    },
+    {
+      "issue": "Multiple keywords targeting same URL",
+      "url": "",
+      "keywordCount": 38,
+      "action": "Create dedicated landing pages for keyword groups"
+    },
+    {
+      "issue": "Poor average position (507.5)",
+      "impact": "Limited visibility for most tracked keywords",
+      "action": "Comprehensive SEO overhaul needed"
+    }
+  ],
+  "medium": [],
+  "low": [],
+  "opportunities": [
+    {
+      "keyword": "instant auto quote",
+      "position": 15,
+      "volume": 90,
+      "potentialTraffic": 8,
+      "action": "Optimize content, build backlinks, improve on-page SEO"
+    },
+    {
+      "achievement": "AI Overview placements secured",
+      "count": 2,
+      "action": "Monitor CTR impact and optimize for featured snippets"
+    }
+  ]
+}

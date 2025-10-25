@@ -98,13 +98,24 @@ class ClientManager {
 
       const date = new Date().toISOString().split('T')[0];
       const reportFile = `logs/seo-audit-report-${date}.html`;
+      const jsonFile = `logs/seo-audit-report-${date}.json`;
 
+      // Copy HTML report
       if (fs.existsSync(reportFile)) {
         fs.copyFileSync(
           reportFile,
           `${clientLogDir}/audit-${date}.html`
         );
-        console.log(`\n✅ Report saved: ${clientLogDir}/audit-${date}.html\n`);
+        console.log(`\n✅ Report saved: ${clientLogDir}/audit-${date}.html`);
+      }
+
+      // Copy JSON report
+      if (fs.existsSync(jsonFile)) {
+        fs.copyFileSync(
+          jsonFile,
+          `${clientLogDir}/audit-${date}.json`
+        );
+        console.log(`✅ JSON data saved: ${clientLogDir}/audit-${date}.json\n`);
       }
 
     } finally {

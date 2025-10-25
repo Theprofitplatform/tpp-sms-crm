@@ -457,4 +457,163 @@ describe('Discord Notifier', () => {
       expect(embedSent.fields.some(f => f.name.includes('Schedule'))).toBe(true);
     });
   });
+
+  describe('sendNewLead()', () => {
+    test('should send new lead notification', async () => {
+      mockPost.mockResolvedValue({ data: { id: '12345' } });
+
+      const leadData = {
+        name: 'John Doe',
+        businessName: 'Acme Corp',
+        email: 'john@acme.com',
+        website: 'https://acme.com',
+        industry: 'Technology',
+        seoScore: 75
+      };
+
+      const result = await notifier.sendNewLead(leadData);
+
+      expect(result.success).toBe(true);
+      const embedSent = mockPost.mock.calls[0][1].embeds[0];
+      expect(embedSent.title).toContain('New Lead');
+      expect(embedSent.description).toContain('Acme Corp');
+      expect(embedSent.color).toBe(0x00ff00);
+    });
+
+    test('should show correct score color indicator', async () => {
+      mockPost.mockResolvedValue({ data: { id: '12345' } });
+
+      const highScoreLead = {
+        name: 'Test',
+        businessName: 'Test Co',
+        email: 'test@test.com',
+        website: 'https://test.com',
+        industry: 'Tech',
+        seoScore: 85
+      };
+
+      await notifier.sendNewLead(highScoreLead);
+      const embedSent = mockPost.mock.calls[0][1].embeds[0];
+      const scoreField = embedSent.fields.find(f => f.name.includes('SEO Score'));
+      expect(scoreField.name).toContain('🟢');
+    });
+  });
+
+  describe('sendEmailCampaign()', () => {
+    test('should send email campaign notification', async () => {
+      mockPost.mockResolvedValue({ data: { id: '12345' } });
+
+      const campaignData = {
+        campaignName: 'Welcome Email',
+        recipientEmail: 'test@test.com',
+        recipientName: 'Test User',
+        scheduledFor: new Date('2025-10-25T10:00:00Z'),
+        emailType: 'welcome'
+      };
+
+      const result = await notifier.sendEmailCampaign(campaignData);
+
+      expect(result.success).toBe(true);
+      const embedSent = mockPost.mock.calls[0][1].embeds[0];
+      expect(embedSent.title).toContain('Email Campaign');
+      expect(embedSent.description).toContain('Welcome Email');
+    });
+  });
+
+  describe('sendLocalSEOAlert()', () => {
+    test('should send local SEO alert', async () => {
+      mockPost.mockResolvedValue({ data: { id: '12345' } });
+
+      const alertData = {
+        clientName: 'Test Client',
+        issueType: 'NAP Inconsistency',
+        severity: 'HIGH',
+        message: 'Business address mismatch detected',
+        score: 65
+      };
+
+      const result = await notifier.sendLocalSEOAlert(alertData);
+
+      expect(result.success).toBe(true);
+      const embedSent = mockPost.mock.calls[0][1].embeds[0];
+      expect(embedSent.title).toContain('Local SEO Alert');
+      expect(embedSent.color).toBe(0xff0000); // Red for HIGH severity
+    });
+
+    test('should use correct colors for different severities', async () => {
+      mockPost.mockResolvedValue({ data: { id: '12345' } });
+
+      await notifier.sendLocalSEOAlert({
+        clientName: 'Test',
+        issueType: 'Minor Issue',
+        severity: 'MEDIUM',
+        message: 'Test',
+        score: 75
+      });
+
+      const embedSent = mockPost.mock.calls[0][1].embeds[0];
+      expect(embedSent.color).toBe(0xffa500); // Orange for MEDIUM
+    });
+  });
+
+  describe('sendMilestone()', () => {
+    test('should send milestone notification', async () => {
+      mockPost.mockResolvedValue({ data: { id: '12345' } });
+
+      const milestoneData = {
+        clientName: 'Acme Corp',
+        milestone: '100 Keywords Ranking',
+        description: 'Your site now ranks for 100+ keywords',
+        achievement: '100 keywords in top 10'
+      };
+
+      const result = await notifier.sendMilestone(milestoneData);
+
+      expect(result.success).toBe(true);
+      const embedSent = mockPost.mock.calls[0][1].embeds[0];
+      expect(embedSent.title).toContain('Milestone');
+      expect(embedSent.color).toBe(0xffd700); // Gold
+    });
+  });
+
+  describe('sendOptimizationComplete()', () => {
+    test('should send optimization complete notification', async () => {
+      mockPost.mockResolvedValue({ data: { id: '12345' } });
+
+      const optimizationData = {
+        clientName: 'Test Client',
+        optimizationType: 'Meta Tags',
+        itemsFixed: 25,
+        beforeScore: 65,
+        afterScore: 85
+      };
+
+      const result = await notifier.sendOptimizationComplete(optimizationData);
+
+      expect(result.success).toBe(true);
+      const embedSent = mockPost.mock.calls[0][1].embeds[0];
+      expect(embedSent.title).toContain('Optimization Complete');
+      expect(embedSent.fields.some(f => f.value.includes('+20'))).toBe(true);
+    });
+  });
+
+  describe('sendReportGenerated()', () => {
+    test('should send PDF report generated notification', async () => {
+      mockPost.mockResolvedValue({ data: { id: '12345' } });
+
+      const reportData = {
+        clientName: 'Acme Corp',
+        reportType: 'Monthly SEO Report',
+        period: 'October 2025',
+        downloadUrl: 'https://example.com/reports/october.pdf'
+      };
+
+      const result = await notifier.sendReportGenerated(reportData);
+
+      expect(result.success).toBe(true);
+      const embedSent = mockPost.mock.calls[0][1].embeds[0];
+      expect(embedSent.title).toContain('PDF Report');
+      expect(embedSent.fields.some(f => f.value.includes('Download'))).toBe(true);
+    });
+  });
 });
