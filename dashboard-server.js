@@ -3472,6 +3472,65 @@ app.post('/api/email/client/:clientId/milestone', async (req, res) => {
 
 /**
  * =================================================================
+ * ADMIN API ENDPOINTS
+ * =================================================================
+ */
+
+/**
+ * GET /api/clients
+ * Get all clients (admin only)
+ */
+app.get('/api/clients', async (req, res) => {
+  try {
+    const clients = db.clientOps.getAll();
+
+    res.json({
+      success: true,
+      count: clients.length,
+      clients
+    });
+
+  } catch (error) {
+    console.error('❌ Get clients error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/clients/:clientId
+ * Get specific client details
+ */
+app.get('/api/clients/:clientId', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const client = db.clientOps.getById(clientId);
+
+    if (!client) {
+      return res.status(404).json({
+        success: false,
+        error: 'Client not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      client
+    });
+
+  } catch (error) {
+    console.error('❌ Get client error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * =================================================================
  * WHITE-LABEL BRANDING API ENDPOINTS
  * =================================================================
  */
