@@ -37,6 +37,15 @@ jest.unstable_mockModule('fs', () => ({
   }
 }));
 
+// Mock config
+jest.unstable_mockModule('../../config/env/config.js', () => ({
+  config: {
+    wordpress: {
+      url: 'https://example.com'
+    }
+  }
+}));
+
 // Dynamic import after mocking
 const { HealthCheck } = await import('../../src/monitoring/health-check.js');
 
