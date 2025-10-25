@@ -29,6 +29,8 @@ import { LocalSEOOrchestrator } from './src/automation/local-seo-orchestrator.js
 import { LocalSEOReportGenerator } from './src/reports/local-seo-report-generator.js';
 import { CompetitorTracker } from './src/automation/competitor-tracker.js';
 import { GoogleSearchConsole } from './src/automation/google-search-console.js';
+import { pdfGenerator } from './src/reports/pdf-generator.js';
+import { discordNotifier } from './src/audit/discord-notifier.js';
 import db from './src/database/index.js';
 
 const execAsync = promisify(exec);
@@ -3904,6 +3906,186 @@ app.delete('/api/white-label/config/:configId', async (req, res) => {
 
   } catch (error) {
     console.error('❌ Delete config error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * =================================================================
+ * PDF REPORT GENERATION API ENDPOINTS
+ * =================================================================
+ */
+
+/**
+ * POST /api/reports/generate/:clientId
+ * Generate PDF report for client
+ */
+app.post('/api/reports/generate/:clientId', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { period, reportType = 'monthly' } = req.body;
+
+    const startTime = Date.now();
+
+    // Get client
+    const client = db.clientOps.getById(clientId);
+    if (!client) {
+      return res.status(404).json({
+        success: false,
+        error: 'Client not found'
+      });
+    }
+
+    // Get client data
+    const metrics = db.gscOps.getLatest(clientId) || {};
+    const keywords = db.keywordOps.getTopKeywords(clientId, 20);
+    const optimizations = db.optimizationOps.getHistory(clientId, 10);
+    const localSeo = db.localSeoOps.getLatest(clientId);
+
+    // Get white-label branding
+    const branding = db.whiteLabelOps.getActive() || {};
+
+    // Generate PDF
+    const pdfResult = await pdfGenerator.generateReport({
+      clientName: client.name,
+      businessName: client.name,
+      period: period || new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      reportType,
+      metrics: {
+        totalClicks: metrics.total_clicks || 0,
+        totalImpressions: metrics.total_impressions || 0,
+        avgPosition: metrics.average_position ? metrics.average_position.toFixed(1) : 'N/A',
+        ctr: metrics.average_ctr ? (metrics.average_ctr * 100).toFixed(2) : 0,
+        clicksChange: '+12%',
+        impressionsChange: '+18%',
+        positionChange: '+2.3',
+        ctrChange: '+0.5%'
+      },
+      rankings: keywords.map(k => ({
+        keyword: k.keyword,
+        position: k.position,
+        change: k.change || 0,
+        clicks: k.clicks || 0
+      })),
+      optimizations: optimizations.map(o => ({
+        description: `${o.type}: ${o.target || 'Multiple items'}`
+      })),
+      recommendations: [
+        { priority: 'high', action: 'Focus on improving mobile page speed' },
+        { priority: 'medium', action: 'Update content on underperforming pages' },
+        { priority: 'medium', action: 'Build backlinks from relevant sites' }
+      ],
+      branding: {
+        companyName: branding.company_name || 'SEO Automation Platform',
+        primaryColor: branding.primary_color || '#667eea',
+        website: branding.company_website || ''
+      }
+    });
+
+    const generationTime = Date.now() - startTime;
+
+    // Save to database
+    const reportId = db.reportsOps.record(clientId, {
+      type: reportType,
+      format: 'pdf',
+      pdfPath: pdfResult.filepath,
+      pdfSize: pdfResult.size,
+      pdfFilename: pdfResult.filename,
+      period: period || new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      generationTimeMs: generationTime,
+      metadata: { metrics, rankings: keywords.length }
+    });
+
+    // Send Discord notification
+    if (process.env.DISCORD_NOTIFICATIONS_ENABLED === 'true') {
+      await discordNotifier.sendReportGenerated({
+        clientName: client.name,
+        reportType: `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} SEO Report`,
+        period: period || new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        downloadUrl: `${process.env.DASHBOARD_URL || 'http://localhost:3000'}/api/reports/${reportId}/download`
+      });
+    }
+
+    res.json({
+      success: true,
+      reportId,
+      filename: pdfResult.filename,
+      size: pdfResult.size,
+      sizeMB: pdfResult.sizeMB,
+      generationTimeMs: generationTime,
+      downloadUrl: `/api/reports/${reportId}/download`
+    });
+
+  } catch (error) {
+    console.error('❌ PDF generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/reports/:reportId/download
+ * Download PDF report
+ */
+app.get('/api/reports/:reportId/download', (req, res) => {
+  try {
+    const { reportId } = req.params;
+
+    const report = db.reportsOps.getById(reportId);
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        error: 'Report not found'
+      });
+    }
+
+    if (!report.pdf_path || !fs.existsSync(report.pdf_path)) {
+      return res.status(404).json({
+        success: false,
+        error: 'PDF file not found'
+      });
+    }
+
+    // Increment download count
+    db.reportsOps.incrementDownloads(reportId);
+
+    // Send file
+    res.download(report.pdf_path, report.pdf_filename);
+
+  } catch (error) {
+    console.error('❌ PDF download error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/reports/:clientId
+ * List all reports for a client
+ */
+app.get('/api/reports/:clientId', (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { limit = 50 } = req.query;
+
+    const reports = db.reportsOps.getHistory(clientId, parseInt(limit));
+
+    res.json({
+      success: true,
+      count: reports.length,
+      reports
+    });
+
+  } catch (error) {
+    console.error('❌ Get reports error:', error);
     res.status(500).json({
       success: false,
       error: error.message

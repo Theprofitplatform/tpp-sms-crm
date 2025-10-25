@@ -179,11 +179,18 @@ CREATE INDEX IF NOT EXISTS idx_logs_level_date ON system_logs(level, created_at)
 CREATE TABLE IF NOT EXISTS reports_generated (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   client_id TEXT NOT NULL,
-  report_type TEXT NOT NULL, -- 'local_seo', 'competitor', 'keyword', 'comprehensive'
+  report_type TEXT NOT NULL, -- 'local_seo', 'competitor', 'keyword', 'comprehensive', 'monthly', 'weekly'
   file_path TEXT,
   format TEXT, -- 'html', 'json', 'pdf'
   size_bytes INTEGER,
   generation_time_ms INTEGER,
+  pdf_path TEXT,
+  pdf_size INTEGER,
+  pdf_filename TEXT,
+  email_sent BOOLEAN DEFAULT 0,
+  download_count INTEGER DEFAULT 0,
+  period TEXT, -- e.g., 'October 2025', '2025-10'
+  metadata TEXT, -- JSON string for additional data
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (client_id) REFERENCES clients(id)
 );
@@ -1130,18 +1137,39 @@ export const reportsOps = {
   record(clientId, report) {
     const stmt = db.prepare(`
       INSERT INTO reports_generated
-      (client_id, report_type, file_path, format, size_bytes, generation_time_ms)
-      VALUES (?, ?, ?, ?, ?, ?)
+      (client_id, report_type, file_path, format, size_bytes, generation_time_ms, pdf_path, pdf_size, pdf_filename, period, metadata)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    return stmt.run(
+    const result = stmt.run(
       clientId,
       report.type,
       report.filePath || null,
       report.format || 'html',
       report.sizeBytes || 0,
-      report.generationTimeMs || 0
+      report.generationTimeMs || 0,
+      report.pdfPath || null,
+      report.pdfSize || null,
+      report.pdfFilename || null,
+      report.period || null,
+      report.metadata ? JSON.stringify(report.metadata) : null
     );
+
+    return result.lastInsertRowid;
+  },
+
+  /**
+   * Get report by ID
+   */
+  getById(reportId) {
+    const stmt = db.prepare('SELECT * FROM reports_generated WHERE id = ?');
+    const report = stmt.get(reportId);
+
+    if (report && report.metadata) {
+      report.metadata = JSON.parse(report.metadata);
+    }
+
+    return report;
   },
 
   /**
@@ -1154,7 +1182,65 @@ export const reportsOps = {
       ORDER BY created_at DESC
       LIMIT ?
     `);
-    return stmt.all(clientId, limit);
+
+    const reports = stmt.all(clientId, limit);
+
+    return reports.map(r => {
+      if (r.metadata) r.metadata = JSON.parse(r.metadata);
+      return r;
+    });
+  },
+
+  /**
+   * Mark report as emailed
+   */
+  markAsEmailed(reportId) {
+    const stmt = db.prepare(`
+      UPDATE reports_generated
+      SET email_sent = 1
+      WHERE id = ?
+    `);
+
+    return stmt.run(reportId).changes > 0;
+  },
+
+  /**
+   * Increment download count
+   */
+  incrementDownloads(reportId) {
+    const stmt = db.prepare(`
+      UPDATE reports_generated
+      SET download_count = download_count + 1
+      WHERE id = ?
+    `);
+
+    return stmt.run(reportId).changes > 0;
+  },
+
+  /**
+   * Delete report
+   */
+  deleteReport(reportId) {
+    const stmt = db.prepare('DELETE FROM reports_generated WHERE id = ?');
+    return stmt.run(reportId).changes > 0;
+  },
+
+  /**
+   * Get reports by period
+   */
+  getByPeriod(clientId, period) {
+    const stmt = db.prepare(`
+      SELECT * FROM reports_generated
+      WHERE client_id = ? AND period = ?
+      ORDER BY created_at DESC
+    `);
+
+    const reports = stmt.all(clientId, period);
+
+    return reports.map(r => {
+      if (r.metadata) r.metadata = JSON.parse(r.metadata);
+      return r;
+    });
   }
 };
 

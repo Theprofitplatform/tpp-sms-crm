@@ -50,7 +50,8 @@
     "multer": "^2.0.2",
     "mysql2": "^3.6.0",
     "nodemailer": "^7.0.10",
-    "openai": "^6.6.0"
+    "openai": "^6.6.0",
+    "pdfkit": "^0.17.2"
   },
   "devDependencies": {
     "@jest/globals": "^30.2.0",
