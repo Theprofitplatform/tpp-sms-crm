@@ -217,6 +217,50 @@ CREATE TABLE IF NOT EXISTS response_performance (
   FOREIGN KEY (client_id) REFERENCES clients(id)
 );
 CREATE INDEX IF NOT EXISTS idx_response_client_task ON response_performance(client_id, task_id);
+
+-- Users (authentication)
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  client_id TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  password TEXT NOT NULL,
+  first_name TEXT,
+  last_name TEXT,
+  role TEXT DEFAULT 'client', -- 'client', 'admin'
+  status TEXT DEFAULT 'active', -- 'active', 'inactive', 'suspended'
+  last_login DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (client_id) REFERENCES clients(id)
+);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_client ON users(client_id);
+
+-- Password reset tokens
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  token TEXT NOT NULL,
+  used BOOLEAN DEFAULT 0,
+  expires_at DATETIME NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_reset_tokens_user ON password_reset_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_reset_tokens_token ON password_reset_tokens(token);
+
+-- Authentication activity log
+CREATE TABLE IF NOT EXISTS auth_activity_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  activity_type TEXT NOT NULL, -- 'login_success', 'login_failed', 'logout', 'password_changed', 'register'
+  ip_address TEXT,
+  user_agent TEXT,
+  metadata TEXT, -- JSON string
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_auth_activity_user_date ON auth_activity_log(user_id, created_at);
 `;
 
 /**
@@ -989,6 +1033,168 @@ export const analytics = {
   }
 };
 
+/**
+ * Authentication Operations
+ */
+export const authOps = {
+  /**
+   * Create a new user
+   */
+  createUser(userData) {
+    const stmt = db.prepare(`
+      INSERT INTO users (client_id, email, password, first_name, last_name, role, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const result = stmt.run(
+      userData.clientId,
+      userData.email,
+      userData.password,
+      userData.firstName || null,
+      userData.lastName || null,
+      userData.role || 'client',
+      'active'
+    );
+
+    return result.lastInsertRowid;
+  },
+
+  /**
+   * Get user by email
+   */
+  getUserByEmail(email) {
+    const stmt = db.prepare('SELECT * FROM users WHERE email = ?');
+    return stmt.get(email);
+  },
+
+  /**
+   * Get user by ID
+   */
+  getUserById(userId) {
+    const stmt = db.prepare('SELECT * FROM users WHERE id = ?');
+    return stmt.get(userId);
+  },
+
+  /**
+   * Update last login timestamp
+   */
+  updateLastLogin(userId) {
+    const stmt = db.prepare(`
+      UPDATE users
+      SET last_login = datetime('now')
+      WHERE id = ?
+    `);
+
+    stmt.run(userId);
+  },
+
+  /**
+   * Update user password
+   */
+  updatePassword(userId, hashedPassword) {
+    const stmt = db.prepare(`
+      UPDATE users
+      SET password = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `);
+
+    stmt.run(hashedPassword, userId);
+  },
+
+  /**
+   * Update user status
+   */
+  updateStatus(userId, status) {
+    const stmt = db.prepare(`
+      UPDATE users
+      SET status = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `);
+
+    stmt.run(status, userId);
+  },
+
+  /**
+   * Store password reset token
+   */
+  storeResetToken(userId, token) {
+    const stmt = db.prepare(`
+      INSERT INTO password_reset_tokens (user_id, token, expires_at)
+      VALUES (?, ?, datetime('now', '+1 hour'))
+    `);
+
+    stmt.run(userId, token);
+  },
+
+  /**
+   * Check if reset token is valid
+   */
+  isResetTokenValid(userId, token) {
+    const stmt = db.prepare(`
+      SELECT * FROM password_reset_tokens
+      WHERE user_id = ? AND token = ? AND used = 0 AND expires_at > datetime('now')
+    `);
+
+    const result = stmt.get(userId, token);
+    return result !== undefined;
+  },
+
+  /**
+   * Invalidate reset token
+   */
+  invalidateResetToken(userId, token) {
+    const stmt = db.prepare(`
+      UPDATE password_reset_tokens
+      SET used = 1
+      WHERE user_id = ? AND token = ?
+    `);
+
+    stmt.run(userId, token);
+  },
+
+  /**
+   * Log authentication activity
+   */
+  logActivity(userId, activityType, metadata = {}) {
+    const stmt = db.prepare(`
+      INSERT INTO auth_activity_log (user_id, activity_type, metadata)
+      VALUES (?, ?, ?)
+    `);
+
+    stmt.run(userId, activityType, JSON.stringify(metadata));
+  },
+
+  /**
+   * Get activity log for user
+   */
+  getActivityLog(userId, limit = 50) {
+    const stmt = db.prepare(`
+      SELECT * FROM auth_activity_log
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT ?
+    `);
+
+    return stmt.all(userId, limit);
+  },
+
+  /**
+   * Get all users for a client
+   */
+  getUsersByClient(clientId) {
+    const stmt = db.prepare('SELECT id, email, first_name, last_name, role, status, last_login, created_at FROM users WHERE client_id = ?');
+    return stmt.all(clientId);
+  },
+
+  /**
+   * Get all users (admin only)
+   */
+  getAllUsers() {
+    const stmt = db.prepare('SELECT id, client_id, email, first_name, last_name, role, status, last_login, created_at FROM users');
+    return stmt.all();
+  }
+};
+
 // Initialize on import
 initializeDatabase();
 
@@ -1008,5 +1214,6 @@ export default {
   systemOps,
   reportsOps,
   analytics,
+  authOps,
   db
 };

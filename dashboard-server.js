@@ -107,6 +107,231 @@ function getClientReports(clientId) {
 
 // API Routes
 
+// ============================================
+// Authentication API
+// ============================================
+
+import { AuthService } from './src/auth/auth-service.js';
+import cookieParser from 'cookie-parser';
+
+// Add cookie parser middleware
+app.use(cookieParser());
+
+/**
+ * POST /api/auth/register
+ * Register a new user
+ */
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const result = await AuthService.register(req.body);
+
+    res.status(201).json(result);
+  } catch (error) {
+    console.error('❌ Registration error:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/auth/login
+ * Login user and return JWT token
+ */
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const result = await AuthService.login(email, password);
+
+    // Set HTTP-only cookie with token
+    res.cookie('auth_token', result.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('❌ Login error:', error);
+    res.status(401).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/auth/logout
+ * Logout user (clear cookie)
+ */
+app.post('/api/auth/logout', async (req, res) => {
+  try {
+    // Clear cookie
+    res.clearCookie('auth_token');
+
+    res.json({
+      success: true,
+      message: 'Logged out successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/auth/me
+ * Get current user info
+ */
+app.get('/api/auth/me', async (req, res) => {
+  try {
+    // Get token from header or cookie
+    let token = null;
+    const authHeader = req.headers.authorization;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else if (req.cookies && req.cookies.auth_token) {
+      token = req.cookies.auth_token;
+    }
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: 'Not authenticated'
+      });
+    }
+
+    const result = await AuthService.verifyToken(token);
+
+    res.json(result);
+  } catch (error) {
+    res.status(401).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/auth/change-password
+ * Change user password
+ */
+app.post('/api/auth/change-password', async (req, res) => {
+  try {
+    // Get token
+    let token = null;
+    const authHeader = req.headers.authorization;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else if (req.cookies && req.cookies.auth_token) {
+      token = req.cookies.auth_token;
+    }
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: 'Not authenticated'
+      });
+    }
+
+    const userResult = await AuthService.verifyToken(token);
+    const { currentPassword, newPassword } = req.body;
+
+    const result = await AuthService.changePassword(
+      userResult.user.id,
+      currentPassword,
+      newPassword
+    );
+
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/auth/request-reset
+ * Request password reset
+ */
+app.post('/api/auth/request-reset', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const result = await AuthService.requestPasswordReset(email);
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/auth/reset-password
+ * Reset password with token
+ */
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    const result = await AuthService.resetPassword(token, newPassword);
+
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/auth/activity
+ * Get user activity log
+ */
+app.get('/api/auth/activity', async (req, res) => {
+  try {
+    // Get token
+    let token = null;
+    const authHeader = req.headers.authorization;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else if (req.cookies && req.cookies.auth_token) {
+      token = req.cookies.auth_token;
+    }
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: 'Not authenticated'
+      });
+    }
+
+    const userResult = await AuthService.verifyToken(token);
+    const result = await AuthService.getUserActivity(userResult.user.id);
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================
+// Public Dashboard API
+// ============================================
+
 // Get dashboard data
 app.get('/api/dashboard', (req, res) => {
   try {
@@ -2176,6 +2401,13 @@ app.listen(PORT, () => {
   console.log(`✅ Server running at: http://localhost:${PORT}`);
   console.log('');
   console.log('📊 API Endpoints Available:');
+  console.log('');
+  console.log('   Authentication:');
+  console.log('   → POST /api/auth/register');
+  console.log('   → POST /api/auth/login');
+  console.log('   → GET /api/auth/me');
+  console.log('');
+  console.log('   Automation:');
   console.log('   → Local SEO: /api/local-seo/:clientId/run');
   console.log('   → Competitors: /api/competitors/:clientId/run');
   console.log('   → Competitor Response: /api/competitor-response/:clientId/analyze');
@@ -2183,6 +2415,8 @@ app.listen(PORT, () => {
   console.log('   → Schema Inject: /api/auto-fix/schema/:clientId/inject');
   console.log('   → Title/Meta AI: /api/auto-fix/title-meta/:clientId/optimize');
   console.log('   → Content Optimize: /api/auto-fix/content/:clientId/optimize');
+  console.log('');
+  console.log('   Reporting:');
   console.log('   → Complete Dashboard: /api/dashboard/:clientId/complete');
   console.log('   → Bridge API: /api/bridge/send-results (POST)');
   console.log('   → Unified View: /api/bridge/:clientId/unified');
@@ -2191,6 +2425,7 @@ app.listen(PORT, () => {
   console.log('🔗 SEO Expert ↔ SEO Analyst Bridge Active');
   console.log('🤖 4 AI-Powered Auto-Fix Engines Ready');
   console.log('🎯 Intelligent Competitor Response System Active');
+  console.log('🔐 Secure Authentication System Active');
   console.log('');
   console.log('Open your browser and navigate to the URL above');
   console.log('');
