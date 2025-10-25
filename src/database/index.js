@@ -732,6 +732,29 @@ export const localSeoOps = {
       ORDER BY date ASC
     `);
     return stmt.all(clientId, days);
+  },
+
+  /**
+   * Record full local SEO audit results
+   */
+  recordAudit(clientId, auditData) {
+    const stmt = db.prepare(`
+      INSERT INTO local_seo_scores
+      (client_id, date, nap_score, has_schema, directories_submitted, reviews_count, issues_found, warnings_found, metadata)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    return stmt.run(
+      clientId,
+      auditData.date || new Date().toISOString().split('T')[0],
+      auditData.napScore || 0,
+      auditData.schemaScore >= 80 ? 1 : 0,
+      auditData.directoriesScore || 0,
+      auditData.reviewsCount || 0,
+      auditData.issuesDetected || 0,
+      auditData.issuesFixed || 0,
+      JSON.stringify(auditData.metadata || {})
+    );
   }
 };
 

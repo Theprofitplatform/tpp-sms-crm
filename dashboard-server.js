@@ -32,6 +32,7 @@ import { GoogleSearchConsole } from './src/automation/google-search-console.js';
 import { pdfGenerator } from './src/reports/pdf-generator.js';
 import { discordNotifier } from './src/audit/discord-notifier.js';
 import { rankScheduler } from './src/automation/rank-scheduler.js';
+import { localSeoScheduler } from './src/automation/local-seo-scheduler.js';
 import db from './src/database/index.js';
 
 const execAsync = promisify(exec);
@@ -4223,6 +4224,99 @@ app.get('/api/automation/schedule', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/automation/local-seo/run
+ * Manually trigger local SEO automation for all clients
+ */
+app.post('/api/automation/local-seo/run', async (req, res) => {
+  try {
+    const { localSeoScheduler } = await import('./src/automation/local-seo-scheduler.js');
+
+    console.log('🗺️  Manual local SEO automation triggered via API');
+    const startTime = Date.now();
+
+    const results = await localSeoScheduler.runForAllClients();
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+
+    res.json({
+      success: true,
+      duration: parseFloat(duration),
+      clientsProcessed: results.clientsProcessed,
+      totalIssues: results.totalIssues,
+      autoFixed: results.autoFixed,
+      errors: results.errors
+    });
+
+  } catch (error) {
+    console.error('❌ Manual local SEO automation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/automation/local-seo/:clientId
+ * Run local SEO automation for a specific client
+ */
+app.post('/api/automation/local-seo/:clientId', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { localSeoScheduler } = await import('./src/automation/local-seo-scheduler.js');
+
+    console.log(`🗺️  Manual local SEO check for client ${clientId}`);
+    const startTime = Date.now();
+
+    const result = await localSeoScheduler.processClient(clientId);
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+
+    res.json({
+      success: true,
+      duration: parseFloat(duration),
+      clientName: result.clientName,
+      issuesDetected: result.issuesDetected,
+      issuesFixed: result.issuesFixed,
+      score: result.score,
+      auditResult: result.auditResult
+    });
+
+  } catch (error) {
+    console.error('❌ Client local SEO automation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/automation/local-seo/:clientId/history
+ * Get local SEO audit history for a client
+ */
+app.get('/api/automation/local-seo/:clientId/history', (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { limit = 30 } = req.query;
+
+    const history = db.localSeoOps.getHistory(clientId, parseInt(limit));
+
+    res.json({
+      success: true,
+      clientId,
+      count: history.length,
+      history
+    });
+
+  } catch (error) {
+    console.error('❌ Local SEO history error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Serve Local SEO reports
 app.use('/reports/local-seo', express.static(path.join(__dirname, 'logs', 'local-seo')));
 
@@ -4246,8 +4340,11 @@ app.listen(PORT, () => {
   console.log('   → Rank Tracking: /api/automation/rank-tracking/run');
   console.log('   → Rank Client: /api/automation/rank-tracking/:clientId');
   console.log('   → Rank Summary: /api/automation/rank-tracking/:clientId/summary');
+  console.log('   → Local SEO All: /api/automation/local-seo/run');
+  console.log('   → Local SEO Client: /api/automation/local-seo/:clientId');
+  console.log('   → Local SEO History: /api/automation/local-seo/:clientId/history');
   console.log('   → Schedule Status: /api/automation/schedule');
-  console.log('   → Local SEO: /api/local-seo/:clientId/run');
+  console.log('   → Legacy Local SEO: /api/local-seo/:clientId/run');
   console.log('   → Competitors: /api/competitors/:clientId/run');
   console.log('   → Competitor Response: /api/competitor-response/:clientId/analyze');
   console.log('   → NAP Auto-Fix: /api/auto-fix/nap/:clientId/run');
@@ -4282,6 +4379,12 @@ app.listen(PORT, () => {
     rankScheduler.start();
   } catch (error) {
     console.error('⚠️  Failed to start rank tracking scheduler:', error.message);
+  }
+
+  try {
+    localSeoScheduler.start();
+  } catch (error) {
+    console.error('⚠️  Failed to start local SEO scheduler:', error.message);
   }
 
   console.log('');
