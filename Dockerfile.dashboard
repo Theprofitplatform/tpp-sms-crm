@@ -51,8 +51,8 @@ COPY --from=dependencies --chown=seouser:seouser /app/node_modules ./node_module
 COPY --chown=seouser:seouser . .
 
 # Create necessary directories
-RUN mkdir -p data logs public && \
-    chown -R seouser:seouser data logs public
+RUN mkdir -p data logs public dashboard/dist && \
+    chown -R seouser:seouser data logs public dashboard
 
 # Switch to non-root user
 USER seouser

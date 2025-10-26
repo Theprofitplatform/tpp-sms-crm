@@ -44,11 +44,10 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Serve the new React dashboard (built version)
-// Uncomment this after building the dashboard with: cd dashboard && npm run build
-// app.use(express.static('dashboard/dist'));
+app.use(express.static('dashboard/dist'));
 
-// Serve legacy public files
-app.use(express.static('public'));
+// Serve legacy public files (for API assets)
+app.use('/legacy', express.static('public'));
 
 // Load clients
 function loadClients() {
@@ -595,6 +594,16 @@ app.use('/api/keyword', createProxyMiddleware({
 }));
 
 console.log('[Keyword Service] Proxy configured for /api/keyword/*');
+
+// Catchall route for React Router (must be last!)
+app.get('*', (req, res) => {
+  // Don't catch API routes
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ success: false, error: 'API endpoint not found' });
+  }
+  // Serve React app for all other routes
+  res.sendFile(path.join(__dirname, 'dashboard', 'dist', 'index.html'));
+});
 
 // Start server
 httpServer.listen(PORT, () => {
