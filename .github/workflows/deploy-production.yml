@@ -118,8 +118,15 @@ jobs:
             echo "🛑 Stopping existing containers..."
             docker compose -f docker-compose.prod.yml down || true
 
+            # Build React dashboard
+            echo "🎨 Building React dashboard..."
+            cd dashboard
+            npm ci --silent
+            npm run build --silent
+            cd ..
+
             # Build and start containers
-            echo "🔨 Building images..."
+            echo "🔨 Building Docker images..."
             docker compose -f docker-compose.prod.yml build --no-cache dashboard
 
             echo "🚀 Starting database first..."
