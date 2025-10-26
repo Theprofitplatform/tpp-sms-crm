@@ -1,0 +1,248 @@
+name: Deploy to Production VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # Allow manual triggering
+
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+        env:
+          CI: true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: coverage/
+
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Add VPS to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.VPS_HOST || '31.97.222.218' }} >> ~/.ssh/known_hosts
+
+      - name: Create deployment archive
+        run: |
+          tar -czf deploy.tar.gz \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='coverage' \
+            --exclude='_archive' \
+            --exclude='serpbear' \
+            --exclude='files' \
+            --exclude='ui' \
+            --exclude='downloads' \
+            --exclude='logs' \
+            --exclude='*.log' \
+            .
+
+      - name: Upload code to VPS
+        run: |
+          scp -o StrictHostKeyChecking=no deploy.tar.gz ${{ secrets.VPS_USER || 'avi' }}@${{ secrets.VPS_HOST || '31.97.222.218' }}:/tmp/
+
+      - name: Deploy on VPS
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER || 'avi' }}@${{ secrets.VPS_HOST || '31.97.222.218' }} << 'ENDSSH'
+            set -e
+
+            # Set deployment directory
+            DEPLOY_DIR="/home/avi/seo-automation"
+
+            # Create directories if they don't exist
+            mkdir -p $DEPLOY_DIR/backups
+            cd $DEPLOY_DIR
+
+            # Backup current deployment
+            if [ -d "current" ]; then
+              echo "📦 Creating backup..."
+              rm -rf backup
+              cp -r current backup
+            fi
+
+            # Extract new code
+            echo "📤 Extracting new code..."
+            mkdir -p current
+            tar -xzf /tmp/deploy.tar.gz -C current/
+            rm /tmp/deploy.tar.gz
+
+            cd current
+
+            # Copy environment file if exists
+            if [ -f "../.env" ]; then
+              echo "📋 Using existing .env file..."
+              cp ../.env .env
+            else
+              echo "⚠️  Warning: No .env file found!"
+            fi
+
+            # Stop existing containers
+            echo "🛑 Stopping existing containers..."
+            docker compose -f docker-compose.prod.yml down || true
+
+            # Build and start containers
+            echo "🔨 Building images..."
+            docker compose -f docker-compose.prod.yml build --no-cache dashboard
+
+            echo "🚀 Starting database first..."
+            docker compose -f docker-compose.prod.yml up -d postgres
+
+            # Wait for database to be healthy
+            echo "⏳ Waiting for database to be ready..."
+            sleep 10
+
+            # Backup database before migration
+            echo "💾 Creating database backup..."
+            BACKUP_FILE="db_backup_$(date +%Y%m%d_%H%M%S).sql"
+            docker compose -f docker-compose.prod.yml exec -T postgres pg_dump -U ${POSTGRES_USER:-seo_user} ${POSTGRES_DB:-seo_unified_prod} > "../backups/$BACKUP_FILE" 2>/dev/null || echo "No existing database to backup"
+
+            # Keep only last 7 backups
+            cd ../backups && ls -t db_backup_*.sql 2>/dev/null | tail -n +8 | xargs -r rm && cd ../current || true
+
+            # Run database migrations
+            echo "🗄️  Running database migrations..."
+            docker compose -f docker-compose.prod.yml exec -T postgres psql -U ${POSTGRES_USER:-seo_user} -d ${POSTGRES_DB:-seo_unified_prod} -f /docker-entrypoint-initdb.d/postgresql-schema.sql || echo "Schema already exists, continuing..."
+
+            echo "🚀 Starting all containers..."
+            docker compose -f docker-compose.prod.yml --profile with-cloudflare up -d
+
+            # Wait for services to be healthy
+            echo "⏳ Waiting for services to be healthy..."
+            sleep 10
+
+            # Check health
+            echo "🏥 Checking service health..."
+            docker compose -f docker-compose.prod.yml ps
+
+            # Test API
+            if curl -f http://localhost:9000/api/v2/health > /dev/null 2>&1; then
+              echo "✅ API health check passed!"
+            else
+              echo "❌ API health check failed!"
+              exit 1
+            fi
+
+            # Clean up old images
+            echo "🧹 Cleaning up old images..."
+            docker image prune -af --filter "until=24h" || true
+
+            echo "✨ Deployment completed successfully!"
+          ENDSSH
+
+      - name: Verify deployment
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER || 'avi' }}@${{ secrets.VPS_HOST || '31.97.222.218' }} << 'ENDSSH'
+            cd /home/avi/seo-automation/current
+            docker compose -f docker-compose.prod.yml ps
+            curl -s http://localhost:9000/api/v2/health | jq '.'
+          ENDSSH
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          COMMIT_AUTHOR="${{ github.event.head_commit.author.name }}"
+
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "✅ Deployment successful at $TIMESTAMP"
+            echo "📝 Commit: $COMMIT_MSG"
+            echo "👤 Author: $COMMIT_AUTHOR"
+
+            # Optional: Send notification to Discord/Slack
+            if [ -n "${{ secrets.DISCORD_WEBHOOK_URL }}" ]; then
+              curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+                -H "Content-Type: application/json" \
+                -d "{\"content\":\"✅ Deployment successful!\n**Commit:** $COMMIT_MSG\n**Author:** $COMMIT_AUTHOR\n**Time:** $TIMESTAMP\"}"
+            fi
+          else
+            echo "❌ Deployment failed at $TIMESTAMP"
+            echo "📝 Commit: $COMMIT_MSG"
+            echo "👤 Author: $COMMIT_AUTHOR"
+
+            # Optional: Send failure notification
+            if [ -n "${{ secrets.DISCORD_WEBHOOK_URL }}" ]; then
+              curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+                -H "Content-Type: application/json" \
+                -d "{\"content\":\"❌ Deployment failed!\n**Commit:** $COMMIT_MSG\n**Author:** $COMMIT_AUTHOR\n**Time:** $TIMESTAMP\n**Check:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
+            fi
+            exit 1
+          fi
+
+  rollback:
+    name: Rollback (Manual)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Rollback deployment
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER || 'avi' }}@${{ secrets.VPS_HOST || '31.97.222.218' }} << 'ENDSSH'
+            set -e
+            cd /home/avi/seo-automation
+
+            if [ ! -d "backup" ]; then
+              echo "❌ No backup found to rollback to!"
+              exit 1
+            fi
+
+            echo "⏮️  Rolling back to previous version..."
+
+            # Stop current containers
+            cd current
+            docker compose -f docker-compose.prod.yml down || true
+
+            # Restore backup
+            cd ..
+            rm -rf current
+            cp -r backup current
+
+            # Start containers
+            cd current
+            docker compose -f docker-compose.prod.yml --profile with-cloudflare up -d
+
+            echo "✅ Rollback completed successfully!"
+          ENDSSH

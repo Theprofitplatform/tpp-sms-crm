@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+      target: production
+    image: seo-automation-dashboard:latest
+    container_name: seo-dashboard
+
+    # Port mapping
+    ports:
+      - "3001:3000"  # Host:Container
+
+    # Environment variables (from .env file)
+    env_file:
+      - .env
+
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+
+    # Volumes for persistence
+    volumes:
+      - ./data:/app/data              # Database persistence
+      - ./logs:/app/logs              # Logs persistence
+      - ./config:/app/config:ro       # Config files (read-only)
+
+    # Network
+    networks:
+      - seo-network
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 512M
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  seo-network:
+    driver: bridge
+
+volumes:
+  data:
+    driver: local
+  logs:
+    driver: local

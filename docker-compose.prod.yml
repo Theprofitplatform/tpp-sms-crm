@@ -1,0 +1,202 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: keyword-tracker-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-seo_unified_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-seo_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_THIS_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/postgresql-schema.sql:/docker-entrypoint-initdb.d/postgresql-schema.sql:ro
+    networks:
+      - keyword-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-seo_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Dashboard Server (Node.js/Express)
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+      target: production
+    image: keyword-tracker-dashboard:latest
+    container_name: keyword-tracker-dashboard
+    environment:
+      - NODE_ENV=production
+      - PORT=9000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-seo_user}:${POSTGRES_PASSWORD:-CHANGE_THIS_PASSWORD}@postgres:5432/${POSTGRES_DB:-seo_unified_prod}
+      - SERPBEAR_DB_PATH=/app/serpbear/data/serpbear.db
+      - KEYWORD_SERVICE_DB_PATH=/app/keyword-service/keywords.db
+      - JWT_SECRET=${JWT_SECRET:-CHANGE_THIS_SECRET}
+      - SYNC_INTERVAL=${SYNC_INTERVAL:-*/5 * * * *}
+      - ENABLE_AUTO_SYNC=${ENABLE_AUTO_SYNC:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - ./logs:/app/logs
+      - ./database:/app/database
+      - serpbear_data:/app/serpbear/data
+      - keyword_service_data:/app/keyword-service
+    ports:
+      - "${DASHBOARD_PORT:-9000}:9000"
+    networks:
+      - keyword-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keyword-service:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/v2/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '1.0'
+          memory: 512M
+
+  # Keyword Service (Python CLI Tool)
+  keyword-service:
+    build:
+      context: ./keyword-service
+      dockerfile: Dockerfile
+    image: keyword-tracker-service:latest
+    container_name: keyword-tracker-service
+    command: ["tail", "-f", "/dev/null"]  # Keep container running for CLI access
+    environment:
+      - FLASK_ENV=production
+      - PORT=5000
+      - DATABASE_PATH=/app/data/keywords.db
+      - GOOGLE_ADS_CLIENT_ID=${GOOGLE_ADS_CLIENT_ID}
+      - GOOGLE_ADS_CLIENT_SECRET=${GOOGLE_ADS_CLIENT_SECRET}
+      - SERPAPI_KEY=${SERPAPI_KEY}
+    volumes:
+      - keyword_service_data:/app/data
+      - ./logs:/app/logs
+    networks:
+      - keyword-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Sync Service (Runs bidirectional sync)
+  sync-service:
+    image: keyword-tracker-dashboard:latest
+    container_name: keyword-tracker-sync
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-seo_user}:${POSTGRES_PASSWORD:-CHANGE_THIS_PASSWORD}@postgres:5432/${POSTGRES_DB:-seo_unified_prod}
+      - SERPBEAR_DB_PATH=/app/serpbear/data/serpbear.db
+      - KEYWORD_SERVICE_DB_PATH=/app/keyword-service/keywords.db
+      - SYNC_INTERVAL=${SYNC_INTERVAL:-*/5 * * * *}
+    volumes:
+      - ./logs:/app/logs
+      - ./database:/app/database
+      - serpbear_data:/app/serpbear/data
+      - keyword_service_data:/app/keyword-service
+    networks:
+      - keyword-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      dashboard:
+        condition: service_healthy
+    command: node src/services/keyword-sync-service.cjs
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # Cloudflare Tunnel (Replaces Nginx)
+  # Provides secure tunneling to Cloudflare without exposing ports
+  # Get your tunnel token from: https://one.dash.cloudflare.com/
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: keyword-tracker-cloudflared
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - keyword-network
+    depends_on:
+      dashboard:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    profiles:
+      - with-cloudflare  # Start with: docker-compose --profile with-cloudflare up
+
+  # Nginx Reverse Proxy (DEPRECATED - Use Cloudflare instead)
+  # Kept for backwards compatibility, disabled by default
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: keyword-tracker-nginx
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./deployment/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./deployment/nginx/ssl:/etc/nginx/ssl:ro
+  #     - ./dashboard/dist:/usr/share/nginx/html:ro
+  #   networks:
+  #     - keyword-network
+  #   depends_on:
+  #     - dashboard
+  #   restart: unless-stopped
+  #   profiles:
+  #     - with-nginx
+  #   healthcheck:
+  #     test: ["CMD", "nginx", "-t"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+networks:
+  keyword-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  serpbear_data:
+    driver: local
+  keyword_service_data:
+    driver: local

@@ -1,0 +1,365 @@
+# CTR (Click-Through Rate) Model Configuration
+# ============================================================================
+# Defines expected CTR by position for different SERP layouts
+# Used to calculate traffic potential = search_volume × CTR
+# ============================================================================
+
+# Base CTR Model by Position (1-10)
+# Based on industry averages (2024 data)
+base_model:
+  # Clean SERP (no special features)
+  clean:
+    1: 0.314  # 31.4%
+    2: 0.164  # 16.4%
+    3: 0.103  # 10.3%
+    4: 0.072  # 7.2%
+    5: 0.054  # 5.4%
+    6: 0.042  # 4.2%
+    7: 0.034  # 3.4%
+    8: 0.028  # 2.8%
+    9: 0.024  # 2.4%
+    10: 0.020  # 2.0%
+    # Positions 11-20 (if needed)
+    11: 0.015
+    12: 0.012
+    13: 0.010
+    14: 0.009
+    15: 0.008
+    16: 0.007
+    17: 0.006
+    18: 0.006
+    19: 0.005
+    20: 0.005
+
+# SERP Layout Variations
+# Adjust CTR based on features present
+layouts:
+  # Featured snippet present (position 0)
+  with_featured_snippet:
+    featured_snippet: 0.089  # 8.9% CTR for position 0
+    1: 0.225  # Reduced from 31.4% (featured snippet steals clicks)
+    2: 0.151
+    3: 0.093
+    4: 0.065
+    5: 0.049
+    6: 0.038
+    7: 0.031
+    8: 0.025
+    9: 0.022
+    10: 0.018
+  
+  # Local pack present (typically positions 1-3)
+  with_local_pack:
+    local_pack_1: 0.165  # Average across 3 local results
+    local_pack_2: 0.120
+    local_pack_3: 0.085
+    1: 0.190  # First organic result (below local pack)
+    2: 0.125
+    3: 0.082
+    4: 0.061
+    5: 0.047
+    6: 0.037
+    7: 0.030
+    8: 0.025
+    9: 0.021
+    10: 0.018
+  
+  # Heavy ads (4+ ads above organic)
+  with_heavy_ads:
+    1: 0.220  # Reduced CTR due to ad blindness
+    2: 0.140
+    3: 0.088
+    4: 0.062
+    5: 0.047
+    6: 0.037
+    7: 0.030
+    8: 0.025
+    9: 0.021
+    10: 0.018
+  
+  # Shopping results present
+  with_shopping:
+    shopping_carousel: 0.045  # Aggregate across all shopping results
+    1: 0.250
+    2: 0.145
+    3: 0.092
+    4: 0.065
+    5: 0.049
+    6: 0.039
+    7: 0.032
+    8: 0.026
+    9: 0.022
+    10: 0.019
+  
+  # News/Top Stories (reduces organic CTR)
+  with_news:
+    news_1: 0.085
+    news_2: 0.055
+    news_3: 0.035
+    1: 0.220
+    2: 0.135
+    3: 0.085
+    4: 0.060
+    5: 0.046
+    6: 0.036
+    7: 0.029
+    8: 0.024
+    9: 0.021
+    10: 0.018
+  
+  # Knowledge panel (right side)
+  with_knowledge_panel:
+    knowledge_panel: 0.025  # Low CTR but present
+    1: 0.270  # Slight reduction from baseline
+    2: 0.150
+    3: 0.095
+    4: 0.067
+    5: 0.051
+    6: 0.040
+    7: 0.032
+    8: 0.027
+    9: 0.023
+    10: 0.019
+  
+  # Video results present
+  with_video:
+    video_carousel: 0.065  # Aggregate video clicks
+    1: 0.280
+    2: 0.152
+    3: 0.096
+    4: 0.068
+    5: 0.051
+    6: 0.040
+    7: 0.033
+    8: 0.027
+    9: 0.023
+    10: 0.019
+  
+  # People Also Ask (PAA) expanded
+  with_paa:
+    paa_aggregate: 0.035  # Across all PAA boxes
+    1: 0.290
+    2: 0.155
+    3: 0.098
+    4: 0.069
+    5: 0.052
+    6: 0.041
+    7: 0.033
+    8: 0.027
+    9: 0.023
+    10: 0.019
+
+# Intent-Specific CTR Adjustments
+# Multipliers applied based on search intent
+intent_modifiers:
+  informational:
+    # Users more likely to click multiple results
+    position_1_boost: 1.00
+    position_2_boost: 1.05
+    position_3_boost: 1.08
+    lower_positions_boost: 1.10
+  
+  commercial:
+    # Users compare options (clicks distributed)
+    position_1_boost: 0.95
+    position_2_boost: 1.00
+    position_3_boost: 1.02
+    lower_positions_boost: 1.05
+  
+  transactional:
+    # Strong position 1 bias
+    position_1_boost: 1.15
+    position_2_boost: 1.05
+    position_3_boost: 1.00
+    lower_positions_boost: 0.90
+  
+  local:
+    # Map pack dominates, organic reduced
+    position_1_boost: 0.85
+    position_2_boost: 0.90
+    position_3_boost: 0.95
+    lower_positions_boost: 0.95
+  
+  navigational:
+    # Extremely strong position 1 bias
+    position_1_boost: 1.50
+    position_2_boost: 0.80
+    position_3_boost: 0.60
+    lower_positions_boost: 0.40
+
+# Brand Recognition Impact
+# Branded vs non-branded CTR differences
+brand_impact:
+  # If your brand appears in SERP
+  own_brand:
+    position_1: 1.40  # 40% higher CTR
+    position_2: 1.35
+    position_3: 1.30
+    position_4_plus: 1.25
+  
+  # If competing against major brands
+  against_major_brands:
+    position_1: 0.85  # 15% lower CTR
+    position_2: 0.80
+    position_3: 0.75
+    position_4_plus: 0.70
+
+# Device Type CTR Variations (optional)
+device_modifiers:
+  desktop:
+    position_1_boost: 1.00
+    position_2_boost: 1.00
+    position_3_boost: 1.00
+  
+  mobile:
+    # Higher CTR for position 1-3 on mobile
+    position_1_boost: 1.10
+    position_2_boost: 1.08
+    position_3_boost: 1.05
+    # Lower for positions 4+
+    position_4_plus: 0.90
+  
+  tablet:
+    position_1_boost: 1.02
+    position_2_boost: 1.02
+    position_3_boost: 1.00
+
+# Seasonal CTR Variations (optional)
+seasonal_modifiers:
+  enabled: false
+  
+  # Example: Holiday season
+  holiday_season:
+    months: [11, 12]  # November, December
+    multiplier: 1.15
+  
+  # Example: Summer dip
+  summer_low:
+    months: [7, 8]  # July, August
+    multiplier: 0.92
+
+# Title Quality Impact
+# Well-crafted titles get higher CTR
+title_quality:
+  excellent:
+    description: "Compelling, emotional, clear value prop"
+    multiplier: 1.20
+  
+  good:
+    description: "Clear, relevant, includes keyword"
+    multiplier: 1.05
+  
+  average:
+    description: "Generic, keyword stuffing"
+    multiplier: 1.00
+  
+  poor:
+    description: "Misleading, irrelevant, clickbait"
+    multiplier: 0.75
+
+# Meta Description Impact
+# Good descriptions improve CTR
+meta_description:
+  present_and_relevant:
+    multiplier: 1.08
+  
+  missing_or_generic:
+    multiplier: 0.95
+  
+  truncated:
+    multiplier: 0.98
+
+# Rich Snippets Impact
+rich_snippets:
+  star_ratings:
+    multiplier: 1.25
+  
+  price:
+    multiplier: 1.15
+  
+  author:
+    multiplier: 1.08
+  
+  date:
+    multiplier: 1.05
+  
+  breadcrumbs:
+    multiplier: 1.03
+  
+  faq:
+    multiplier: 1.20
+  
+  how_to:
+    multiplier: 1.18
+
+# CTR Calculation Priority
+# When multiple features present, use this priority order
+calculation_priority:
+  1: "layout"  # Start with SERP layout (featured snippet, local pack, etc.)
+  2: "intent"  # Apply intent modifier
+  3: "brand"  # Apply brand impact
+  4: "rich_snippets"  # Apply rich snippet boost
+  5: "title_quality"  # Apply title quality modifier
+  6: "device"  # Apply device modifier (if available)
+  7: "seasonal"  # Apply seasonal modifier (if enabled)
+
+# Default Target Rank
+# Used when calculating traffic potential
+default_target_rank: 3
+
+# Target Rank by Intent
+# Adjust expected ranking position by intent
+target_rank_by_intent:
+  informational: 3
+  commercial: 3
+  transactional: 2  # More important to rank higher
+  local: 1  # Critical to rank in top 3 or local pack
+  navigational: 1  # Must rank #1
+
+# CTR Confidence Intervals
+# Add uncertainty bounds to estimates
+confidence_intervals:
+  enabled: false
+  
+  # 95% confidence interval
+  lower_bound: 0.85  # 15% lower
+  upper_bound: 1.15  # 15% higher
+
+# Data Sources
+data_sources:
+  - "Advanced Web Ranking (AWR) 2024 CTR Study"
+  - "Backlinko 2024 SERP CTR Analysis"
+  - "FirstPageSage Click Curve Study"
+  - "Internal tracking data (when available)"
+
+# Calibration Settings
+calibration:
+  enabled: false
+  
+  # Adjust based on actual CTR from Search Console
+  # Formula: actual_ctr / expected_ctr = calibration_factor
+  position_1_adjustment: 1.0
+  position_2_adjustment: 1.0
+  position_3_adjustment: 1.0
+  
+  # Auto-calibrate when Search Console data available
+  auto_calibrate: false
+  min_impressions: 1000  # Minimum impressions needed
+
+# Version and Metadata
+metadata:
+  version: "1.0"
+  last_updated: "2025-10-24"
+  description: "CTR model based on 2024 industry data"
+  author: "The Profit Platform"
+  accuracy: "±15% in controlled tests"
+
+# Notes:
+# - CTR varies significantly by query, niche, and SERP features
+# - These are industry averages - adjust based on your data
+# - Use Search Console to calibrate for your specific site
+# - Higher positions always get more clicks, but distribution varies
+# - Mobile CTR patterns differ significantly from desktop
+# - Brand recognition has massive impact on CTR
+# - Rich snippets can increase CTR by 20-30%
+# - Test and iterate based on actual results

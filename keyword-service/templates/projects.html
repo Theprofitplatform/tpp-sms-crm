@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}All Projects - Keyword Research Tool{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>All Projects</h2>
+    
+    {% if projects %}
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Project Name</th>
+                <th>Created</th>
+                <th>Keywords</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for project in projects %}
+            <tr>
+                <td>{{ project.id }}</td>
+                <td><strong>{{ project.name }}</strong></td>
+                <td>{{ project.created_at }}</td>
+                <td>{{ project.keyword_count }}</td>
+                <td>
+                    {% if project.last_checkpoint == 'completed' %}
+                        <span class="badge badge-success">✅ Completed</span>
+                    {% elif project.last_checkpoint %}
+                        <span class="badge badge-warning">⏳ {{ project.last_checkpoint }}</span>
+                    {% else %}
+                        <span class="badge badge-info">🔄 Starting...</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="/project/{{ project.id }}" class="btn" style="padding: 8px 15px; font-size: 0.9em;">View</a>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p style="text-align: center; padding: 40px 0; color: #999;">
+            No projects yet. <a href="/">Create your first project!</a>
+        </p>
+    {% endif %}
+</div>
+{% endblock %}

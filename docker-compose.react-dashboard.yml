@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # React Dashboard (Frontend)
+  react-dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+      target: production
+    image: seo-react-dashboard:latest
+    container_name: seo-react-dashboard
+
+    ports:
+      - "8080:80"  # Map host:8080 to container:80
+
+    environment:
+      - NODE_ENV=production
+
+    networks:
+      - seo-network
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Backend API (Optional - if you want to run backend too)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+      target: production
+    image: seo-automation-backend:latest
+    container_name: seo-backend
+
+    ports:
+      - "9000:3000"
+
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config:/app/config:ro
+
+    networks:
+      - seo-network
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+networks:
+  seo-network:
+    driver: bridge
+
+volumes:
+  data:
+    driver: local
+  logs:
+    driver: local

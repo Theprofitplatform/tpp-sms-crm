@@ -1,0 +1,637 @@
+/**
+ * Unified Dashboard - Responsive Styles
+ *
+ * Mobile-first responsive design for tablets and phones
+ */
+
+/* ============================================
+   TABLET (max-width: 1024px)
+   ============================================ */
+
+@media (max-width: 1024px) {
+  /* Sidebar adjustments */
+  .sidebar {
+    width: 240px;
+  }
+
+  .main-content {
+    margin-left: 240px;
+  }
+
+  /* Grid adjustments */
+  .dashboard-row {
+    grid-template-columns: 1fr;
+  }
+
+  .charts-row {
+    grid-template-columns: 1fr;
+  }
+
+  /* Header search */
+  .header-search {
+    width: 200px;
+  }
+
+  /* Modal */
+  .modal {
+    max-width: 500px;
+  }
+}
+
+/* ============================================
+   MOBILE (max-width: 768px)
+   ============================================ */
+
+@media (max-width: 768px) {
+  /* Sidebar becomes overlay */
+  .sidebar {
+    width: 280px;
+    transform: translateX(-100%);
+    z-index: var(--z-modal);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-toggle {
+    display: block;
+  }
+
+  /* Main content takes full width */
+  .main-content {
+    margin-left: 0;
+  }
+
+  /* Header adjustments */
+  .content-header {
+    padding: var(--spacing-md) var(--spacing-lg);
+    flex-wrap: wrap;
+  }
+
+  .header-search {
+    width: 100%;
+    order: 3;
+    margin-top: var(--spacing-md);
+  }
+
+  .header-actions {
+    gap: var(--spacing-sm);
+  }
+
+  /* Mobile menu overlay */
+  .mobile-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: calc(var(--z-modal) - 1);
+  }
+
+  .mobile-overlay.active {
+    display: block;
+  }
+
+  /* Content body */
+  .content-body {
+    padding: var(--spacing-lg);
+  }
+
+  /* Stats grid */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-md);
+  }
+
+  /* Charts */
+  .charts-row {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+  }
+
+  .chart-container {
+    height: 250px;
+  }
+
+  /* Dashboard row */
+  .dashboard-row {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+  }
+
+  /* Content grid */
+  .content-grid {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+  }
+
+  /* Tables - Horizontal scroll */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table {
+    min-width: 600px;
+  }
+
+  .table th,
+  .table td {
+    padding: 12px;
+    font-size: 13px;
+  }
+
+  /* Cards */
+  .card {
+    padding: var(--spacing-md);
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+  }
+
+  /* Stat cards */
+  .stat-card {
+    padding: var(--spacing-md);
+  }
+
+  .stat-value {
+    font-size: 28px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+  }
+
+  /* Recommendation cards */
+  .recommendation-card {
+    padding: var(--spacing-md);
+  }
+
+  .recommendation-header {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .recommendation-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+  }
+
+  /* Goal cards */
+  .goal-card {
+    padding: var(--spacing-md);
+  }
+
+  .goal-header {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  /* Buttons */
+  .btn {
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+
+  .btn-group {
+    flex-wrap: wrap;
+  }
+
+  /* Filters */
+  .filters-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-sm);
+  }
+
+  .filter-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-select {
+    width: 100%;
+  }
+
+  /* Modals */
+  .modal {
+    max-width: 90%;
+    width: 90%;
+  }
+
+  .modal-header {
+    padding: var(--spacing-md);
+  }
+
+  .modal-body {
+    padding: var(--spacing-md);
+  }
+
+  .modal-footer {
+    padding: var(--spacing-md);
+    flex-direction: column-reverse;
+  }
+
+  .modal-footer .btn {
+    width: 100%;
+  }
+
+  /* Toast notifications */
+  .toast-container {
+    left: var(--spacing-md);
+    right: var(--spacing-md);
+    top: var(--spacing-md);
+  }
+
+  .toast {
+    min-width: auto;
+    width: 100%;
+  }
+
+  /* Activity feed */
+  .activity-item {
+    padding: var(--spacing-sm);
+  }
+
+  .activity-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  /* Form inputs - Touch friendly */
+  .form-input,
+  .form-select,
+  .form-textarea {
+    padding: 12px;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  .form-group {
+    margin-bottom: var(--spacing-md);
+  }
+}
+
+/* ============================================
+   SMALL MOBILE (max-width: 480px)
+   ============================================ */
+
+@media (max-width: 480px) {
+  /* Stats grid - Single column on very small screens */
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Header */
+  .content-header {
+    padding: var(--spacing-md);
+  }
+
+  /* Content body */
+  .content-body {
+    padding: var(--spacing-md);
+  }
+
+  /* Stat cards - Compact */
+  .stat-card {
+    padding: var(--spacing-md);
+  }
+
+  .stat-value {
+    font-size: 24px;
+  }
+
+  .stat-icon {
+    font-size: 24px;
+  }
+
+  /* Cards */
+  .card {
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+  }
+
+  .card-title {
+    font-size: 16px;
+  }
+
+  /* Tables - Stack on tiny screens */
+  .table-responsive {
+    display: block;
+  }
+
+  .table-responsive thead {
+    display: none;
+  }
+
+  .table-responsive tbody,
+  .table-responsive tr,
+  .table-responsive td {
+    display: block;
+    width: 100%;
+  }
+
+  .table-responsive tr {
+    margin-bottom: var(--spacing-md);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+  }
+
+  .table-responsive td {
+    padding: var(--spacing-xs) 0;
+    border: none;
+    position: relative;
+    padding-left: 50%;
+  }
+
+  .table-responsive td::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 0;
+    width: 45%;
+    padding-right: var(--spacing-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+
+  /* Buttons */
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .btn-group {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .btn-group .btn {
+    width: 100%;
+  }
+
+  /* Modal */
+  .modal {
+    border-radius: var(--radius-md);
+    max-height: 95vh;
+  }
+
+  .modal-title {
+    font-size: 18px;
+  }
+
+  /* Chart containers */
+  .chart-container {
+    height: 200px;
+  }
+
+  /* Activity feed */
+  .activity-title {
+    font-size: 13px;
+  }
+
+  .activity-description {
+    font-size: 12px;
+  }
+
+  /* Recommendation cards */
+  .recommendation-title {
+    font-size: 14px;
+  }
+
+  .recommendation-body {
+    font-size: 13px;
+  }
+
+  /* Toast */
+  .toast {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .toast-title {
+    font-size: 13px;
+  }
+
+  .toast-message {
+    font-size: 12px;
+  }
+}
+
+/* ============================================
+   LANDSCAPE MODE (phones in landscape)
+   ============================================ */
+
+@media (max-height: 500px) and (orientation: landscape) {
+  /* Reduce vertical padding */
+  .content-body {
+    padding: var(--spacing-md) var(--spacing-lg);
+  }
+
+  .card {
+    padding: var(--spacing-md);
+  }
+
+  /* Compact stats */
+  .stat-value {
+    font-size: 24px;
+  }
+
+  /* Compact charts */
+  .chart-container {
+    height: 200px;
+  }
+
+  /* Sidebar - Keep collapsed by default in landscape */
+  .sidebar {
+    transform: translateX(-100%);
+  }
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+
+@media print {
+  /* Hide interactive elements */
+  .sidebar,
+  .content-header,
+  .btn,
+  .modal-overlay,
+  .toast-container,
+  .filters-bar {
+    display: none !important;
+  }
+
+  /* Adjust layout for printing */
+  .main-content {
+    margin-left: 0;
+  }
+
+  .content-body {
+    padding: 0;
+  }
+
+  /* Ensure good contrast */
+  body {
+    background: white;
+    color: black;
+  }
+
+  .card {
+    box-shadow: none;
+    border: 1px solid #ddd;
+    page-break-inside: avoid;
+  }
+
+  /* Charts - Make them print-friendly */
+  .chart-container {
+    height: auto;
+    page-break-inside: avoid;
+  }
+
+  /* Tables */
+  .table {
+    border: 1px solid #ddd;
+  }
+
+  .table th,
+  .table td {
+    border: 1px solid #ddd;
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY - Reduced Motion
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================
+   DARK MODE (Optional - Future Enhancement)
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+  /* Uncomment to enable auto dark mode based on system preference */
+  /*
+  :root {
+    --bg-primary: #1a202c;
+    --bg-secondary: #2d3748;
+    --bg-tertiary: #2d3748;
+    --bg-hover: #374151;
+    --text-primary: #f7fafc;
+    --text-secondary: #e2e8f0;
+    --text-tertiary: #cbd5e0;
+    --border-light: #4a5568;
+    --border-medium: #718096;
+  }
+  */
+}
+
+/* ============================================
+   HIGH CONTRAST MODE
+   ============================================ */
+
+@media (prefers-contrast: high) {
+  :root {
+    --border-light: #000;
+    --border-medium: #000;
+  }
+
+  .btn {
+    border: 2px solid currentColor;
+  }
+
+  .card {
+    border: 1px solid var(--border-light);
+  }
+
+  .table th,
+  .table td {
+    border: 1px solid var(--border-light);
+  }
+}
+
+/* ============================================
+   UTILITIES - Show/Hide on Different Screens
+   ============================================ */
+
+/* Hide on mobile */
+.hide-mobile {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+/* Show only on mobile */
+.show-mobile {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .show-mobile {
+    display: block !important;
+  }
+}
+
+/* Hide on tablet */
+.hide-tablet {
+  display: block;
+}
+
+@media (max-width: 1024px) and (min-width: 769px) {
+  .hide-tablet {
+    display: none !important;
+  }
+}
+
+/* Show only on tablet */
+.show-tablet {
+  display: none;
+}
+
+@media (max-width: 1024px) and (min-width: 769px) {
+  .show-tablet {
+    display: block !important;
+  }
+}
+
+/* Hide on desktop */
+.hide-desktop {
+  display: block;
+}
+
+@media (min-width: 1025px) {
+  .hide-desktop {
+    display: none !important;
+  }
+}
+
+/* Show only on desktop */
+.show-desktop {
+  display: none;
+}
+
+@media (min-width: 1025px) {
+  .show-desktop {
+    display: block !important;
+  }
+}

@@ -1,0 +1,79 @@
+# SEO Automation Platform v2.0 - Dashboard Server
+# Multi-stage build for optimized production image
+
+FROM node:20-alpine AS base
+LABEL maintainer="SEO Automation Platform"
+LABEL description="SEO Automation Dashboard Server v2.0.0"
+
+# Install dependencies
+RUN apk add --no-cache \
+    curl \
+    bash \
+    git \
+    sqlite
+
+WORKDIR /app
+
+# ============================================
+# Stage: Dependencies
+# ============================================
+FROM base AS dependencies
+
+COPY package*.json ./
+# Skip all install scripts (including husky), then rebuild native modules
+RUN npm ci --only=production --ignore-scripts && \
+    npm rebuild better-sqlite3 && \
+    npm cache clean --force
+
+# ============================================
+# Stage: Development
+# ============================================
+FROM base AS development
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+# ============================================
+# Stage: Production
+# ============================================
+FROM base AS production
+
+# Create non-root user
+RUN addgroup -g 1001 seouser && \
+    adduser -D -u 1001 -G seouser seouser
+
+# Copy production dependencies
+COPY --from=dependencies --chown=seouser:seouser /app/node_modules ./node_modules
+
+# Copy application code
+COPY --chown=seouser:seouser . .
+
+# Create necessary directories
+RUN mkdir -p data logs public && \
+    chown -R seouser:seouser data logs public
+
+# Switch to non-root user
+USER seouser
+
+# Environment variables
+ENV NODE_ENV=production \
+    PORT=3000 \
+    LOG_LEVEL=info
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:3000/ || exit 1
+
+# Start dashboard server
+CMD ["node", "dashboard-server.js"]
+
+# Metadata
+LABEL version="2.0.0"
+LABEL org.opencontainers.image.title="SEO Automation Platform"
+LABEL org.opencontainers.image.description="Complete SEO automation platform with dashboard, API, and automation features"
+LABEL org.opencontainers.image.version="2.0.0"

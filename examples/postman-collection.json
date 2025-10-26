@@ -1,0 +1,504 @@
+{
+  "info": {
+    "name": "Unified Keyword Tracking API v2",
+    "description": "Complete Postman collection for the unified keyword tracking system API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "2.0.0"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:9000/api/v2",
+      "type": "string"
+    },
+    {
+      "key": "keywordId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "projectId",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Keywords API",
+      "item": [
+        {
+          "name": "List Keywords",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/keywords?page=1&per_page=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["keywords"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "Get a paginated list of all keywords"
+          }
+        },
+        {
+          "name": "Filter by Domain",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/keywords?domain=example.com",
+              "host": ["{{baseUrl}}"],
+              "path": ["keywords"],
+              "query": [
+                {
+                  "key": "domain",
+                  "value": "example.com"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter by Intent",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/keywords?intent=commercial",
+              "host": ["{{baseUrl}}"],
+              "path": ["keywords"],
+              "query": [
+                {
+                  "key": "intent",
+                  "value": "commercial",
+                  "description": "informational, commercial, transactional, navigational"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter by Opportunity Score",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/keywords?opportunity_score_min=70&opportunity_score_max=100",
+              "host": ["{{baseUrl}}"],
+              "path": ["keywords"],
+              "query": [
+                {
+                  "key": "opportunity_score_min",
+                  "value": "70"
+                },
+                {
+                  "key": "opportunity_score_max",
+                  "value": "100"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Sort Keywords",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/keywords?sort_by=opportunity_score&sort_order=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["keywords"],
+              "query": [
+                {
+                  "key": "sort_by",
+                  "value": "opportunity_score",
+                  "description": "keyword, search_volume, position, opportunity_score, created_at"
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc",
+                  "description": "asc or desc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Tracking Keywords Only",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/keywords?is_tracking=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["keywords"],
+              "query": [
+                {
+                  "key": "is_tracking",
+                  "value": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Keyword",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('keywordId', json.keyword.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"keyword\": \"best seo tools 2025\",\n  \"domain\": \"example.com\",\n  \"device\": \"desktop\",\n  \"country\": \"US\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/keywords",
+              "host": ["{{baseUrl}}"],
+              "path": ["keywords"]
+            }
+          }
+        },
+        {
+          "name": "Get Keyword Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/keywords/{{keywordId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["keywords", "{{keywordId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Keyword",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sticky\": true,\n  \"tags\": [\"important\", \"priority\"],\n  \"notes\": \"Target for Q1 2025\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/keywords/{{keywordId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["keywords", "{{keywordId}}"]
+            }
+          }
+        },
+        {
+          "name": "Track Keyword",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"domain\": \"example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/keywords/{{keywordId}}/track",
+              "host": ["{{baseUrl}}"],
+              "path": ["keywords", "{{keywordId}}", "track"]
+            }
+          }
+        },
+        {
+          "name": "Enrich Keyword",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/keywords/{{keywordId}}/enrich",
+              "host": ["{{baseUrl}}"],
+              "path": ["keywords", "{{keywordId}}", "enrich"]
+            }
+          }
+        },
+        {
+          "name": "Get Keyword Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/keywords/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["keywords", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Delete Keyword",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/keywords/{{keywordId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["keywords", "{{keywordId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Research API",
+      "item": [
+        {
+          "name": "List Projects",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/research/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["research", "projects"]
+            }
+          }
+        },
+        {
+          "name": "Create Project",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('projectId', json.project.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Q1 2025 Blog Content\",\n  \"seeds\": [\"seo tools\", \"keyword tracking\", \"rank monitoring\"],\n  \"geo\": \"US\",\n  \"language\": \"en\",\n  \"focus\": \"informational\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/research/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["research", "projects"]
+            }
+          }
+        },
+        {
+          "name": "Get Project Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/research/projects/{{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["research", "projects", "{{projectId}}"]
+            }
+          }
+        },
+        {
+          "name": "Track Top Opportunities",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"limit\": 20\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/research/projects/{{projectId}}/track-opportunities",
+              "host": ["{{baseUrl}}"],
+              "path": ["research", "projects", "{{projectId}}", "track-opportunities"]
+            }
+          }
+        },
+        {
+          "name": "List Topics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/research/topics?project_id={{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["research", "topics"],
+              "query": [
+                {
+                  "key": "project_id",
+                  "value": "{{projectId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Topic",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"SEO Tools Comparison\",\n  \"project_id\": {{projectId}},\n  \"keywords\": [\"best seo tools\", \"seo tools comparison\", \"top seo software\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/research/topics",
+              "host": ["{{baseUrl}}"],
+              "path": ["research", "topics"]
+            }
+          }
+        },
+        {
+          "name": "List Page Groups",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/research/page-groups",
+              "host": ["{{baseUrl}}"],
+              "path": ["research", "page-groups"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sync API",
+      "item": [
+        {
+          "name": "Get Sync Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sync/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["sync", "status"]
+            }
+          }
+        },
+        {
+          "name": "Trigger Manual Sync",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sync/trigger",
+              "host": ["{{baseUrl}}"],
+              "path": ["sync", "trigger"]
+            }
+          }
+        },
+        {
+          "name": "Get Sync History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sync/history?page=1&per_page=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["sync", "history"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Bulk Sync Keywords",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"serpbear\",\n  \"keyword_ids\": [1, 2, 3, 4, 5]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sync/keywords/bulk",
+              "host": ["{{baseUrl}}"],
+              "path": ["sync", "keywords", "bulk"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health & Monitoring",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

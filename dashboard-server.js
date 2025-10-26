@@ -25,7 +25,10 @@ import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import historyDB from './src/database/history-db.js';
+import apiV2Router from './src/api/v2/index.js';
+import cookieParser from 'cookie-parser';
 
 const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
@@ -34,10 +37,17 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer);
-const PORT = 3000;
+const PORT = 9000;
 
 // Middleware
 app.use(express.json());
+app.use(cookieParser());
+
+// Serve the new React dashboard (built version)
+// Uncomment this after building the dashboard with: cd dashboard && npm run build
+// app.use(express.static('dashboard/dist'));
+
+// Serve legacy public files
 app.use(express.static('public'));
 
 // Load clients
@@ -547,6 +557,45 @@ app.get('/api/analytics/clients/metrics', (req, res) => {
   }
 });
 
+// ============================================
+// API V2 ROUTES - Unified Keyword Management
+// ============================================
+
+console.log('[API v2] Mounting unified keyword management API...');
+app.use('/api/v2', apiV2Router);
+console.log('[API v2] Routes available at /api/v2/*');
+
+// ============================================
+// KEYWORD RESEARCH PROXY ROUTES (Legacy)
+// ============================================
+
+const KEYWORD_SERVICE_URL = 'http://localhost:5000';
+
+console.log('[Keyword Service] Configuring proxy to:', KEYWORD_SERVICE_URL);
+
+// Proxy all keyword research requests to Python service
+app.use('/api/keyword', createProxyMiddleware({
+  target: KEYWORD_SERVICE_URL,
+  changeOrigin: true,
+  onProxyReq: (proxyReq, req, res) => {
+    console.log(`[Keyword Service] Proxying ${req.method} ${req.url} -> ${KEYWORD_SERVICE_URL}${req.url}`);
+  },
+  onError: (err, req, res) => {
+    console.error('[Keyword Service] Proxy error:', err.message);
+    res.status(503).json({
+      success: false,
+      error: 'Keyword research service unavailable',
+      message: 'Please ensure the Python keyword service is running on port 5000',
+      details: err.message
+    });
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    console.log(`[Keyword Service] Response ${proxyRes.statusCode} for ${req.url}`);
+  }
+}));
+
+console.log('[Keyword Service] Proxy configured for /api/keyword/*');
+
 // Start server
 httpServer.listen(PORT, () => {
   console.log('');
@@ -557,6 +606,14 @@ httpServer.listen(PORT, () => {
   console.log(`✅ Server running at: http://localhost:${PORT}`);
   console.log('✅ Real-time updates: WebSocket enabled');
   console.log('✅ Analytics API: Available');
+  console.log('✅ API v2: Unified keyword management at /api/v2');
+  console.log('');
+  console.log('📚 API Documentation:');
+  console.log(`   - API v2 Docs: http://localhost:${PORT}/api/v2`);
+  console.log(`   - Health Check: http://localhost:${PORT}/api/v2/health`);
+  console.log(`   - Keywords: http://localhost:${PORT}/api/v2/keywords`);
+  console.log(`   - Research: http://localhost:${PORT}/api/v2/research/projects`);
+  console.log(`   - Sync: http://localhost:${PORT}/api/v2/sync/status`);
   console.log('');
   console.log('Open your browser and navigate to the URL above');
   console.log('');

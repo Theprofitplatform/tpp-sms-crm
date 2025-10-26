@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SEO Automation Platform - Unified Dashboard</title>
+  <!-- ========================================
+       SHADCN UI - COMPLETE DESIGN SYSTEM
+       ======================================== -->
+  <link rel="stylesheet" href="css/shadcn-complete.css?v=SHADCN">
+
+  <!-- ONLY load essential dashboard-specific styles (layout, not components) -->
+  <link rel="stylesheet" href="css/unified.css?v=SHADCN">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h1>🚀 SEO Platform</h1>
+        <button class="mobile-toggle" id="sidebarToggle">☰</button>
+      </div>
+
+      <nav class="nav-menu">
+        <a href="#dashboard" class="nav-link active" data-section="dashboard">
+          <span class="icon">📊</span>
+          <span class="text">Dashboard</span>
+        </a>
+
+        <a href="#clients" class="nav-link" data-section="clients">
+          <span class="icon">👥</span>
+          <span class="text">Clients</span>
+        </a>
+
+        <div class="nav-group">
+          <div class="nav-group-title">Automation</div>
+          <a href="#automation" class="nav-link" data-section="automation">
+            <span class="icon">🚀</span>
+            <span class="text">Control Center</span>
+          </a>
+          <a href="#autofix" class="nav-link" data-section="autofix">
+            <span class="icon">🤖</span>
+            <span class="text">Auto-Fix Engines</span>
+          </a>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">Insights</div>
+          <a href="#analytics" class="nav-link" data-section="analytics">
+            <span class="icon">📈</span>
+            <span class="text">Analytics</span>
+          </a>
+          <a href="#recommendations" class="nav-link" data-section="recommendations">
+            <span class="icon">💡</span>
+            <span class="text">Recommendations</span>
+          </a>
+          <a href="#goals" class="nav-link" data-section="goals">
+            <span class="icon">🎯</span>
+            <span class="text">Goals</span>
+          </a>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">Communications</div>
+          <a href="#emails" class="nav-link" data-section="emails">
+            <span class="icon">📧</span>
+            <span class="text">Email Campaigns</span>
+          </a>
+          <a href="#reports" class="nav-link" data-section="reports">
+            <span class="icon">📄</span>
+            <span class="text">Reports</span>
+          </a>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">Research</div>
+          <a href="#keyword-research" class="nav-link" data-section="keyword-research">
+            <span class="icon">🔍</span>
+            <span class="text">Keyword Research</span>
+          </a>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">Configuration</div>
+          <a href="#whitelabel" class="nav-link" data-section="whitelabel">
+            <span class="icon">🎨</span>
+            <span class="text">White-Label</span>
+          </a>
+          <a href="#webhooks" class="nav-link" data-section="webhooks">
+            <span class="icon">🔔</span>
+            <span class="text">Webhooks</span>
+          </a>
+          <a href="#settings" class="nav-link" data-section="settings">
+            <span class="icon">⚙️</span>
+            <span class="text">Settings</span>
+          </a>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-profile">
+          <div class="user-avatar">A</div>
+          <div class="user-info">
+            <div class="user-name">Admin</div>
+            <div class="user-role">Administrator</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Header -->
+      <header class="content-header">
+        <div class="header-left">
+          <h2 id="sectionTitle">Dashboard Overview</h2>
+          <div class="breadcrumb" id="breadcrumb">Home / Dashboard</div>
+        </div>
+        <div class="header-right">
+          <div class="search-box">
+            <input type="text" placeholder="Search..." id="globalSearch">
+          </div>
+          <button class="btn-icon" id="notificationsBtn">
+            <span class="icon">🔔</span>
+            <span class="badge">3</span>
+          </button>
+          <button class="btn-icon" id="refreshBtn">
+            <span class="icon">🔄</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Dashboard Section -->
+      <section id="dashboard-section" class="content-section active">
+        <!-- Stats Cards - Using shadcn Card Component -->
+        <div class="stats-grid">
+          <div class="card">
+            <div class="card-content" style="display: flex; align-items: center; gap: 1rem;">
+              <div style="font-size: 2rem;">👥</div>
+              <div style="flex: 1;">
+                <div class="text-sm font-medium" style="color: hsl(var(--muted-foreground)); margin-bottom: 0.25rem;">Total Clients</div>
+                <div style="font-size: 1.5rem; font-weight: 700;" id="statTotalClients">--</div>
+                <span class="badge badge-success" style="margin-top: 0.5rem;">+3 this month</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-content" style="display: flex; align-items: center; gap: 1rem;">
+              <div style="font-size: 2rem;">🚀</div>
+              <div style="flex: 1;">
+                <div class="text-sm font-medium" style="color: hsl(var(--muted-foreground)); margin-bottom: 0.25rem;">Active Automations</div>
+                <div style="font-size: 1.5rem; font-weight: 700;" id="statActiveAutomations">--</div>
+                <span class="badge badge-primary" style="margin-top: 0.5rem;">Running now</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-content" style="display: flex; align-items: center; gap: 1rem;">
+              <div style="font-size: 2rem;">📄</div>
+              <div style="flex: 1;">
+                <div class="text-sm font-medium" style="color: hsl(var(--muted-foreground)); margin-bottom: 0.25rem;">Reports Generated</div>
+                <div style="font-size: 1.5rem; font-weight: 700;" id="statReports">--</div>
+                <span class="badge badge-success" style="margin-top: 0.5rem;">+12 this week</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-content" style="display: flex; align-items: center; gap: 1rem;">
+              <div style="font-size: 2rem;">💡</div>
+              <div style="flex: 1;">
+                <div class="text-sm font-medium" style="color: hsl(var(--muted-foreground)); margin-bottom: 0.25rem;">Recommendations</div>
+                <div style="font-size: 1.5rem; font-weight: 700;" id="statRecommendations">--</div>
+                <span class="badge badge-outline" style="margin-top: 0.5rem;">Pending action</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="card-header">
+              <h3>📈 Rankings Trend</h3>
+              <select id="rankingsTrendTimeframe" class="select-sm">
+                <option value="7d">7 Days</option>
+                <option value="30d" selected>30 Days</option>
+                <option value="90d">90 Days</option>
+              </select>
+            </div>
+            <div class="card-body">
+              <canvas id="rankingsTrendChart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="card-header">
+              <h3>🤖 Auto-Fixes Applied</h3>
+              <span class="stat-badge">Last 30 days</span>
+            </div>
+            <div class="card-body">
+              <canvas id="autoFixesChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Actions & Activity -->
+        <div class="dashboard-row">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">⚡ Quick Actions</div>
+            </div>
+            <div class="card-content">
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
+                <button class="btn btn-outline" onclick="runAllAutomations()" style="justify-content: flex-start;">
+                  <span style="font-size: 1.25rem;">🚀</span>
+                  <span>Run All Automations</span>
+                </button>
+                <button class="btn btn-outline" onclick="generateRecommendations()" style="justify-content: flex-start;">
+                  <span style="font-size: 1.25rem;">💡</span>
+                  <span>Generate Recommendations</span>
+                </button>
+                <button class="btn btn-outline" onclick="createReport()" style="justify-content: flex-start;">
+                  <span style="font-size: 1.25rem;">📄</span>
+                  <span>Create Report</span>
+                </button>
+                <button class="btn btn-outline" onclick="addNewClient()" style="justify-content: flex-start;">
+                  <span style="font-size: 1.25rem;">👥</span>
+                  <span>Add Client</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📋 Recent Activity</div>
+            </div>
+            <div class="card-content">
+              <div id="activityFeed">
+                <div style="display: flex; gap: 0.75rem; padding: 0.75rem 0; border-bottom: 1px solid hsl(var(--border));">
+                  <div style="width: 2rem; height: 2rem; border-radius: var(--radius); background: hsl(var(--success)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600;">✓</div>
+                  <div style="flex: 1;">
+                    <div style="font-weight: 500; margin-bottom: 0.125rem;">Rank tracking completed</div>
+                    <div style="font-size: 0.75rem; color: hsl(var(--muted-foreground));">2 minutes ago</div>
+                  </div>
+                </div>
+                <!-- More activity items loaded dynamically -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Clients Section -->
+      <section id="clients-section" class="content-section">
+        <div class="section-header">
+          <h2>Clients Management</h2>
+          <button class="btn btn-primary" onclick="openAddClientModal()">
+            <span class="icon">+</span> Add Client
+          </button>
+        </div>
+
+        <div class="filters-bar">
+          <div class="search-filter">
+            <input type="text" placeholder="Search clients..." id="clientSearch">
+          </div>
+          <select id="statusFilter" class="select-md">
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <select id="clientSort" class="select-md">
+            <option value="name">Sort by Name</option>
+            <option value="date">Sort by Date</option>
+            <option value="activity">Sort by Activity</option>
+          </select>
+        </div>
+
+        <div class="clients-grid" id="clientsGrid">
+          <!-- Client cards loaded dynamically -->
+        </div>
+      </section>
+
+      <!-- Analytics Section -->
+      <section id="analytics-section" class="content-section">
+        <div class="section-header">
+          <h2>Analytics & Insights</h2>
+          <div class="header-controls">
+            <select id="analyticsClient" class="select-md">
+              <option value="admin">All Clients</option>
+            </select>
+            <select id="analyticsTimeframe" class="select-md">
+              <option value="7d">Last 7 Days</option>
+              <option value="30d" selected>Last 30 Days</option>
+              <option value="90d">Last 90 Days</option>
+            </select>
+            <div class="btn-group">
+              <button class="btn btn-secondary" onclick="exportData('csv')">
+                📥 CSV
+              </button>
+              <button class="btn btn-secondary" onclick="exportData('xlsx')">
+                📥 Excel
+              </button>
+              <button class="btn btn-secondary" onclick="exportData('json')">
+                📥 JSON
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="analytics-grid">
+          <div class="analytics-card">
+            <h3>Rankings Performance</h3>
+            <canvas id="analyticsRankingsChart"></canvas>
+          </div>
+
+          <div class="analytics-card">
+            <h3>Keyword Distribution</h3>
+            <canvas id="keywordDistributionChart"></canvas>
+          </div>
+
+          <div class="analytics-card">
+            <h3>Local SEO Score</h3>
+            <canvas id="localSeoChart"></canvas>
+          </div>
+
+          <div class="analytics-card">
+            <h3>Competitor Gaps</h3>
+            <canvas id="competitorGapsChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Recommendations Section -->
+      <section id="recommendations-section" class="content-section">
+        <div class="section-header">
+          <h2>AI Recommendations</h2>
+          <button class="btn btn-primary" onclick="generateRecommendations()">
+            🔄 Generate New
+          </button>
+        </div>
+
+        <div class="filters-bar">
+          <button class="filter-btn active" data-filter="all">All</button>
+          <button class="filter-btn" data-filter="critical">Critical</button>
+          <button class="filter-btn" data-filter="warning">Warning</button>
+          <button class="filter-btn" data-filter="opportunity">Opportunity</button>
+          <button class="filter-btn" data-filter="info">Info</button>
+        </div>
+
+        <div class="recommendations-grid" id="recommendationsGrid">
+          <!-- Recommendation cards loaded dynamically -->
+        </div>
+      </section>
+
+      <!-- Goals Section -->
+      <section id="goals-section" class="content-section">
+        <div class="section-header">
+          <h2>Goals Tracking</h2>
+          <button class="btn btn-primary" onclick="openCreateGoalModal()">
+            + Create Goal
+          </button>
+        </div>
+
+        <div class="goals-grid" id="goalsGrid">
+          <!-- Goal cards loaded dynamically -->
+        </div>
+      </section>
+
+      <!-- Automation Section -->
+      <section id="automation-section" class="content-section">
+        <div class="section-header">
+          <h2>Automation Control Center</h2>
+          <button class="btn btn-primary" onclick="runAllAutomations()">
+            ▶️ Run All
+          </button>
+        </div>
+
+        <div class="automation-grid">
+          <div class="automation-card">
+            <div class="auto-icon">📈</div>
+            <h3>Rank Tracking</h3>
+            <p class="auto-status">Status: <span class="status-badge enabled">Enabled</span></p>
+            <p class="auto-last-run">Last run: <span id="rankTrackingLastRun">Never</span></p>
+            <button class="btn btn-secondary" onclick="runAutomation('rank-tracking')">
+              ▶️ Run Now
+            </button>
+          </div>
+
+          <div class="automation-card">
+            <div class="auto-icon">📍</div>
+            <h3>Local SEO</h3>
+            <p class="auto-status">Status: <span class="status-badge enabled">Enabled</span></p>
+            <p class="auto-last-run">Last run: <span id="localSeoLastRun">Never</span></p>
+            <button class="btn btn-secondary" onclick="runAutomation('local-seo')">
+              ▶️ Run Now
+            </button>
+          </div>
+
+          <div class="automation-card">
+            <div class="auto-icon">🎯</div>
+            <h3>Competitors</h3>
+            <p class="auto-status">Status: <span class="status-badge enabled">Enabled</span></p>
+            <p class="auto-last-run">Last run: <span id="competitorsLastRun">Never</span></p>
+            <button class="btn btn-secondary" onclick="runAutomation('competitors')">
+              ▶️ Run Now
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Auto-Fix Engines Section -->
+      <section id="autofix-section" class="content-section">
+        <div class="section-header">
+          <h2>Auto-Fix Engines</h2>
+        </div>
+
+        <div class="autofix-grid">
+          <div class="autofix-card">
+            <h3>🏢 NAP Fixer</h3>
+            <p>Fix business information inconsistencies</p>
+            <div class="autofix-stats">
+              <span>Issues Found: <strong id="napIssues">--</strong></span>
+            </div>
+            <button class="btn btn-primary" onclick="runAutoFix('nap')">
+              🔧 Detect & Fix
+            </button>
+          </div>
+
+          <div class="autofix-card">
+            <h3>📋 Schema Injector</h3>
+            <p>Add structured data markup</p>
+            <div class="autofix-stats">
+              <span>Pages Missing: <strong id="schemaIssues">--</strong></span>
+            </div>
+            <button class="btn btn-primary" onclick="runAutoFix('schema')">
+              🔧 Inject Schema
+            </button>
+          </div>
+
+          <div class="autofix-card">
+            <h3>📝 Title/Meta Optimizer</h3>
+            <p>Optimize titles and meta descriptions</p>
+            <div class="autofix-stats">
+              <span>Pages to Optimize: <strong id="titleMetaIssues">--</strong></span>
+            </div>
+            <button class="btn btn-primary" onclick="runAutoFix('title-meta')">
+              🔧 Optimize
+            </button>
+          </div>
+
+          <div class="autofix-card">
+            <h3>✍️ Content Optimizer</h3>
+            <p>Improve content quality and relevance</p>
+            <div class="autofix-stats">
+              <span>Opportunities: <strong id="contentIssues">--</strong></span>
+            </div>
+            <button class="btn btn-primary" onclick="runAutoFix('content')">
+              🔧 Optimize
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Email Campaigns Section -->
+      <section id="emails-section" class="content-section">
+        <div class="section-header">
+          <h2>Email Campaigns</h2>
+          <button class="btn btn-primary" onclick="createCampaign()">
+            + New Campaign
+          </button>
+        </div>
+
+        <div class="email-tabs">
+          <button class="tab-btn active" data-tab="campaigns">Campaigns</button>
+          <button class="tab-btn" data-tab="queue">Email Queue</button>
+          <button class="tab-btn" data-tab="stats">Statistics</button>
+        </div>
+
+        <div id="campaigns-tab" class="tab-content active">
+          <div id="campaignsList"></div>
+        </div>
+
+        <div id="queue-tab" class="tab-content">
+          <div id="emailQueue"></div>
+        </div>
+
+        <div id="stats-tab" class="tab-content">
+          <div class="email-stats-grid" id="emailStats"></div>
+        </div>
+      </section>
+
+      <!-- Webhooks Section -->
+      <section id="webhooks-section" class="content-section">
+        <div class="section-header">
+          <h2>Webhooks</h2>
+          <button class="btn btn-primary" onclick="openAddWebhookModal()">
+            + Add Webhook
+          </button>
+        </div>
+
+        <div class="webhooks-table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>URL</th>
+                <th>Events</th>
+                <th>Status</th>
+                <th>Last Triggered</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="webhooksTableBody">
+              <!-- Webhooks loaded dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Keyword Research Section -->
+      <section id="keyword-research-section" class="content-section">
+        <div class="section-header">
+          <h2>🔍 Keyword Research</h2>
+          <button class="btn btn-primary" onclick="openNewResearchModal()">
+            + New Research Project
+          </button>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="stats-grid" id="keywordStats" style="display:none;">
+          <div class="stat-card">
+            <div class="stat-icon">📁</div>
+            <div class="stat-content">
+              <div class="stat-label">Total Projects</div>
+              <div class="stat-value" id="totalKeywordProjects">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">🔑</div>
+            <div class="stat-content">
+              <div class="stat-label">Total Keywords</div>
+              <div class="stat-value" id="totalKeywords">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📊</div>
+            <div class="stat-content">
+              <div class="stat-label">Topics Identified</div>
+              <div class="stat-value" id="totalTopics">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Projects List -->
+        <div class="card">
+          <h3>Research Projects</h3>
+          <div id="keywordProjectsContainer">
+            <p class="text-muted" style="text-align:center;padding:20px;">
+              Loading projects...
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Other sections follow similar patterns -->
+    </main>
+  </div>
+
+  <!-- Toast Notifications Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Modal Container -->
+  <div id="modalContainer"></div>
+
+  <!-- Scripts -->
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/modals.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/clients.js"></script>
+  <script src="js/analytics.js"></script>
+  <script src="js/recommendations.js"></script>
+  <script src="js/goals.js"></script>
+  <script src="js/automation.js"></script>
+  <script src="js/webhooks.js"></script>
+  <script src="js/keyword-research.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

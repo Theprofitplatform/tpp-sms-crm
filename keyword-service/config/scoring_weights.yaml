@@ -1,0 +1,199 @@
+# Scoring Weights Configuration
+# ============================================================================
+# Controls how difficulty and opportunity scores are calculated
+# Values are normalized weights (sum should equal 1.0)
+# ============================================================================
+
+# Difficulty Score Components (0-100)
+# Higher difficulty = harder to rank
+difficulty:
+  # SERP strength (homepage ratio, brand presence)
+  serp_strength:
+    weight: 0.40
+    components:
+      homepage_ratio: 0.50  # % of homepages in top 10
+      brand_presence: 0.30  # % of major brands
+      domain_authority: 0.20  # Estimated DR/DA of top 10
+  
+  # Competition (title matching, exact match domains)
+  competition:
+    weight: 0.30
+    components:
+      exact_match_titles: 0.60  # % of exact matches in titles
+      partial_match_titles: 0.30  # % of partial matches
+      exact_match_domains: 0.10  # EMD in top 10
+  
+  # SERP crowding (ads, features reducing organic CTR)
+  serp_crowding:
+    weight: 0.20
+    components:
+      ads_density: 0.40  # Number and position of ads
+      featured_snippet: 0.30  # Presence of position 0
+      knowledge_panel: 0.15  # Knowledge graph presence
+      other_features: 0.15  # Shopping, news, etc.
+  
+  # Content depth (proxy via snippet length and word count signals)
+  content_depth:
+    weight: 0.10
+    components:
+      avg_snippet_length: 0.50  # Longer = more comprehensive
+      title_complexity: 0.30  # Word count, question words
+      url_depth: 0.20  # Deep URLs = detailed content
+
+# Opportunity Score Components
+# Higher opportunity = better target
+opportunity:
+  # Traffic potential
+  traffic_potential:
+    weight: 0.40
+    formula: "search_volume * ctr_at_target_rank"
+    ctr_model: "config/ctr_model.yaml"
+  
+  # Commercial value
+  commercial_value:
+    weight: 0.25
+    components:
+      cpc: 0.60  # Cost per click
+      intent_fit: 0.40  # Intent match score
+    # CPC weighting (normalize to 0-1 scale)
+    cpc_scaling:
+      low: 1.0  # $0-$5
+      medium: 3.0  # $5-$15
+      high: 10.0  # $15-$30
+      very_high: 20.0  # $30+
+  
+  # Competition inverse (easier = better opportunity)
+  ease_of_ranking:
+    weight: 0.25
+    formula: "100 - difficulty"
+    scaling: "logarithmic"  # Options: linear, logarithmic, exponential
+  
+  # Trend momentum
+  trend_momentum:
+    weight: 0.10
+    components:
+      trend_direction: 1.0  # rising=1.5, stable=1.0, declining=0.5
+      trend_score: 0.5  # % change over 90 days
+
+# Final Opportunity Formula
+# opportunity = (traffic_potential * commercial_value * intent_fit) / (difficulty + brand_crowding)
+# Normalized to 0-100 scale with logarithmic smoothing
+
+# Intent Fit Multipliers
+# Applied based on keyword intent matching content focus
+intent_fit:
+  exact_match: 1.0  # Intent matches focus exactly
+  related_match: 0.8  # Related intent
+  weak_match: 0.5  # Weak intent match
+  no_match: 0.2  # Intent mismatch
+
+# Intent Scoring by Type
+intent_scoring:
+  informational:
+    question_words: 2.0  # how, what, why, etc.
+    guide_words: 1.5  # guide, tutorial, learn
+    definition_words: 1.3  # what is, definition
+  
+  commercial:
+    comparison_words: 2.0  # vs, compare, best
+    review_words: 1.8  # review, rating
+    recommendation_words: 1.5  # best, top, recommended
+  
+  transactional:
+    buying_words: 2.5  # buy, price, discount
+    product_words: 1.8  # product names, models
+    location_words: 1.5  # near me, location
+  
+  local:
+    location_words: 2.5  # near me, in [city]
+    service_words: 2.0  # emergency, 24/7
+    map_pack: 1.8  # boost if map pack present
+  
+  navigational:
+    brand_words: 2.0  # brand names
+    login_words: 0.5  # login, sign in (low value)
+
+# SERP Feature Impact on Opportunity
+# Multipliers applied if feature is present
+serp_features:
+  featured_snippet:
+    opportunity_boost: 1.3  # Can capture position 0
+    difficulty_penalty: 1.2  # Harder to get it
+  
+  people_also_ask:
+    opportunity_boost: 1.1  # FAQ schema opportunity
+    difficulty_penalty: 1.0  # Neutral
+  
+  local_pack:
+    opportunity_boost: 1.4  # High value for local
+    difficulty_penalty: 1.3  # Need GMB optimization
+  
+  shopping_results:
+    opportunity_boost: 1.2  # E-commerce opportunity
+    difficulty_penalty: 1.1  # Need product data
+  
+  video_results:
+    opportunity_boost: 1.1  # Video content opportunity
+    difficulty_penalty: 1.0  # Neutral
+  
+  knowledge_panel:
+    opportunity_boost: 0.7  # Reduces organic CTR
+    difficulty_penalty: 1.5  # Very hard to compete
+  
+  top_stories:
+    opportunity_boost: 0.8  # News sites dominate
+    difficulty_penalty: 1.4  # Hard for non-news sites
+  
+  image_pack:
+    opportunity_boost: 1.0  # Neutral
+    difficulty_penalty: 1.0  # Neutral
+
+# Brand Crowding Penalty
+# Applied when top 10 has many major brands
+brand_crowding:
+  thresholds:
+    low: 2  # ≤2 brands = low crowding
+    medium: 5  # 3-5 brands = medium
+    high: 7  # 6-7 brands = high
+    very_high: 8  # ≥8 brands = very high
+  
+  penalties:
+    low: 1.0  # No penalty
+    medium: 1.3  # 30% harder
+    high: 1.6  # 60% harder
+    very_high: 2.0  # 100% harder (2x difficulty)
+
+# Normalization Settings
+normalization:
+  difficulty:
+    min: 0
+    max: 100
+    distribution: "normal"  # Options: linear, normal, logarithmic
+  
+  opportunity:
+    min: 0
+    max: 100
+    distribution: "logarithmic"  # Emphasize high-opportunity keywords
+    smoothing_factor: 1.5
+
+# Calibration (optional - adjust based on actual ranking success)
+calibration:
+  enabled: false
+  # After tracking actual results, adjust these multipliers
+  difficulty_adjustment: 1.0
+  opportunity_adjustment: 1.0
+  # Example: If difficulty scores are too pessimistic, set to 0.9
+
+# Version and metadata
+metadata:
+  version: "1.0"
+  last_updated: "2025-10-24"
+  description: "Default scoring weights optimized for general SEO"
+  author: "The Profit Platform"
+
+# Notes:
+# - Weights should sum to 1.0 within each section
+# - Adjust based on your niche and success data
+# - Higher weights emphasize that component more
+# - Test changes on sample projects before production use
+# - See ARCHITECTURE.md for detailed scoring algorithm documentation

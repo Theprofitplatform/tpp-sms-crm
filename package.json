@@ -17,7 +17,18 @@
     "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
     "lint": "eslint src/ tests/",
     "lint:fix": "eslint src/ tests/ --fix",
-    "prepare": "husky"
+    "prepare": "husky",
+    "vps:deploy": "./deploy-to-tpp-vps.sh",
+    "vps:update": "ssh tpp-vps 'cd ~/projects/seo-expert && git pull && npm ci --omit=dev --ignore-scripts && pm2 restart seo-expert'",
+    "vps:health": "ssh tpp-vps 'curl -sf http://localhost:3000/health && echo \"✓ SEO Expert healthy\" || echo \"✗ Health check failed\"'",
+    "vps:logs": "ssh tpp-vps 'pm2 logs seo-expert --lines 50 --nostream'",
+    "vps:status": "ssh tpp-vps 'pm2 show seo-expert'",
+    "vps:restart": "ssh tpp-vps 'pm2 restart seo-expert'",
+    "vps:connect": "ssh tpp-vps",
+    "vps:monitor": "ssh tpp-vps 'pm2 monit'",
+    "vps:backup": "ssh tpp-vps 'cd ~/projects/seo-expert && tar -czf ~/backups/seo-expert/manual-backup-$(date +%Y%m%d-%H%M%S).tar.gz --exclude=node_modules --exclude=.git .'",
+    "actions:status": "echo 'Check: https://github.com/YOUR_USERNAME/seo-expert/actions'",
+    "actions:logs": "gh run list --limit 5 || echo 'Install gh CLI: https://cli.github.com/'"
   },
   "keywords": [
     "seo",
@@ -45,6 +56,7 @@
     "express": "^5.1.0",
     "googleapis": "^164.1.0",
     "html-to-text": "^9.0.5",
+    "http-proxy-middleware": "^3.0.5",
     "jsdom": "^25.0.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
@@ -59,10 +71,12 @@
   },
   "devDependencies": {
     "@jest/globals": "^30.2.0",
+    "@playwright/test": "^1.56.1",
     "@types/jest": "^29.5.0",
     "eslint": "^8.50.0",
     "husky": "^9.1.7",
     "jest": "^29.7.0",
-    "lint-staged": "^16.2.4"
+    "lint-staged": "^16.2.4",
+    "playwright": "^1.56.1"
   }
 }
