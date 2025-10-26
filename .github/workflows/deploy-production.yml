@@ -69,7 +69,7 @@ jobs:
             --exclude='_archive' \
             --exclude='serpbear' \
             --exclude='files' \
-            --exclude='ui' \
+            --exclude='./ui' \
             --exclude='downloads' \
             --exclude='logs' \
             --exclude='*.log' \
