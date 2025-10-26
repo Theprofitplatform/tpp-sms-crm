@@ -596,7 +596,8 @@ app.use('/api/keyword', createProxyMiddleware({
 console.log('[Keyword Service] Proxy configured for /api/keyword/*');
 
 // Catchall route for React Router (must be last!)
-app.get('*', (req, res) => {
+// Note: Using app.use instead of app.get to handle all HTTP methods and avoid path-to-regexp errors
+app.use((req, res, next) => {
   // Don't catch API routes
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ success: false, error: 'API endpoint not found' });
