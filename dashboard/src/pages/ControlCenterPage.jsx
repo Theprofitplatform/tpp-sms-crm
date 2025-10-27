@@ -16,8 +16,15 @@ import {
   Calendar,
   Settings,
   TrendingUp,
-  Activity
+  Activity,
+  Sparkles,
+  Globe,
+  Mail,
+  Target,
+  MapPin,
+  FileText
 } from 'lucide-react'
+import { io } from 'socket.io-client'
 import {
   Dialog,
   DialogContent,
@@ -48,6 +55,7 @@ export function ControlCenterPage() {
   const [loading, setLoading] = useState(true)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [showBatchModal, setShowBatchModal] = useState(false)
+  const [selectedQuickActionClient, setSelectedQuickActionClient] = useState(null)
   const [scheduleConfig, setScheduleConfig] = useState({
     jobType: 'audit',
     clientIds: [],
@@ -60,10 +68,56 @@ export function ControlCenterPage() {
     clientIds: []
   })
 
+  // Socket.IO connection for real-time updates
+  useEffect(() => {
+    const socket = io('http://localhost:9000')
+
+    socket.on('connect', () => {
+      console.log('Control Center: Socket connected')
+    })
+
+    socket.on('job-started', (job) => {
+      console.log('Job started:', job)
+      fetchControlData()
+      toast({
+        title: "Job Started",
+        description: `${job.type} for ${job.clientName}`,
+      })
+    })
+
+    socket.on('job-completed', (job) => {
+      console.log('Job completed:', job)
+      fetchControlData()
+      toast({
+        title: "Job Completed",
+        description: `${job.type} finished successfully`,
+      })
+    })
+
+    socket.on('job-failed', (job) => {
+      console.log('Job failed:', job)
+      fetchControlData()
+      toast({
+        title: "Job Failed",
+        description: `${job.type} encountered an error`,
+        variant: "destructive"
+      })
+    })
+
+    socket.on('job-stopped', (data) => {
+      console.log('Job stopped:', data)
+      fetchControlData()
+    })
+
+    return () => {
+      socket.disconnect()
+    }
+  }, [toast])
+
   useEffect(() => {
     fetchControlData()
-    // Refresh every 10 seconds for real-time updates
-    const interval = setInterval(fetchControlData, 10000)
+    // Refresh every 5 seconds for real-time updates
+    const interval = setInterval(fetchControlData, 5000)
     return () => clearInterval(interval)
   }, [])
 
@@ -74,80 +128,38 @@ export function ControlCenterPage() {
       const dashData = await dashResponse.json()
       setClients(dashData.clients || [])
 
-      // Mock active jobs (in real implementation, fetch from backend)
-      const mockActiveJobs = [
-        {
-          id: 'job-1',
-          type: 'audit',
-          clientId: 'instantautotraders',
-          clientName: 'Instant Auto Traders',
-          status: 'running',
-          progress: 65,
-          startTime: new Date(Date.now() - 120000),
-          estimatedTime: 180000
-        }
-      ]
+      // Fetch active jobs
+      const activeJobsResponse = await fetch('/api/control/jobs/active')
+      const activeJobsData = await activeJobsResponse.json()
+      if (activeJobsData.success) {
+        // Calculate progress for each job based on elapsed time
+        const jobsWithProgress = activeJobsData.jobs.map(job => {
+          const elapsed = job.elapsedTime || 0
+          const estimatedTotal = job.estimatedTime || 60000
+          const progress = Math.min(Math.round((elapsed / estimatedTotal) * 100), 99)
+          return {
+            ...job,
+            progress: job.progress || progress,
+            clientName: clients.find(c => c.id === job.clientId)?.name || job.clientId
+          }
+        })
+        setActiveJobs(jobsWithProgress)
+      }
 
-      // Mock scheduled jobs
-      const mockScheduledJobs = [
-        {
-          id: 'schedule-1',
-          type: 'audit',
-          schedule: 'daily',
-          time: '09:00',
-          clients: ['instantautotraders', 'theprofitplatform'],
-          enabled: true,
-          nextRun: new Date(Date.now() + 86400000)
-        },
-        {
-          id: 'schedule-2',
-          type: 'optimization',
-          schedule: 'weekly',
-          time: '02:00',
-          clients: ['all'],
-          enabled: true,
-          nextRun: new Date(Date.now() + 259200000)
-        }
-      ]
+      // Fetch scheduled jobs
+      const scheduledJobsResponse = await fetch('/api/control/jobs/scheduled')
+      const scheduledJobsData = await scheduledJobsResponse.json()
+      if (scheduledJobsData.success) {
+        setScheduledJobs(scheduledJobsData.schedules || [])
+      }
 
-      // Mock job history
-      const mockJobHistory = [
-        {
-          id: 'hist-1',
-          type: 'batch-audit',
-          status: 'completed',
-          startTime: new Date(Date.now() - 3600000),
-          endTime: new Date(Date.now() - 3000000),
-          clientsProcessed: 4,
-          successCount: 4,
-          failCount: 0
-        },
-        {
-          id: 'hist-2',
-          type: 'scheduled-optimization',
-          status: 'completed',
-          startTime: new Date(Date.now() - 86400000),
-          endTime: new Date(Date.now() - 86100000),
-          clientsProcessed: 4,
-          successCount: 3,
-          failCount: 1
-        },
-        {
-          id: 'hist-3',
-          type: 'batch-audit',
-          status: 'failed',
-          startTime: new Date(Date.now() - 172800000),
-          endTime: new Date(Date.now() - 172200000),
-          clientsProcessed: 2,
-          successCount: 0,
-          failCount: 2,
-          error: 'Connection timeout'
-        }
-      ]
+      // Fetch job history
+      const historyResponse = await fetch('/api/control/jobs/history?limit=10')
+      const historyData = await historyResponse.json()
+      if (historyData.success) {
+        setJobHistory(historyData.history || [])
+      }
 
-      setActiveJobs(mockActiveJobs)
-      setScheduledJobs(mockScheduledJobs)
-      setJobHistory(mockJobHistory)
       setLoading(false)
     } catch (error) {
       console.error('Failed to fetch control data:', error)
@@ -204,37 +216,148 @@ export function ControlCenterPage() {
     }
   }
 
-  const handleScheduleJob = () => {
-    // In real implementation, save to backend
-    toast({
-      title: "Job Scheduled",
-      description: `${scheduleConfig.jobType} scheduled for ${scheduleConfig.schedule} at ${scheduleConfig.time}`,
-    })
-    setShowScheduleModal(false)
-    setScheduleConfig({
-      jobType: 'audit',
-      clientIds: [],
-      schedule: 'daily',
-      time: '09:00',
-      enabled: true
-    })
+  const handleScheduleJob = async () => {
+    try {
+      const response = await fetch('/api/control/jobs/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(scheduleConfig)
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        toast({
+          title: "Job Scheduled",
+          description: `${scheduleConfig.jobType} scheduled for ${scheduleConfig.schedule} at ${scheduleConfig.time}`,
+        })
+        setShowScheduleModal(false)
+        setScheduleConfig({
+          jobType: 'audit',
+          clientIds: [],
+          schedule: 'daily',
+          time: '09:00',
+          enabled: true
+        })
+        fetchControlData()
+      } else {
+        throw new Error(data.error)
+      }
+    } catch (error) {
+      toast({
+        title: "Failed to Schedule Job",
+        description: error.message,
+        variant: "destructive"
+      })
+    }
   }
 
-  const handleStopJob = (jobId) => {
-    toast({
-      title: "Job Stopped",
-      description: "The running job has been cancelled.",
-      variant: "destructive"
-    })
-    fetchControlData()
+  const handleStopJob = async (jobId) => {
+    try {
+      const response = await fetch(`/api/control/jobs/${jobId}/stop`, {
+        method: 'POST'
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        toast({
+          title: "Job Stopped",
+          description: "The running job has been cancelled.",
+          variant: "destructive"
+        })
+        fetchControlData()
+      } else {
+        throw new Error(data.error)
+      }
+    } catch (error) {
+      toast({
+        title: "Failed to Stop Job",
+        description: error.message,
+        variant: "destructive"
+      })
+    }
   }
 
-  const handleToggleSchedule = (scheduleId, enabled) => {
-    toast({
-      title: enabled ? "Schedule Enabled" : "Schedule Disabled",
-      description: `The scheduled job has been ${enabled ? 'enabled' : 'disabled'}.`,
-    })
-    fetchControlData()
+  const handleToggleSchedule = async (scheduleId, enabled) => {
+    try {
+      const response = await fetch(`/api/control/schedules/${scheduleId}/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        toast({
+          title: enabled ? "Schedule Enabled" : "Schedule Disabled",
+          description: `The scheduled job has been ${enabled ? 'enabled' : 'disabled'}.`,
+        })
+        fetchControlData()
+      } else {
+        throw new Error(data.error)
+      }
+    } catch (error) {
+      toast({
+        title: "Failed to Toggle Schedule",
+        description: error.message,
+        variant: "destructive"
+      })
+    }
+  }
+
+  // Quick Action Handlers
+  const handleQuickAction = async (action, clientId) => {
+    try {
+      let response
+      switch (action) {
+        case 'content':
+          response = await fetch(`/api/control/auto-fix/content/${clientId}`, { method: 'POST' })
+          break
+        case 'nap':
+          response = await fetch(`/api/control/auto-fix/nap/${clientId}`, { method: 'POST' })
+          break
+        case 'schema':
+          response = await fetch(`/api/control/auto-fix/schema/${clientId}`, { method: 'POST' })
+          break
+        case 'titles':
+          response = await fetch(`/api/control/auto-fix/titles/${clientId}`, { method: 'POST' })
+          break
+        case 'gsc':
+          response = await fetch(`/api/control/gsc/sync/${clientId}`, { method: 'POST' })
+          break
+        case 'email':
+          response = await fetch(`/api/control/email/campaign/${clientId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ campaignType: 'monthly' })
+          })
+          break
+        case 'competitor':
+          response = await fetch(`/api/control/competitor/scan/${clientId}`, { method: 'POST' })
+          break
+        case 'local-seo':
+          response = await fetch(`/api/control/local-seo/sync/${clientId}`, { method: 'POST' })
+          break
+        default:
+          throw new Error('Invalid action')
+      }
+
+      const data = await response.json()
+      if (data.success) {
+        toast({
+          title: "Action Started",
+          description: data.message,
+        })
+        fetchControlData()
+      } else {
+        throw new Error(data.error)
+      }
+    } catch (error) {
+      toast({
+        title: "Action Failed",
+        description: error.message,
+        variant: "destructive"
+      })
+    }
   }
 
   const formatDuration = (ms) => {
@@ -474,6 +597,162 @@ export function ControlCenterPage() {
           </Dialog>
         </div>
       </div>
+
+      {/* Quick Actions Panel */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="h-5 w-5" />
+            Quick Actions
+          </CardTitle>
+          <CardDescription>
+            One-click automation triggers for your clients
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Client Selector */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium">Select Client:</label>
+              <select
+                className="flex-1 px-3 py-2 border rounded-md bg-background"
+                value={selectedQuickActionClient || ''}
+                onChange={(e) => setSelectedQuickActionClient(e.target.value)}
+              >
+                <option value="">-- Select a client --</option>
+                {clients.map(client => (
+                  <option key={client.id} value={client.id}>
+                    {client.name || client.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedQuickActionClient && (
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                {/* Auto-Fixer Actions */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold flex items-center gap-1">
+                    <Sparkles className="h-4 w-4" />
+                    Auto-Fixers
+                  </h4>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="justify-start"
+                      onClick={() => handleQuickAction('content', selectedQuickActionClient)}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Content Optimizer
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="justify-start"
+                      onClick={() => handleQuickAction('nap', selectedQuickActionClient)}
+                    >
+                      <MapPin className="h-4 w-4 mr-2" />
+                      NAP Consistency
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="justify-start"
+                      onClick={() => handleQuickAction('schema', selectedQuickActionClient)}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Schema Injector
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="justify-start"
+                      onClick={() => handleQuickAction('titles', selectedQuickActionClient)}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Title/Meta Optimizer
+                    </Button>
+                  </div>
+                </div>
+
+                {/* SEO Tools */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold flex items-center gap-1">
+                    <Globe className="h-4 w-4" />
+                    SEO Tools
+                  </h4>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="justify-start"
+                      onClick={() => handleQuickAction('gsc', selectedQuickActionClient)}
+                    >
+                      <Globe className="h-4 w-4 mr-2" />
+                      GSC Sync
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="justify-start"
+                      onClick={() => handleQuickAction('local-seo', selectedQuickActionClient)}
+                    >
+                      <MapPin className="h-4 w-4 mr-2" />
+                      Local SEO Sync
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Marketing */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold flex items-center gap-1">
+                    <Mail className="h-4 w-4" />
+                    Marketing
+                  </h4>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="justify-start"
+                      onClick={() => handleQuickAction('email', selectedQuickActionClient)}
+                    >
+                      <Mail className="h-4 w-4 mr-2" />
+                      Email Campaign
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Intelligence */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold flex items-center gap-1">
+                    <Target className="h-4 w-4" />
+                    Intelligence
+                  </h4>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="justify-start"
+                      onClick={() => handleQuickAction('competitor', selectedQuickActionClient)}
+                    >
+                      <Target className="h-4 w-4 mr-2" />
+                      Competitor Scan
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!selectedQuickActionClient && (
+              <div className="text-center py-8 text-muted-foreground">
+                <Sparkles className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>Select a client to see available quick actions</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
