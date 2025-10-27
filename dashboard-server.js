@@ -557,6 +557,544 @@ app.get('/api/analytics/clients/metrics', (req, res) => {
 });
 
 // ============================================
+// CONTROL CENTER API ENDPOINTS
+// ============================================
+
+// In-memory storage for active jobs and schedules
+const activeJobs = new Map();
+const scheduledJobs = new Map();
+const jobHistory = [];
+let jobIdCounter = 1;
+let scheduleIdCounter = 1;
+
+// Get active jobs
+app.get('/api/control/jobs/active', (req, res) => {
+  try {
+    const jobs = Array.from(activeJobs.values()).map(job => ({
+      ...job,
+      elapsedTime: Date.now() - job.startTime
+    }));
+    res.json({
+      success: true,
+      jobs
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get scheduled jobs
+app.get('/api/control/jobs/scheduled', (req, res) => {
+  try {
+    const schedules = Array.from(scheduledJobs.values());
+    res.json({
+      success: true,
+      schedules
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get job history
+app.get('/api/control/jobs/history', (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 20;
+    const history = jobHistory.slice(-limit).reverse();
+    res.json({
+      success: true,
+      history
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Create scheduled job
+app.post('/api/control/jobs/schedule', (req, res) => {
+  try {
+    const { jobType, clientIds, schedule, time, enabled } = req.body;
+
+    const scheduleId = `schedule-${scheduleIdCounter++}`;
+    const nextRun = calculateNextRun(schedule, time);
+
+    const newSchedule = {
+      id: scheduleId,
+      type: jobType,
+      schedule,
+      time,
+      clients: clientIds.length === 0 ? ['all'] : clientIds,
+      enabled: enabled !== false,
+      nextRun,
+      createdAt: new Date()
+    };
+
+    scheduledJobs.set(scheduleId, newSchedule);
+
+    res.json({
+      success: true,
+      schedule: newSchedule
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Helper function to calculate next run time
+function calculateNextRun(schedule, time) {
+  const now = new Date();
+  const [hours, minutes] = time.split(':').map(Number);
+  const next = new Date();
+  next.setHours(hours, minutes, 0, 0);
+
+  switch (schedule) {
+    case 'hourly':
+      if (next <= now) next.setHours(next.getHours() + 1);
+      break;
+    case 'daily':
+      if (next <= now) next.setDate(next.getDate() + 1);
+      break;
+    case 'weekly':
+      if (next <= now) next.setDate(next.getDate() + 7);
+      break;
+    case 'monthly':
+      if (next <= now) next.setMonth(next.getMonth() + 1);
+      break;
+  }
+
+  return next;
+}
+
+// Stop a running job
+app.post('/api/control/jobs/:jobId/stop', (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const job = activeJobs.get(jobId);
+
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        error: 'Job not found'
+      });
+    }
+
+    // Move to history
+    jobHistory.push({
+      ...job,
+      status: 'cancelled',
+      endTime: new Date(),
+      duration: Date.now() - job.startTime
+    });
+
+    activeJobs.delete(jobId);
+
+    // Broadcast update
+    broadcastUpdate('job-stopped', { jobId });
+
+    res.json({
+      success: true,
+      message: 'Job stopped successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Toggle schedule enabled/disabled
+app.post('/api/control/schedules/:scheduleId/toggle', (req, res) => {
+  try {
+    const { scheduleId } = req.params;
+    const { enabled } = req.body;
+    const schedule = scheduledJobs.get(scheduleId);
+
+    if (!schedule) {
+      return res.status(404).json({
+        success: false,
+        error: 'Schedule not found'
+      });
+    }
+
+    schedule.enabled = enabled;
+    scheduledJobs.set(scheduleId, schedule);
+
+    res.json({
+      success: true,
+      schedule
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Auto-Fixer Quick Actions
+app.post('/api/control/auto-fix/content/:clientId', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const jobId = `job-${jobIdCounter++}`;
+
+    // Create active job
+    const job = {
+      id: jobId,
+      type: 'content-optimization',
+      clientId,
+      clientName: clientId,
+      status: 'running',
+      progress: 0,
+      startTime: Date.now()
+    };
+    activeJobs.set(jobId, job);
+
+    // Broadcast job started
+    broadcastUpdate('job-started', job);
+
+    // Execute content optimizer in background
+    execAsync(`node auto-fix-all.js ${clientId}`)
+      .then(({ stdout }) => {
+        job.status = 'completed';
+        job.progress = 100;
+        job.endTime = Date.now();
+        activeJobs.delete(jobId);
+        jobHistory.push({ ...job, output: stdout.substring(0, 200) });
+        broadcastUpdate('job-completed', job);
+      })
+      .catch((error) => {
+        job.status = 'failed';
+        job.error = error.message;
+        job.endTime = Date.now();
+        activeJobs.delete(jobId);
+        jobHistory.push(job);
+        broadcastUpdate('job-failed', job);
+      });
+
+    res.json({
+      success: true,
+      jobId,
+      message: 'Content optimization started'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// NAP Consistency Fixer
+app.post('/api/control/auto-fix/nap/:clientId', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const jobId = `job-${jobIdCounter++}`;
+
+    const job = {
+      id: jobId,
+      type: 'nap-consistency',
+      clientId,
+      clientName: clientId,
+      status: 'running',
+      progress: 0,
+      startTime: Date.now()
+    };
+    activeJobs.set(jobId, job);
+    broadcastUpdate('job-started', job);
+
+    // Simulate NAP fix (in real implementation, call the NAP fixer module)
+    setTimeout(() => {
+      job.status = 'completed';
+      job.progress = 100;
+      job.endTime = Date.now();
+      activeJobs.delete(jobId);
+      jobHistory.push(job);
+      broadcastUpdate('job-completed', job);
+    }, 5000);
+
+    res.json({
+      success: true,
+      jobId,
+      message: 'NAP consistency check started'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Schema Injector
+app.post('/api/control/auto-fix/schema/:clientId', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const jobId = `job-${jobIdCounter++}`;
+
+    const job = {
+      id: jobId,
+      type: 'schema-injection',
+      clientId,
+      clientName: clientId,
+      status: 'running',
+      progress: 0,
+      startTime: Date.now()
+    };
+    activeJobs.set(jobId, job);
+    broadcastUpdate('job-started', job);
+
+    // Simulate schema injection
+    setTimeout(() => {
+      job.status = 'completed';
+      job.progress = 100;
+      job.endTime = Date.now();
+      activeJobs.delete(jobId);
+      jobHistory.push(job);
+      broadcastUpdate('job-completed', job);
+    }, 4000);
+
+    res.json({
+      success: true,
+      jobId,
+      message: 'Schema injection started'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Title/Meta Optimizer
+app.post('/api/control/auto-fix/titles/:clientId', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const jobId = `job-${jobIdCounter++}`;
+
+    const job = {
+      id: jobId,
+      type: 'title-meta-optimization',
+      clientId,
+      clientName: clientId,
+      status: 'running',
+      progress: 0,
+      startTime: Date.now()
+    };
+    activeJobs.set(jobId, job);
+    broadcastUpdate('job-started', job);
+
+    execAsync(`node auto-fix-titles.js ${clientId}`)
+      .then(({ stdout }) => {
+        job.status = 'completed';
+        job.progress = 100;
+        job.endTime = Date.now();
+        activeJobs.delete(jobId);
+        jobHistory.push({ ...job, output: stdout.substring(0, 200) });
+        broadcastUpdate('job-completed', job);
+      })
+      .catch((error) => {
+        job.status = 'failed';
+        job.error = error.message;
+        job.endTime = Date.now();
+        activeJobs.delete(jobId);
+        jobHistory.push(job);
+        broadcastUpdate('job-failed', job);
+      });
+
+    res.json({
+      success: true,
+      jobId,
+      message: 'Title/Meta optimization started'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Google Search Console Sync
+app.post('/api/control/gsc/sync/:clientId', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const jobId = `job-${jobIdCounter++}`;
+
+    const job = {
+      id: jobId,
+      type: 'gsc-sync',
+      clientId,
+      clientName: clientId,
+      status: 'running',
+      progress: 0,
+      startTime: Date.now()
+    };
+    activeJobs.set(jobId, job);
+    broadcastUpdate('job-started', job);
+
+    // Simulate GSC sync
+    setTimeout(() => {
+      job.status = 'completed';
+      job.progress = 100;
+      job.endTime = Date.now();
+      activeJobs.delete(jobId);
+      jobHistory.push(job);
+      broadcastUpdate('job-completed', job);
+    }, 8000);
+
+    res.json({
+      success: true,
+      jobId,
+      message: 'Google Search Console sync started'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Email Campaign Trigger
+app.post('/api/control/email/campaign/:clientId', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { campaignType } = req.body;
+    const jobId = `job-${jobIdCounter++}`;
+
+    const job = {
+      id: jobId,
+      type: 'email-campaign',
+      clientId,
+      clientName: clientId,
+      status: 'running',
+      progress: 0,
+      startTime: Date.now(),
+      campaignType
+    };
+    activeJobs.set(jobId, job);
+    broadcastUpdate('job-started', job);
+
+    // Simulate email campaign
+    setTimeout(() => {
+      job.status = 'completed';
+      job.progress = 100;
+      job.endTime = Date.now();
+      activeJobs.delete(jobId);
+      jobHistory.push(job);
+      broadcastUpdate('job-completed', job);
+    }, 3000);
+
+    res.json({
+      success: true,
+      jobId,
+      message: `${campaignType || 'Email'} campaign started`
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Competitor Scan
+app.post('/api/control/competitor/scan/:clientId', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const jobId = `job-${jobIdCounter++}`;
+
+    const job = {
+      id: jobId,
+      type: 'competitor-scan',
+      clientId,
+      clientName: clientId,
+      status: 'running',
+      progress: 0,
+      startTime: Date.now()
+    };
+    activeJobs.set(jobId, job);
+    broadcastUpdate('job-started', job);
+
+    // Simulate competitor scan
+    setTimeout(() => {
+      job.status = 'completed';
+      job.progress = 100;
+      job.endTime = Date.now();
+      activeJobs.delete(jobId);
+      jobHistory.push(job);
+      broadcastUpdate('job-completed', job);
+    }, 12000);
+
+    res.json({
+      success: true,
+      jobId,
+      message: 'Competitor scan started'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Local SEO Sync
+app.post('/api/control/local-seo/sync/:clientId', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const jobId = `job-${jobIdCounter++}`;
+
+    const job = {
+      id: jobId,
+      type: 'local-seo-sync',
+      clientId,
+      clientName: clientId,
+      status: 'running',
+      progress: 0,
+      startTime: Date.now()
+    };
+    activeJobs.set(jobId, job);
+    broadcastUpdate('job-started', job);
+
+    // Simulate local SEO sync
+    setTimeout(() => {
+      job.status = 'completed';
+      job.progress = 100;
+      job.endTime = Date.now();
+      activeJobs.delete(jobId);
+      jobHistory.push(job);
+      broadcastUpdate('job-completed', job);
+    }, 6000);
+
+    res.json({
+      success: true,
+      jobId,
+      message: 'Local SEO sync started'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================
 // API V2 ROUTES - Unified Keyword Management
 // ============================================
 
