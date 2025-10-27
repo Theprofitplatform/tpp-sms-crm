@@ -17,7 +17,7 @@ import {
   MapPin,
   Globe,
   Sparkles,
-  Wordpress,
+  FileCode,
   Clock,
   Zap,
   Download,
@@ -50,7 +50,7 @@ const navGroups = [
     items: [
       { icon: Globe, label: 'Google Console', href: '#google-console' },
       { icon: MapPin, label: 'Local SEO', href: '#local-seo' },
-      { icon: Wordpress, label: 'WordPress', href: '#wordpress' },
+      { icon: FileCode, label: 'WordPress', href: '#wordpress' },
     ]
   },
   {
