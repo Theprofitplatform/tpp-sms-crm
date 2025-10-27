@@ -15,6 +15,15 @@ import { WhiteLabelPage } from './pages/WhiteLabelPage'
 import { AnalyticsPage } from './pages/AnalyticsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { ClientDetailPage } from './pages/ClientDetailPage'
+import { GoogleSearchConsolePage } from './pages/GoogleSearchConsolePage'
+import { LocalSEOPage } from './pages/LocalSEOPage'
+import { AIOptimizerPage } from './pages/AIOptimizerPage'
+import { WordPressManagerPage } from './pages/WordPressManagerPage'
+import { SchedulerPage } from './pages/SchedulerPage'
+import { BulkOperationsPage } from './pages/BulkOperationsPage'
+import { ExportBackupPage } from './pages/ExportBackupPage'
+import { NotificationCenterPage } from './pages/NotificationCenterPage'
+import { APIDocumentationPage } from './pages/APIDocumentationPage'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { Bell, Search, Moon, Sun } from 'lucide-react'
@@ -260,35 +269,33 @@ function App() {
           )}
           {currentSection === 'clients' && <ClientsPage />}
           {currentSection === 'reports' && <ReportsPage />}
-          {currentSection === 'control-center' && <ControlCenterPage />}
-          {currentSection === 'auto-fix-engines' && <AutoFixPage />}
+          {currentSection === 'automation' && <ControlCenterPage />}
+          {currentSection === 'autofix' && <AutoFixPage />}
+          {currentSection === 'ai-optimizer' && <AIOptimizerPage />}
+          {currentSection === 'scheduler' && <SchedulerPage />}
+          {currentSection === 'bulk-operations' && <BulkOperationsPage />}
+          {currentSection === 'google-console' && <GoogleSearchConsolePage />}
+          {currentSection === 'local-seo' && <LocalSEOPage />}
+          {currentSection === 'wordpress' && <WordPressManagerPage />}
           {currentSection === 'recommendations' && <RecommendationsPage />}
           {currentSection === 'keyword-research' && <KeywordResearchPage />}
           {currentSection === 'unified-keywords' && <UnifiedKeywordsPage />}
           {currentSection === 'goals' && <GoalsPage />}
-          {currentSection === 'email-campaigns' && <EmailCampaignsPage />}
+          {currentSection === 'emails' && <EmailCampaignsPage />}
+          {currentSection === 'notifications' && <NotificationCenterPage />}
           {currentSection === 'webhooks' && <WebhooksPage />}
-          {currentSection === 'white-label' && <WhiteLabelPage />}
+          {currentSection === 'api-docs' && <APIDocumentationPage />}
+          {currentSection === 'export-backup' && <ExportBackupPage />}
+          {currentSection === 'whitelabel' && <WhiteLabelPage />}
           {currentSection === 'analytics' && <AnalyticsPage data={dashboardData} />}
           {currentSection === 'settings' && <SettingsPage />}
           {currentSection === 'client-detail' && (
             <ClientDetailPage clientId={selectedClient} onBack={handleBackToDashboard} />
           )}
-          {currentSection !== 'dashboard' &&
-           currentSection !== 'clients' &&
-           currentSection !== 'reports' &&
-           currentSection !== 'control-center' &&
-           currentSection !== 'auto-fix-engines' &&
-           currentSection !== 'recommendations' &&
-           currentSection !== 'keyword-research' &&
-           currentSection !== 'unified-keywords' &&
-           currentSection !== 'goals' &&
-           currentSection !== 'email-campaigns' &&
-           currentSection !== 'webhooks' &&
-           currentSection !== 'white-label' &&
-           currentSection !== 'analytics' &&
-           currentSection !== 'settings' &&
-           currentSection !== 'client-detail' && (
+          {!['dashboard', 'clients', 'reports', 'automation', 'autofix', 'ai-optimizer', 'scheduler',
+              'bulk-operations', 'google-console', 'local-seo', 'wordpress', 'recommendations',
+              'keyword-research', 'unified-keywords', 'goals', 'emails', 'notifications', 'webhooks',
+              'api-docs', 'export-backup', 'whitelabel', 'analytics', 'settings', 'client-detail'].includes(currentSection) && (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
                 <h2 className="text-2xl font-bold mb-2 capitalize">

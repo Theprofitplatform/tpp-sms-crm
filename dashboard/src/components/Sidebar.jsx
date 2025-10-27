@@ -13,7 +13,16 @@ import {
   Bot,
   Palette,
   Webhook,
-  Database
+  Database,
+  MapPin,
+  Globe,
+  Sparkles,
+  Wordpress,
+  Clock,
+  Zap,
+  Download,
+  Bell,
+  Code
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -31,6 +40,17 @@ const navGroups = [
     items: [
       { icon: Rocket, label: 'Control Center', href: '#automation' },
       { icon: Bot, label: 'Auto-Fix Engines', href: '#autofix' },
+      { icon: Sparkles, label: 'AI Optimizer', href: '#ai-optimizer' },
+      { icon: Clock, label: 'Scheduler', href: '#scheduler' },
+      { icon: Zap, label: 'Bulk Operations', href: '#bulk-operations' },
+    ]
+  },
+  {
+    title: 'SEO Tools',
+    items: [
+      { icon: Globe, label: 'Google Console', href: '#google-console' },
+      { icon: MapPin, label: 'Local SEO', href: '#local-seo' },
+      { icon: Wordpress, label: 'WordPress', href: '#wordpress' },
     ]
   },
   {
@@ -46,6 +66,7 @@ const navGroups = [
     items: [
       { icon: Mail, label: 'Email Campaigns', href: '#emails' },
       { icon: FileText, label: 'Reports', href: '#reports' },
+      { icon: Bell, label: 'Notifications', href: '#notifications' },
     ]
   },
   {
@@ -56,8 +77,10 @@ const navGroups = [
     ]
   },
   {
-    title: 'Configuration',
+    title: 'System',
     items: [
+      { icon: Code, label: 'API Docs', href: '#api-docs' },
+      { icon: Download, label: 'Export & Backup', href: '#export-backup' },
       { icon: Palette, label: 'White-Label', href: '#whitelabel' },
       { icon: Webhook, label: 'Webhooks', href: '#webhooks' },
       { icon: Settings, label: 'Settings', href: '#settings' },
