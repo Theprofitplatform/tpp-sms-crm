@@ -21,7 +21,7 @@ FROM base AS dependencies
 COPY package*.json ./
 
 # Install production dependencies only
-RUN npm ci --only=production && \
+RUN npm ci --omit=dev --ignore-scripts && \
     npm cache clean --force
 
 # Stage 3: Development
