@@ -111,8 +111,20 @@ jobs:
               echo "📋 Using existing .env file..."
               cp ../.env .env
             else
-              echo "⚠️  Warning: No .env file found!"
+              echo "⚠️  Warning: No .env file found, creating from example..."
+              cp .env.example .env 2>/dev/null || touch .env
             fi
+
+            # Add or update Cloudflare Tunnel Token
+            echo "🔐 Configuring Cloudflare Tunnel..."
+            if grep -q "^CLOUDFLARE_TUNNEL_TOKEN=" .env; then
+              sed -i "s|^CLOUDFLARE_TUNNEL_TOKEN=.*|CLOUDFLARE_TUNNEL_TOKEN=${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}|" .env
+            else
+              echo "" >> .env
+              echo "# Cloudflare Tunnel" >> .env
+              echo "CLOUDFLARE_TUNNEL_TOKEN=${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}" >> .env
+            fi
+            echo "✅ Cloudflare Tunnel token configured"
 
             # Stop existing containers
             echo "🛑 Stopping existing containers..."
