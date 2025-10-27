@@ -85,3 +85,8 @@ export function DashboardSkeleton() {
     </div>
   )
 }
+
+// Generic LoadingState wrapper for backward compatibility
+export function LoadingState() {
+  return <DashboardSkeleton />
+}
