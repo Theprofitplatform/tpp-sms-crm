@@ -1,0 +1,71 @@
+name: Sync Documentation to VPS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sync-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Add VPS to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H 31.97.222.218 >> ~/.ssh/known_hosts
+
+      - name: Copy documentation files to VPS
+        run: |
+          ssh avi@31.97.222.218 << 'ENDSSH'
+            # Create documentation directory
+            mkdir -p /home/avi/seo-automation/current/docs
+          ENDSSH
+
+          # Copy all documentation files
+          scp DEPLOYMENT-COMPLETE-NEXT-STEPS.md avi@31.97.222.218:/home/avi/seo-automation/current/
+          scp CLOUDFLARE-TUNNEL-SETUP.md avi@31.97.222.218:/home/avi/seo-automation/current/
+          scp QUICK-CLOUDFLARE-SETUP.md avi@31.97.222.218:/home/avi/seo-automation/current/
+          scp setup-cloudflare-tunnel.sh avi@31.97.222.218:/home/avi/seo-automation/current/
+          scp check-vps-tmp.sh avi@31.97.222.218:/home/avi/seo-automation/current/
+
+          # Make scripts executable
+          ssh avi@31.97.222.218 << 'ENDSSH'
+            cd /home/avi/seo-automation/current
+            chmod +x setup-cloudflare-tunnel.sh check-vps-tmp.sh
+
+            echo "✅ Documentation files copied successfully!"
+            echo ""
+            echo "Files in current directory:"
+            ls -lh *.md *.sh 2>/dev/null || echo "No doc files found"
+          ENDSSH
+
+      - name: Verify files
+        run: |
+          ssh avi@31.97.222.218 << 'ENDSSH'
+            echo ""
+            echo "📚 Documentation files available:"
+            cd /home/avi/seo-automation/current
+            for file in DEPLOYMENT-COMPLETE-NEXT-STEPS.md CLOUDFLARE-TUNNEL-SETUP.md QUICK-CLOUDFLARE-SETUP.md; do
+              if [ -f "$file" ]; then
+                echo "  ✅ $file ($(wc -l < $file) lines)"
+              else
+                echo "  ❌ $file (missing)"
+              fi
+            done
+
+            echo ""
+            echo "🔧 Scripts available:"
+            for script in setup-cloudflare-tunnel.sh check-vps-tmp.sh; do
+              if [ -f "$script" ]; then
+                echo "  ✅ $script (executable: $(test -x $script && echo 'yes' || echo 'no'))"
+              else
+                echo "  ❌ $script (missing)"
+              fi
+            done
+          ENDSSH
