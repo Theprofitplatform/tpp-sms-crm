@@ -36,6 +36,22 @@ RUN npm ci
 COPY . .
 
 # ============================================
+# Stage: Dashboard Builder
+# ============================================
+FROM base AS dashboard-builder
+
+# Copy dashboard package files
+COPY dashboard/package*.json ./dashboard/
+WORKDIR /app/dashboard
+RUN npm ci
+
+# Copy dashboard source code
+COPY dashboard/ ./
+
+# Build the React dashboard
+RUN npm run build
+
+# ============================================
 # Stage: Production
 # ============================================
 FROM base AS production
@@ -50,8 +66,11 @@ COPY --from=dependencies --chown=seouser:seouser /app/node_modules ./node_module
 # Copy application code
 COPY --chown=seouser:seouser . .
 
+# Copy built dashboard from builder stage
+COPY --from=dashboard-builder --chown=seouser:seouser /app/dashboard/dist ./dashboard/dist
+
 # Create necessary directories
-RUN mkdir -p data logs public dashboard/dist && \
+RUN mkdir -p data logs public && \
     chown -R seouser:seouser data logs public dashboard
 
 # Switch to non-root user
