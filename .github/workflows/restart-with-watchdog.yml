@@ -1,0 +1,64 @@
+name: Restart All Services (With Watchdog)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  restart:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Restart all services with Cloudflare + Watchdog
+        run: |
+          ssh-keyscan -H 31.97.222.218 >> ~/.ssh/known_hosts
+
+          ssh avi@31.97.222.218 << 'ENDSSH'
+            cd /home/avi/seo-automation/current
+
+            echo "🛑 Stopping all containers..."
+            docker compose -f docker-compose.prod.yml down
+
+            echo ""
+            echo "🧹 Cleaning up Docker resources..."
+            docker network prune -f
+            docker volume prune -f
+
+            echo ""
+            echo "🚀 Starting all services with Cloudflare + Watchdog..."
+            docker compose -f docker-compose.prod.yml --profile with-cloudflare --profile with-watchdog up -d
+
+            echo ""
+            echo "⏳ Waiting 30 seconds for services to start..."
+            sleep 30
+
+            echo ""
+            echo "✅ Container status:"
+            docker ps --filter "name=keyword-tracker" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+            echo ""
+            echo "🏥 Testing dashboard health:"
+            for i in {1..5}; do
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9000/api/v2/health)
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "  ✅ Dashboard healthy (HTTP $HTTP_CODE)"
+                curl -s http://localhost:9000/api/v2/health | head -5
+                break
+              else
+                echo "  ⏳ Attempt $i/5: Dashboard not ready yet (HTTP $HTTP_CODE)"
+                sleep 5
+              fi
+            done
+
+            echo ""
+            echo "🔍 Watchdog status:"
+            docker logs keyword-tracker-watchdog --tail 5
+
+            echo ""
+            echo "🌐 Testing public URL..."
+            sleep 10
+            curl -s https://seodashboard.theprofitplatform.com.au/api/v2/health | head -5
+          ENDSSH
