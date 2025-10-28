@@ -1,0 +1,62 @@
+name: Diagnose Container Issues
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Diagnose container startup issues
+        run: |
+          ssh-keyscan -H 31.97.222.218 >> ~/.ssh/known_hosts
+
+          ssh avi@31.97.222.218 << 'ENDSSH'
+            cd /home/avi/seo-automation/current
+
+            echo "📊 All containers (including stopped):"
+            docker ps -a --filter "name=keyword-tracker"
+
+            echo ""
+            echo "🐳 Docker Compose config check:"
+            docker compose -f docker-compose.prod.yml config --services
+
+            echo ""
+            echo "📋 Recent dashboard logs (if any):"
+            docker logs keyword-tracker-dashboard --tail 50 2>&1 || echo "No dashboard logs available"
+
+            echo ""
+            echo "📋 Recent database logs (if any):"
+            docker logs keyword-tracker-db --tail 30 2>&1 || echo "No database logs available"
+
+            echo ""
+            echo "🔍 Disk space:"
+            df -h /
+
+            echo ""
+            echo "💾 Memory usage:"
+            free -h
+
+            echo ""
+            echo "🖼️ Docker images:"
+            docker images | grep keyword-tracker
+
+            echo ""
+            echo "🔄 Attempting manual start..."
+            docker compose -f docker-compose.prod.yml up -d postgres keyword-service dashboard
+
+            echo ""
+            sleep 10
+
+            echo "📊 Container status after manual start:"
+            docker ps --filter "name=keyword-tracker"
+
+            echo ""
+            echo "📋 Dashboard logs after start attempt:"
+            docker logs keyword-tracker-dashboard --tail 30 2>&1 || echo "Still no dashboard"
+          ENDSSH
