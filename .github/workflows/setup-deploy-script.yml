@@ -1,0 +1,60 @@
+name: Setup Deploy Script (One-time)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Setup deploy script on VPS
+        run: |
+          ssh-keyscan -H 31.97.222.218 >> ~/.ssh/known_hosts
+
+          echo "📦 Copying deploy.sh to VPS..."
+          scp deploy.sh avi@31.97.222.218:/home/avi/seo-automation/deploy.sh
+          scp update-cloudflare-tunnel.sh avi@31.97.222.218:/home/avi/seo-automation/update-cloudflare-tunnel.sh
+
+          echo ""
+          echo "🔧 Setting up scripts on VPS..."
+
+          ssh avi@31.97.222.218 << 'ENDSSH'
+            cd /home/avi/seo-automation
+
+            # Make scripts executable
+            chmod +x deploy.sh
+            chmod +x update-cloudflare-tunnel.sh
+
+            # Pull latest changes to current/
+            cd current
+            git fetch origin
+            git reset --hard origin/main
+
+            echo ""
+            echo "📋 File status:"
+            ls -lh ../deploy.sh
+            ls -lh ../update-cloudflare-tunnel.sh
+            ls -lh deploy.sh
+            ls -lh update-cloudflare-tunnel.sh
+
+            echo ""
+            echo "✅ Deploy scripts ready!"
+          ENDSSH
+
+      - name: Verify setup
+        run: |
+          echo ""
+          echo "✅ Setup complete!"
+          echo ""
+          echo "You can now use these commands:"
+          echo "  • Deploy: gh workflow run deploy-latest"
+          echo "  • Update Cloudflare: gh workflow run update-cloudflare-tunnel"
+          echo "  • Or SSH directly: ssh avi@31.97.222.218 'cd /home/avi/seo-automation && ./deploy.sh'"
