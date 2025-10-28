@@ -1,0 +1,90 @@
+name: Health Monitor - Auto Restart
+
+on:
+  schedule:
+    # Run every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Dashboard Health
+        id: health
+        run: |
+          echo "🏥 Checking dashboard health..."
+
+          # Test API health endpoint
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://seodashboard.theprofitplatform.com.au/api/v2/health)
+
+          echo "HTTP Status Code: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Dashboard is healthy!"
+            echo "healthy=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Dashboard is down (HTTP $HTTP_CODE)"
+            echo "healthy=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup SSH (if unhealthy)
+        if: steps.health.outputs.healthy == 'false'
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Auto-restart containers (if unhealthy)
+        if: steps.health.outputs.healthy == 'false'
+        run: |
+          ssh-keyscan -H 31.97.222.218 >> ~/.ssh/known_hosts
+
+          ssh avi@31.97.222.218 << 'ENDSSH'
+            echo "🚨 Dashboard is down - Auto-restarting containers..."
+
+            cd /home/avi/seo-automation/current
+
+            # Check if containers are running
+            echo "📊 Current container status:"
+            docker ps --filter "name=keyword-tracker" --format "table {{.Names}}\t{{.Status}}"
+
+            # Restart all containers
+            echo ""
+            echo "🔄 Restarting all containers..."
+            docker compose -f docker-compose.prod.yml --profile with-cloudflare down || true
+            docker compose -f docker-compose.prod.yml --profile with-cloudflare up -d
+
+            # Wait for services to start
+            echo ""
+            echo "⏳ Waiting for services to start..."
+            sleep 30
+
+            # Check final status
+            echo ""
+            echo "✅ Container status after restart:"
+            docker ps --filter "name=keyword-tracker" --format "table {{.Names}}\t{{.Status}}"
+
+            echo ""
+            echo "🎯 Testing health endpoint..."
+            curl -s https://seodashboard.theprofitplatform.com.au/api/v2/health | head -10
+          ENDSSH
+
+      - name: Notify status
+        if: always()
+        run: |
+          if [ "${{ steps.health.outputs.healthy }}" = "true" ]; then
+            echo "✅ Dashboard is healthy - no action needed"
+          else
+            echo "🔄 Dashboard was down - auto-restart completed"
+            echo "Check the logs above for restart details"
+          fi
+
+      - name: Send Discord notification (if down)
+        if: steps.health.outputs.healthy == 'false' && secrets.DISCORD_WEBHOOK_URL != ''
+        run: |
+          TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S UTC')
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"content\": \"⚠️ **Dashboard Auto-Restart Triggered**\n\n**Time:** $TIMESTAMP\n**Reason:** Health check failed\n**Action:** Containers automatically restarted\n**Status:** Check logs at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+            }" || true

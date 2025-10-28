@@ -164,6 +164,39 @@ services:
     profiles:
       - with-cloudflare  # Start with: docker-compose --profile with-cloudflare up
 
+  # Health Monitor Watchdog - Ensures 24/7 uptime
+  watchdog:
+    image: alpine:latest
+    container_name: keyword-tracker-watchdog
+    command: >
+      sh -c "apk add --no-cache curl docker-cli &&
+      while true; do
+        echo '[Watchdog] Checking dashboard health...';
+        if ! curl -f -s http://dashboard:9000/api/v2/health > /dev/null 2>&1; then
+          echo '[Watchdog] ❌ Dashboard unhealthy - triggering restart...';
+          docker restart keyword-tracker-dashboard || true;
+          sleep 60;
+        else
+          echo '[Watchdog] ✅ Dashboard healthy';
+        fi;
+        sleep 300;
+      done"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - keyword-network
+    depends_on:
+      dashboard:
+        condition: service_started
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 64M
+    profiles:
+      - with-watchdog
+
   # Nginx Reverse Proxy (DEPRECATED - Use Cloudflare instead)
   # Kept for backwards compatibility, disabled by default
   # nginx:
