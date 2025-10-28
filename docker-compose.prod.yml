@@ -112,6 +112,8 @@ services:
           memory: 256M
 
   # Sync Service (Runs bidirectional sync)
+  # DISABLED: Crashing due to SQLite database connectivity issues
+  # Re-enable once SQLite database setup is properly configured
   sync-service:
     image: keyword-tracker-dashboard:latest
     container_name: keyword-tracker-sync
@@ -143,6 +145,8 @@ services:
         reservations:
           cpus: '0.25'
           memory: 128M
+    profiles:
+      - with-sync  # Disabled by default, enable with: docker compose --profile with-sync up
 
   # Cloudflare Tunnel (Replaces Nginx)
   # Provides secure tunneling to Cloudflare without exposing ports
