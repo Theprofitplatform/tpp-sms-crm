@@ -1,0 +1,36 @@
+name: Stop Sync Service
+
+on:
+  workflow_dispatch:
+
+jobs:
+  stop-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Stop sync service
+        run: |
+          ssh-keyscan -H 31.97.222.218 >> ~/.ssh/known_hosts
+
+          ssh avi@31.97.222.218 << 'ENDSSH'
+            cd /home/avi/seo-automation/current
+
+            echo "🛑 Stopping sync service..."
+            docker stop keyword-tracker-sync || true
+            docker rm keyword-tracker-sync || true
+
+            echo ""
+            echo "✅ Sync service stopped and removed"
+
+            echo ""
+            echo "📊 Current container status:"
+            docker ps --filter "name=keyword-tracker" --format "table {{.Names}}\t{{.Status}}"
+
+            echo ""
+            echo "🏥 Testing dashboard:"
+            curl -s http://localhost:9000/api/v2/health | head -5
+          ENDSSH
