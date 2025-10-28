@@ -1,0 +1,98 @@
+name: Deploy Latest Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_build:
+        description: 'Skip dashboard build (faster, but uses cached build)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Deploy latest version to VPS
+        run: |
+          ssh-keyscan -H 31.97.222.218 >> ~/.ssh/known_hosts
+
+          ssh avi@31.97.222.218 << 'ENDSSH'
+            echo "🚀 Starting automated deployment..."
+            echo ""
+
+            cd /home/avi/seo-automation
+
+            # Make deploy script executable if not already
+            chmod +x deploy.sh
+
+            # Run deployment with appropriate flags
+            if [ "${{ inputs.skip_build }}" = "true" ]; then
+              echo "⚡ Running quick deployment (skipping build)..."
+              ./deploy.sh --skip-build
+            else
+              echo "🔨 Running full deployment (with build)..."
+              ./deploy.sh
+            fi
+
+            echo ""
+            echo "📋 Deployment log saved to:"
+            ls -t deploy-*.log | head -1
+          ENDSSH
+
+      - name: Verify deployment
+        run: |
+          echo "⏳ Waiting 15 seconds for services to stabilize..."
+          sleep 15
+
+          echo ""
+          echo "🏥 Testing public health endpoint..."
+          for i in {1..5}; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://seodashboard.theprofitplatform.com.au/api/v2/health)
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Deployment successful! Dashboard is healthy (HTTP $HTTP_CODE)"
+              curl -s https://seodashboard.theprofitplatform.com.au/api/v2/health
+              exit 0
+            else
+              echo "⏳ Attempt $i/5: Dashboard not ready yet (HTTP $HTTP_CODE)"
+              sleep 10
+            fi
+          done
+
+          echo "❌ Deployment verification failed - dashboard not responding"
+          exit 1
+
+      - name: Send success notification
+        if: success()
+        run: |
+          TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S UTC')
+          echo "✅ Deployment completed successfully at $TIMESTAMP"
+          echo "🌐 Dashboard: https://seodashboard.theprofitplatform.com.au/"
+
+      - name: Send Discord notification (if configured)
+        if: success() && secrets.DISCORD_WEBHOOK_URL != ''
+        run: |
+          TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S UTC')
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"content\": \"✅ **Deployment Successful**\\n\\n**Time:** $TIMESTAMP\\n**URL:** https://seodashboard.theprofitplatform.com.au/\\n**Status:** All services healthy\"
+            }" || true
+
+      - name: Send failure notification
+        if: failure() && secrets.DISCORD_WEBHOOK_URL != ''
+        run: |
+          TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S UTC')
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"content\": \"❌ **Deployment Failed**\\n\\n**Time:** $TIMESTAMP\\n**Logs:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+            }" || true

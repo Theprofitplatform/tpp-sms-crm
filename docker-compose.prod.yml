@@ -35,6 +35,7 @@ services:
       target: production
     image: keyword-tracker-dashboard:latest
     container_name: keyword-tracker-dashboard
+    hostname: dashboard
     environment:
       - NODE_ENV=production
       - PORT=9000
@@ -53,7 +54,12 @@ services:
     ports:
       - "${DASHBOARD_PORT:-9000}:9000"
     networks:
-      - keyword-network
+      keyword-network:
+        aliases:
+          - dashboard
+          - keyword-tracker-dashboard
+          - app
+          - seo-dashboard
     depends_on:
       postgres:
         condition: service_healthy

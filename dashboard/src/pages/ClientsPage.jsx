@@ -382,7 +382,7 @@ export function ClientsPage() {
                       Run Audits
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleBulkOptimize}>
-                      <Settings ClassName="h-4 w-4 mr-2" />
+                      <SettingsIcon className="h-4 w-4 mr-2" />
                       Optimize All
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />

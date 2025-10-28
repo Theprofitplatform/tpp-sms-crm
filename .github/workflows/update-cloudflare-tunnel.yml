@@ -1,0 +1,137 @@
+name: Update Cloudflare Tunnel Configuration
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-tunnel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update Cloudflare Tunnel via API
+        run: |
+          echo "🔧 Updating Cloudflare Tunnel Configuration..."
+          echo ""
+
+          # Configuration
+          CLOUDFLARE_API_TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}"
+          TUNNEL_NAME="keyword-tracker-tunnel"
+          DASHBOARD_SERVICE="dashboard:9000"
+
+          # Get account ID
+          echo "📡 Fetching account information..."
+          ACCOUNT_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/accounts" \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" | jq -r '.result[0].id')
+
+          echo "✅ Account ID: $ACCOUNT_ID"
+
+          # Get tunnel ID
+          echo "📡 Fetching tunnel information..."
+          TUNNEL_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/cfd_tunnel" \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" | jq -r ".result[] | select(.name==\"$TUNNEL_NAME\") | .id")
+
+          echo "✅ Tunnel ID: $TUNNEL_ID"
+          echo ""
+
+          # Get current configuration
+          echo "📋 Current tunnel configuration:"
+          curl -s -X GET "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/cfd_tunnel/$TUNNEL_ID/configurations" \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" | jq '.result.config.ingress'
+          echo ""
+
+          # Update tunnel configuration
+          echo "🔄 Updating tunnel to route to $DASHBOARD_SERVICE..."
+          UPDATE_RESULT=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/cfd_tunnel/$TUNNEL_ID/configurations" \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{
+                  \"config\": {
+                      \"ingress\": [
+                          {
+                              \"hostname\": \"seodashboard.theprofitplatform.com.au\",
+                              \"service\": \"http://$DASHBOARD_SERVICE\",
+                              \"originRequest\": {
+                                  \"connectTimeout\": 30,
+                                  \"noTLSVerify\": false
+                              }
+                          },
+                          {
+                              \"service\": \"http_status:404\"
+                          }
+                      ]
+                  }
+              }")
+
+          SUCCESS=$(echo "$UPDATE_RESULT" | jq -r '.success')
+
+          if [ "$SUCCESS" = "true" ]; then
+              echo "✅ Tunnel configuration updated successfully!"
+              echo ""
+              echo "📋 New configuration:"
+              echo "$UPDATE_RESULT" | jq '.result.config.ingress'
+          else
+              echo "❌ Failed to update tunnel configuration"
+              echo ""
+              echo "Error details:"
+              echo "$UPDATE_RESULT" | jq '.'
+              exit 1
+          fi
+
+      - name: Wait for propagation
+        run: |
+          echo ""
+          echo "⏳ Waiting 30 seconds for Cloudflare to propagate changes..."
+          sleep 30
+
+      - name: Verify tunnel is working
+        run: |
+          echo ""
+          echo "🧪 Testing public URL..."
+
+          for i in {1..5}; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://seodashboard.theprofitplatform.com.au/api/v2/health)
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Tunnel working! Dashboard is accessible (HTTP $HTTP_CODE)"
+              curl -s https://seodashboard.theprofitplatform.com.au/api/v2/health
+              exit 0
+            else
+              echo "⏳ Attempt $i/5: Not ready yet (HTTP $HTTP_CODE)"
+              sleep 10
+            fi
+          done
+
+          echo "⚠️  Tunnel updated but dashboard not responding yet"
+          echo "This is normal - it may take a few more minutes to propagate"
+          echo "Check manually: https://seodashboard.theprofitplatform.com.au/api/v2/health"
+
+      - name: Setup SSH for container restart
+        if: failure()
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Restart Cloudflared container (if verification failed)
+        if: failure()
+        run: |
+          echo ""
+          echo "🔄 Restarting Cloudflared container to pick up new configuration..."
+
+          ssh-keyscan -H 31.97.222.218 >> ~/.ssh/known_hosts
+
+          ssh avi@31.97.222.218 << 'ENDSSH'
+            cd /home/avi/seo-automation/current
+            docker restart keyword-tracker-cloudflared
+
+            echo "⏳ Waiting for container to restart..."
+            sleep 15
+
+            echo ""
+            echo "📊 Container status:"
+            docker ps --filter "name=cloudflared" --format "table {{.Names}}\t{{.Status}}"
+
+            echo ""
+            echo "📋 Recent logs:"
+            docker logs keyword-tracker-cloudflared --tail 20
+          ENDSSH
