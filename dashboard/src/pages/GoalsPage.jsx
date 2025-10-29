@@ -1,10 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { useToast } from '@/hooks/use-toast'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+
+import { goalsAPI } from '@/services/api'
+import { useAPIRequest, useAPIData } from '@/hooks/useAPIRequest'
+
 import {
   Target,
   TrendingUp,
@@ -15,32 +24,16 @@ import {
   XCircle,
   Clock,
   Award,
-  Activity
+  Activity,
+  Loader2,
+  Trash2
 } from 'lucide-react'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useToast } from '@/hooks/use-toast'
 
-export function GoalsPage() {
+export default function GoalsPage() {
   const { toast } = useToast()
-  const [goals, setGoals] = useState([])
-  const [kpis, setKpis] = useState([])
-  const [loading, setLoading] = useState(true)
+  
   const [showNewGoalModal, setShowNewGoalModal] = useState(false)
+  const [editingGoal, setEditingGoal] = useState(null)
   const [newGoal, setNewGoal] = useState({
     title: '',
     description: '',
@@ -50,289 +43,121 @@ export function GoalsPage() {
     clientId: ''
   })
 
-  useEffect(() => {
-    fetchGoalsData()
+  // API Requests
+  const { data: goalsData, loading: loadingGoals, refetch: refetchGoals } = useAPIData(
+    () => goalsAPI.getAll(),
+    { autoFetch: true, initialData: { goals: [], kpis: [] } }
+  )
+
+  const { execute: createGoal, loading: creating } = useAPIRequest()
+  const { execute: updateGoal, loading: updating } = useAPIRequest()
+  const { execute: deleteGoal, loading: deleting } = useAPIRequest()
+
+  const goals = goalsData?.goals || []
+  const kpis = goalsData?.kpis || []
+
+  // Calculate progress
+  const calculateProgress = useCallback((goal) => {
+    const range = goal.targetValue - goal.startValue
+    const current = goal.currentValue - goal.startValue
+    return Math.max(0, Math.min(100, (current / range) * 100))
   }, [])
 
-  const fetchGoalsData = async () => {
-    setLoading(true)
-    try {
-      // Mock goals data (in real implementation, fetch from backend)
-      const mockGoals = [
-        {
-          id: 'goal-1',
-          title: 'Increase Organic Traffic by 30%',
-          description: 'Grow monthly organic traffic from 10K to 13K visitors',
-          metric: 'traffic',
-          currentValue: 11200,
-          targetValue: 13000,
-          startValue: 10000,
-          status: 'in-progress',
-          clientId: 'instantautotraders',
-          clientName: 'Instant Auto Traders',
-          startDate: new Date(Date.now() - 2592000000),
-          deadline: new Date(Date.now() + 2592000000),
-          createdAt: new Date(Date.now() - 2592000000)
-        },
-        {
-          id: 'goal-2',
-          title: 'Achieve Top 3 Rankings for Main Keywords',
-          description: 'Get top 3 positions for 5 primary keywords',
-          metric: 'rankings',
-          currentValue: 3,
-          targetValue: 5,
-          startValue: 0,
-          status: 'in-progress',
-          clientId: 'theprofitplatform',
-          clientName: 'The Profit Platform',
-          startDate: new Date(Date.now() - 1728000000),
-          deadline: new Date(Date.now() + 3456000000),
-          createdAt: new Date(Date.now() - 1728000000)
-        },
-        {
-          id: 'goal-3',
-          title: 'Reduce Page Load Time to Under 2s',
-          description: 'Optimize website performance for better UX',
-          metric: 'performance',
-          currentValue: 2.3,
-          targetValue: 2.0,
-          startValue: 3.5,
-          status: 'in-progress',
-          clientId: 'hottyres',
-          clientName: 'Hot Tyres',
-          startDate: new Date(Date.now() - 1296000000),
-          deadline: new Date(Date.now() + 1296000000),
-          createdAt: new Date(Date.now() - 1296000000)
-        },
-        {
-          id: 'goal-4',
-          title: 'Build 50 Quality Backlinks',
-          description: 'Acquire backlinks from high-authority domains',
-          metric: 'backlinks',
-          currentValue: 52,
-          targetValue: 50,
-          startValue: 23,
-          status: 'completed',
-          clientId: 'sadcdisabilityservices',
-          clientName: 'SADC Disability Services',
-          startDate: new Date(Date.now() - 5184000000),
-          deadline: new Date(Date.now() - 86400000),
-          completedAt: new Date(Date.now() - 86400000),
-          createdAt: new Date(Date.now() - 5184000000)
-        },
-        {
-          id: 'goal-5',
-          title: 'Improve Mobile Score to 90+',
-          description: 'Optimize mobile experience and performance',
-          metric: 'mobile-score',
-          currentValue: 85,
-          targetValue: 90,
-          startValue: 72,
-          status: 'in-progress',
-          clientId: 'instantautotraders',
-          clientName: 'Instant Auto Traders',
-          startDate: new Date(Date.now() - 864000000),
-          deadline: new Date(Date.now() + 864000000),
-          createdAt: new Date(Date.now() - 864000000)
-        },
-        {
-          id: 'goal-6',
-          title: 'Fix All Critical SEO Issues',
-          description: 'Resolve 15 critical issues identified in audits',
-          metric: 'issues',
-          currentValue: 3,
-          targetValue: 0,
-          startValue: 15,
-          status: 'in-progress',
-          clientId: 'theprofitplatform',
-          clientName: 'The Profit Platform',
-          startDate: new Date(Date.now() - 604800000),
-          deadline: new Date(Date.now() + 1209600000),
-          createdAt: new Date(Date.now() - 604800000)
-        }
-      ]
-
-      // Mock KPIs
-      const mockKpis = [
-        {
-          id: 'kpi-1',
-          name: 'Organic Traffic',
-          value: 45200,
-          change: 12,
-          trend: 'up',
-          target: 50000,
-          unit: 'visits'
-        },
-        {
-          id: 'kpi-2',
-          name: 'Avg. Ranking Position',
-          value: 8.2,
-          change: -2.1,
-          trend: 'up',
-          target: 5.0,
-          unit: 'position'
-        },
-        {
-          id: 'kpi-3',
-          name: 'Conversion Rate',
-          value: 3.4,
-          change: 0.8,
-          trend: 'up',
-          target: 4.0,
-          unit: '%'
-        },
-        {
-          id: 'kpi-4',
-          name: 'Page Speed Score',
-          value: 87,
-          change: 5,
-          trend: 'up',
-          target: 90,
-          unit: 'score'
-        },
-        {
-          id: 'kpi-5',
-          name: 'Total Backlinks',
-          value: 1247,
-          change: 23,
-          trend: 'up',
-          target: 1500,
-          unit: 'links'
-        },
-        {
-          id: 'kpi-6',
-          name: 'Mobile Score',
-          value: 82,
-          change: 7,
-          trend: 'up',
-          target: 90,
-          unit: 'score'
-        }
-      ]
-
-      setGoals(mockGoals)
-      setKpis(mockKpis)
-      setLoading(false)
-    } catch (error) {
-      console.error('Failed to fetch goals data:', error)
-      toast({
-        title: "Error Loading Goals",
-        description: "Could not fetch goals and KPIs data.",
-        variant: "destructive"
-      })
-      setLoading(false)
+  // Stats calculation
+  const stats = useMemo(() => {
+    return {
+      totalGoals: goals.length,
+      inProgress: goals.filter(g => g.status === 'in-progress').length,
+      completed: goals.filter(g => g.status === 'completed').length,
+      avgProgress: goals.length > 0 
+        ? goals.reduce((sum, g) => sum + calculateProgress(g), 0) / goals.length 
+        : 0
     }
-  }
+  }, [goals, calculateProgress])
 
-  const handleCreateGoal = () => {
-    if (!newGoal.title || !newGoal.target || !newGoal.deadline) {
+  const handleCreateGoal = useCallback(async () => {
+    if (!newGoal.title || !newGoal.target) {
       toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
-        variant: "destructive"
+        title: 'Validation Error',
+        description: 'Please fill in all required fields.',
+        variant: 'destructive'
       })
       return
     }
 
-    const goal = {
-      id: `goal-${Date.now()}`,
-      ...newGoal,
-      targetValue: parseFloat(newGoal.target),
-      currentValue: 0,
-      startValue: 0,
-      status: 'in-progress',
-      startDate: new Date(),
-      deadline: new Date(newGoal.deadline),
-      createdAt: new Date()
-    }
+    await createGoal(
+      () => goalsAPI.create(newGoal),
+      {
+        showSuccessToast: true,
+        successMessage: 'Goal created successfully',
+        onSuccess: () => {
+          setShowNewGoalModal(false)
+          setNewGoal({
+            title: '',
+            description: '',
+            target: '',
+            metric: 'traffic',
+            deadline: '',
+            clientId: ''
+          })
+          refetchGoals()
+        }
+      }
+    )
+  }, [newGoal, createGoal, refetchGoals, toast])
 
-    setGoals([...goals, goal])
-    setShowNewGoalModal(false)
-    setNewGoal({
-      title: '',
-      description: '',
-      target: '',
-      metric: 'traffic',
-      deadline: '',
-      clientId: ''
-    })
+  const handleUpdateGoal = useCallback(async (goalId, updates) => {
+    await updateGoal(
+      () => goalsAPI.update(goalId, updates),
+      {
+        showSuccessToast: true,
+        successMessage: 'Goal updated successfully',
+        onSuccess: () => {
+          setEditingGoal(null)
+          refetchGoals()
+        }
+      }
+    )
+  }, [updateGoal, refetchGoals])
 
-    toast({
-      title: "Goal Created",
-      description: `${goal.title} has been created successfully.`,
-    })
-  }
+  const handleDeleteGoal = useCallback(async (goalId) => {
+    if (!confirm('Are you sure you want to delete this goal?')) return
 
-  const handleMarkComplete = (goalId) => {
-    setGoals(goals.map(goal =>
-      goal.id === goalId
-        ? { ...goal, status: 'completed', completedAt: new Date() }
-        : goal
-    ))
-    toast({
-      title: "Goal Completed!",
-      description: "Congratulations on achieving this goal!",
-    })
-  }
+    await deleteGoal(
+      () => goalsAPI.delete(goalId),
+      {
+        showSuccessToast: true,
+        successMessage: 'Goal deleted successfully',
+        onSuccess: () => {
+          refetchGoals()
+        }
+      }
+    )
+  }, [deleteGoal, refetchGoals])
 
-  const handleDeleteGoal = (goalId) => {
-    setGoals(goals.filter(g => g.id !== goalId))
-    toast({
-      title: "Goal Deleted",
-      description: "The goal has been removed.",
-      variant: "destructive"
-    })
-  }
-
-  const calculateProgress = (goal) => {
-    if (goal.metric === 'issues') {
-      // For issues, progress is inverted (less is better)
-      const resolved = goal.startValue - goal.currentValue
-      const total = goal.startValue - goal.targetValue
-      return Math.min(100, Math.round((resolved / total) * 100))
-    } else {
-      const progress = goal.currentValue - goal.startValue
-      const total = goal.targetValue - goal.startValue
-      return Math.min(100, Math.round((progress / total) * 100))
-    }
-  }
-
-  const calculateDaysLeft = (deadline) => {
-    const days = Math.ceil((new Date(deadline) - new Date()) / (1000 * 60 * 60 * 24))
-    return days
-  }
-
-  const getStatusColor = (status) => {
+  const getStatusColor = useCallback((status) => {
     switch (status) {
-      case 'completed':
-        return 'default'
-      case 'in-progress':
-        return 'secondary'
-      case 'at-risk':
-        return 'destructive'
-      default:
-        return 'outline'
+      case 'completed': return 'default'
+      case 'in-progress': return 'secondary'
+      case 'at-risk': return 'destructive'
+      default: return 'outline'
     }
-  }
+  }, [])
 
-  const stats = {
-    totalGoals: goals.length,
-    activeGoals: goals.filter(g => g.status === 'in-progress').length,
-    completedGoals: goals.filter(g => g.status === 'completed').length,
-    avgProgress: goals.filter(g => g.status === 'in-progress').length > 0
-      ? Math.round(goals.filter(g => g.status === 'in-progress').reduce((sum, g) => sum + calculateProgress(g), 0) / goals.filter(g => g.status === 'in-progress').length)
-      : 0
-  }
+  const getMetricIcon = useCallback((metric) => {
+    switch (metric) {
+      case 'traffic': return <TrendingUp className="h-4 w-4" />
+      case 'rankings': return <Award className="h-4 w-4" />
+      case 'performance': return <Activity className="h-4 w-4" />
+      default: return <Target className="h-4 w-4" />
+    }
+  }, [])
 
-  if (loading) {
+  if (loadingGoals) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Goals & KPIs</h1>
-            <p className="text-muted-foreground">Loading goals...</p>
-          </div>
-        </div>
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading goals...</span>
       </div>
     )
   }
@@ -342,7 +167,10 @@ export function GoalsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Goals & KPIs</h1>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Target className="h-8 w-8" />
+            Goals & KPIs
+          </h1>
           <p className="text-muted-foreground">
             Track progress towards your SEO objectives
           </p>
@@ -355,28 +183,30 @@ export function GoalsPage() {
               New Goal
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Create New Goal</DialogTitle>
               <DialogDescription>
-                Set a measurable SEO goal to track progress
+                Set a new goal to track your SEO performance
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label>Goal Title *</Label>
+                <Label htmlFor="goal-title">Title *</Label>
                 <Input
-                  placeholder="e.g., Increase organic traffic by 25%"
+                  id="goal-title"
+                  placeholder="e.g., Increase Organic Traffic by 30%"
                   value={newGoal.title}
                   onChange={(e) => setNewGoal({ ...newGoal, title: e.target.value })}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>Description</Label>
-                <Input
-                  placeholder="Brief description of this goal"
+                <Label htmlFor="goal-description">Description</Label>
+                <Textarea
+                  id="goal-description"
+                  placeholder="Describe the goal in detail..."
                   value={newGoal.description}
                   onChange={(e) => setNewGoal({ ...newGoal, description: e.target.value })}
                 />
@@ -384,30 +214,29 @@ export function GoalsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Metric *</Label>
+                  <Label htmlFor="goal-metric">Metric</Label>
                   <Select
                     value={newGoal.metric}
                     onValueChange={(value) => setNewGoal({ ...newGoal, metric: value })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id="goal-metric">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="traffic">Traffic</SelectItem>
                       <SelectItem value="rankings">Rankings</SelectItem>
-                      <SelectItem value="backlinks">Backlinks</SelectItem>
                       <SelectItem value="performance">Performance</SelectItem>
-                      <SelectItem value="mobile-score">Mobile Score</SelectItem>
-                      <SelectItem value="issues">Issues</SelectItem>
+                      <SelectItem value="conversions">Conversions</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Target Value *</Label>
+                  <Label htmlFor="goal-target">Target Value *</Label>
                   <Input
+                    id="goal-target"
                     type="number"
-                    placeholder="e.g., 10000"
+                    placeholder="Target value"
                     value={newGoal.target}
                     onChange={(e) => setNewGoal({ ...newGoal, target: e.target.value })}
                   />
@@ -415,20 +244,12 @@ export function GoalsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Deadline *</Label>
+                <Label htmlFor="goal-deadline">Deadline</Label>
                 <Input
+                  id="goal-deadline"
                   type="date"
                   value={newGoal.deadline}
                   onChange={(e) => setNewGoal({ ...newGoal, deadline: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Client (Optional)</Label>
-                <Input
-                  placeholder="Client ID"
-                  value={newGoal.clientId}
-                  onChange={(e) => setNewGoal({ ...newGoal, clientId: e.target.value })}
                 />
               </div>
             </div>
@@ -437,7 +258,8 @@ export function GoalsPage() {
               <Button variant="outline" onClick={() => setShowNewGoalModal(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleCreateGoal}>
+              <Button onClick={handleCreateGoal} disabled={creating}>
+                {creating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Create Goal
               </Button>
             </div>
@@ -448,63 +270,51 @@ export function GoalsPage() {
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total Goals</CardTitle>
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalGoals}</div>
-            <p className="text-xs text-muted-foreground">
-              All time
-            </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.activeGoals}</div>
-            <p className="text-xs text-muted-foreground">
-              In progress
-            </p>
+            <div className="text-2xl font-bold">{stats.inProgress}</div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Completed</CardTitle>
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.completedGoals}</div>
-            <p className="text-xs text-muted-foreground">
-              Achieved
-            </p>
+            <div className="text-2xl font-bold">{stats.completed}</div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Avg Progress</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.avgProgress}%</div>
-            <p className="text-xs text-muted-foreground">
-              Across active goals
-            </p>
+            <div className="text-2xl font-bold">{stats.avgProgress.toFixed(0)}%</div>
           </CardContent>
         </Card>
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="goals" className="space-y-4">
+      <Tabs defaultValue="goals">
         <TabsList>
-          <TabsTrigger value="goals">Goals</TabsTrigger>
-          <TabsTrigger value="kpis">KPIs</TabsTrigger>
+          <TabsTrigger value="goals">Goals ({goals.length})</TabsTrigger>
+          <TabsTrigger value="kpis">KPIs ({kpis.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="goals" className="space-y-4">
@@ -523,141 +333,95 @@ export function GoalsPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
-              {goals.map(goal => {
-                const progress = calculateProgress(goal)
-                const daysLeft = calculateDaysLeft(goal.deadline)
-                const isAtRisk = daysLeft < 7 && progress < 80 && goal.status === 'in-progress'
-
-                return (
-                  <Card key={goal.id} className={goal.status === 'completed' ? 'opacity-60' : ''}>
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <CardTitle className="text-lg">{goal.title}</CardTitle>
-                            <Badge variant={getStatusColor(isAtRisk ? 'at-risk' : goal.status)}>
-                              {goal.status === 'completed' ? 'Completed' : isAtRisk ? 'At Risk' : 'In Progress'}
-                            </Badge>
-                            {goal.clientName && (
-                              <Badge variant="outline">{goal.clientName}</Badge>
-                            )}
-                          </div>
+            <div className="grid gap-4">
+              {goals.map(goal => (
+                <Card key={goal.id}>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                          {getMetricIcon(goal.metric)}
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">{goal.title}</CardTitle>
                           <CardDescription>{goal.description}</CardDescription>
-                        </div>
-                        {goal.status === 'in-progress' && (
-                          <div className="flex gap-2">
-                            <Button size="sm" onClick={() => handleMarkComplete(goal.id)}>
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Complete
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleDeleteGoal(goal.id)}
-                            >
-                              Delete
-                            </Button>
-                          </div>
-                        )}
-                        {goal.status === 'completed' && (
-                          <Badge variant="default" className="gap-1">
-                            <Award className="h-4 w-4" />
-                            Achieved
-                          </Badge>
-                        )}
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {/* Progress Bar */}
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Progress</span>
-                            <span className="font-semibold">{progress}%</span>
-                          </div>
-                          <Progress value={progress} />
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>
-                              Current: {goal.currentValue.toLocaleString()}
-                            </span>
-                            <span>
-                              Target: {goal.targetValue.toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Timeline */}
-                        <div className="flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">
-                              {goal.status === 'completed'
-                                ? `Completed ${new Date(goal.completedAt).toLocaleDateString()}`
-                                : `Deadline: ${new Date(goal.deadline).toLocaleDateString()}`
-                              }
-                            </span>
-                          </div>
-                          {goal.status === 'in-progress' && (
-                            <Badge variant={daysLeft < 7 ? 'destructive' : 'secondary'}>
-                              <Clock className="h-3 w-3 mr-1" />
-                              {daysLeft > 0 ? `${daysLeft} days left` : 'Overdue'}
+                          {goal.clientName && (
+                            <Badge variant="outline" className="mt-2">
+                              {goal.clientName}
                             </Badge>
                           )}
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
+                      <div className="flex items-center gap-2">
+                        <Badge variant={getStatusColor(goal.status)}>
+                          {goal.status}
+                        </Badge>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteGoal(goal.id)}
+                          disabled={deleting}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Progress</span>
+                        <span className="font-medium">
+                          {goal.currentValue} / {goal.targetValue}
+                        </span>
+                      </div>
+                      <Progress value={calculateProgress(goal)} className="h-2" />
+                      <p className="text-sm text-muted-foreground">
+                        {calculateProgress(goal).toFixed(0)}% complete
+                      </p>
+                    </div>
+
+                    {goal.deadline && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4" />
+                        Deadline: {new Date(goal.deadline).toLocaleDateString()}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
         </TabsContent>
 
         <TabsContent value="kpis" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {kpis.map(kpi => {
-              const progressToTarget = Math.min(100, Math.round((kpi.value / kpi.target) * 100))
-
-              return (
-                <Card key={kpi.id}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">{kpi.name}</CardTitle>
-                      {kpi.trend === 'up' ? (
-                        <TrendingUp className="h-5 w-5 text-green-500" />
-                      ) : (
-                        <TrendingUp className="h-5 w-5 text-red-500 rotate-180" />
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div>
-                        <div className="text-3xl font-bold">
-                          {kpi.value.toLocaleString()}
-                          {kpi.unit !== 'visits' && kpi.unit !== 'links' && kpi.unit !== 'score' && (
-                            <span className="text-sm text-muted-foreground ml-1">{kpi.unit}</span>
-                          )}
-                        </div>
-                        <Badge variant={kpi.trend === 'up' ? 'default' : 'destructive'} className="mt-2">
-                          {kpi.change > 0 ? '+' : ''}{kpi.change}%
-                        </Badge>
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>Target: {kpi.target.toLocaleString()}</span>
-                          <span>{progressToTarget}%</span>
-                        </div>
-                        <Progress value={progressToTarget} />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Key Performance Indicators</CardTitle>
+              <CardDescription>Track your most important metrics</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {kpis.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No KPIs configured yet
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {kpis.map((kpi, idx) => (
+                    <Card key={idx}>
+                      <CardHeader>
+                        <CardTitle className="text-sm">{kpi.name}</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">{kpi.value}</div>
+                        <p className="text-sm text-muted-foreground">{kpi.description}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

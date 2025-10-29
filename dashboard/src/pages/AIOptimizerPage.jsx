@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useToast } from '@/hooks/use-toast'
 import {
   Sparkles,
   TrendingUp,
@@ -17,7 +18,8 @@ import {
   FileText,
   BarChart3,
   Zap,
-  RefreshCw
+  RefreshCw,
+  Loader2
 } from 'lucide-react'
 import {
   Table,
@@ -27,10 +29,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { LoadingState } from '@/components/LoadingState'
-import { ErrorState } from '@/components/ErrorState'
 
-export function AIOptimizerPage() {
+export default function AIOptimizerPage() {
+  const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [optimizing, setOptimizing] = useState(false)
@@ -48,16 +49,26 @@ export function AIOptimizerPage() {
     clients: []
   })
 
-  useEffect(() => {
-    fetchOptimizerData()
-  }, [])
+  // Refs to prevent stale closures
+  const abortControllerRef = useRef(null)
+  const intervalRef = useRef(null)
 
-  const fetchOptimizerData = async () => {
-    setLoading(true)
-    setError(null)
+  // Memoized fetch function to prevent infinite loops
+  const fetchOptimizerData = useCallback(async () => {
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    // Create new AbortController
+    abortControllerRef.current = new AbortController()
 
     try {
-      const response = await fetch('/api/ai-optimizer/status')
+      setError(null)
+
+      const response = await fetch('/api/ai-optimizer/status', {
+        signal: abortControllerRef.current.signal
+      })
 
       if (!response.ok) {
         throw new Error('Failed to fetch optimizer data')
@@ -77,273 +88,347 @@ export function AIOptimizerPage() {
         clients: data.clients || []
       })
     } catch (err) {
-      console.error('Error fetching optimizer data:', err)
-      setError(err.message)
+      // Don't show error for aborted requests
+      if (err.name !== 'AbortError') {
+        console.error('Error fetching optimizer data:', err)
+        setError(err.message)
+      }
     } finally {
       setLoading(false)
     }
-  }
+  }, []) // No dependencies - function is stable
 
-  const calculateSuccessRate = (history) => {
+  const calculateSuccessRate = useCallback((history) => {
     if (history.length === 0) return 0
     const successful = history.filter(h => h.status === 'completed').length
     return ((successful / history.length) * 100).toFixed(1)
-  }
+  }, [])
 
-  const calculateAvgImprovement = (history) => {
+  const calculateAvgImprovement = useCallback((history) => {
     const completed = history.filter(h => h.status === 'completed' && h.improvement)
     if (completed.length === 0) return 0
     const sum = completed.reduce((acc, h) => acc + h.improvement, 0)
     return (sum / completed.length).toFixed(1)
-  }
+  }, [])
 
-  const handleOptimize = async () => {
-    if (!selectedClient) return
+  // Initial fetch
+  useEffect(() => {
+    fetchOptimizerData()
+  }, [fetchOptimizerData])
+
+  // FIXED: Polling logic separated into its own effect to prevent infinite loops
+  useEffect(() => {
+    // Only poll if there are jobs in progress
+    const hasActiveJobs = optimizerData.stats.inProgress > 0 || 
+                         optimizerData.queue.some(q => q.status === 'processing')
+
+    if (hasActiveJobs) {
+      // Clear any existing interval
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+
+      // Set up new polling interval
+      intervalRef.current = setInterval(() => {
+        fetchOptimizerData()
+      }, 5000) // Poll every 5 seconds
+    }
+
+    // Cleanup function
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+    }
+  }, [optimizerData.stats.inProgress, optimizerData.queue, fetchOptimizerData])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Abort any pending requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+      // Clear polling interval
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    }
+  }, [])
+
+  const handleOptimize = useCallback(async () => {
+    if (!selectedClient) {
+      toast({
+        title: 'Client Required',
+        description: 'Please select a client first.',
+        variant: 'destructive'
+      })
+      return
+    }
 
     setOptimizing(true)
     try {
       const response = await fetch('/api/ai-optimizer/optimize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId: selectedClient })
+        body: JSON.stringify({ 
+          clientId: selectedClient,
+          contentType: 'post'
+        })
       })
 
       if (response.ok) {
         await fetchOptimizerData()
         setSelectedClient('')
+        toast({
+          title: 'Optimization Started',
+          description: 'The optimization will take 5-10 seconds to complete.'
+        })
+      } else {
+        throw new Error('Failed to start optimization')
       }
     } catch (err) {
       console.error('Optimization error:', err)
+      toast({
+        title: 'Optimization Failed',
+        description: err.message,
+        variant: 'destructive'
+      })
     } finally {
       setOptimizing(false)
     }
-  }
+  }, [selectedClient, fetchOptimizerData, toast])
 
-  const handleBulkOptimize = async () => {
+  const handleBulkOptimize = useCallback(async () => {
+    if (!selectedClient) {
+      toast({
+        title: 'Client Required',
+        description: 'Please select a client first.',
+        variant: 'destructive'
+      })
+      return
+    }
+
     setOptimizing(true)
     try {
       const response = await fetch('/api/ai-optimizer/bulk-optimize', {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          clientId: selectedClient,
+          limit: 10
+        })
       })
 
       if (response.ok) {
         await fetchOptimizerData()
+        toast({
+          title: 'Bulk Optimization Started',
+          description: 'Processing multiple optimizations...'
+        })
+      } else {
+        throw new Error('Failed to start bulk optimization')
       }
     } catch (err) {
       console.error('Bulk optimization error:', err)
+      toast({
+        title: 'Bulk Optimization Failed',
+        description: err.message,
+        variant: 'destructive'
+      })
     } finally {
       setOptimizing(false)
     }
+  }, [selectedClient, fetchOptimizerData, toast])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading AI Optimizer...</span>
+      </div>
+    )
   }
 
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'completed':
-        return <Badge variant="default"><CheckCircle2 className="h-3 w-3 mr-1" />Completed</Badge>
-      case 'processing':
-        return <Badge variant="secondary"><RefreshCw className="h-3 w-3 mr-1 animate-spin" />Processing</Badge>
-      case 'pending':
-        return <Badge variant="outline"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
-      case 'failed':
-        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Failed</Badge>
-      default:
-        return <Badge variant="outline">{status}</Badge>
-    }
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Sparkles className="h-8 w-8" />
+            AI Optimizer
+          </h1>
+        </div>
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Failed to Load</h3>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={fetchOptimizerData}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
-
-  if (loading) return <LoadingState message="Loading AI Optimizer data..." />
-  if (error) return <ErrorState message={error} onRetry={fetchOptimizerData} />
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Sparkles className="h-8 w-8 text-primary" />
-            AI Content Optimizer
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Sparkles className="h-8 w-8" />
+            AI Optimizer
           </h1>
           <p className="text-muted-foreground">
-            Powered by Claude AI - Optimize content for better rankings
+            AI-powered content optimization
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchOptimizerData}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button>
-                <Play className="h-4 w-4 mr-2" />
-                New Optimization
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Start AI Optimization</DialogTitle>
-                <DialogDescription>
-                  Select a client to optimize their content using AI
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Select Client</label>
-                  <Select value={selectedClient} onValueChange={setSelectedClient}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a client..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {optimizerData.clients.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setSelectedClient('')}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleOptimize} disabled={!selectedClient || optimizing}>
-                    {optimizing ? 'Starting...' : 'Start Optimization'}
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+        <Button onClick={fetchOptimizerData} variant="outline">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total Optimizations</CardTitle>
-            <Sparkles className="h-4 w-4 text-muted-foreground" />
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{optimizerData.stats.totalOptimizations}</div>
-            <p className="text-xs text-muted-foreground">All time</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
             <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {optimizerData.stats.successRate}%
-            </div>
-            <Progress value={parseFloat(optimizerData.stats.successRate)} className="h-2 mt-2" />
+            <div className="text-2xl font-bold">{optimizerData.stats.successRate}%</div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Avg Improvement</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              +{optimizerData.stats.avgImprovement}%
-            </div>
-            <p className="text-xs text-muted-foreground">Content score</p>
+            <div className="text-2xl font-bold">+{optimizerData.stats.avgImprovement}%</div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-            <Zap className="h-4 w-4 text-muted-foreground" />
+            <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{optimizerData.stats.inProgress}</div>
-            <p className="text-xs text-muted-foreground">Currently optimizing</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="queue" className="space-y-4">
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Optimize</CardTitle>
+          <CardDescription>Start a new optimization job</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-4">
+            <Select value={selectedClient} onValueChange={setSelectedClient}>
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder="Select a client..." />
+              </SelectTrigger>
+              <SelectContent>
+                {optimizerData.clients.map(client => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={handleOptimize} disabled={optimizing || !selectedClient}>
+              {optimizing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4 mr-2" />
+                  Optimize
+                </>
+              )}
+            </Button>
+            <Button onClick={handleBulkOptimize} disabled={optimizing || !selectedClient} variant="outline">
+              <Zap className="h-4 w-4 mr-2" />
+              Bulk Optimize
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Queue and History */}
+      <Tabs defaultValue="queue">
         <TabsList>
-          <TabsTrigger value="queue">Optimization Queue</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
-          <TabsTrigger value="comparisons">Before/After</TabsTrigger>
+          <TabsTrigger value="queue">
+            Queue ({optimizerData.queue.length})
+          </TabsTrigger>
+          <TabsTrigger value="history">
+            History ({optimizerData.history.length})
+          </TabsTrigger>
         </TabsList>
 
-        {/* Queue Tab */}
         <TabsContent value="queue" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Active Optimization Queue</CardTitle>
-              <CardDescription>
-                Content currently being optimized by AI
-              </CardDescription>
+              <CardTitle>Optimization Queue</CardTitle>
+              <CardDescription>Jobs waiting to be processed</CardDescription>
             </CardHeader>
             <CardContent>
               {optimizerData.queue.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No optimizations in queue</p>
-                  <Button className="mt-4" onClick={() => document.querySelector('[data-dialog-trigger]')?.click()}>
-                    Start Optimization
-                  </Button>
+                  No jobs in queue
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Client</TableHead>
-                      <TableHead>Content Type</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Progress</TableHead>
-                      <TableHead>Started</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {optimizerData.queue.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.clientName}</TableCell>
-                        <TableCell>{item.contentType}</TableCell>
-                        <TableCell>{getStatusBadge(item.status)}</TableCell>
-                        <TableCell>
-                          <Progress value={item.progress || 0} className="h-2" />
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {new Date(item.startedAt).toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <Button size="sm" variant="ghost">
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <div className="space-y-2">
+                  {optimizerData.queue.map((job, idx) => (
+                    <div key={job.id || idx} className="flex items-center justify-between p-3 border rounded">
+                      <div>
+                        <p className="font-medium">{job.clientName || job.clientId}</p>
+                        <p className="text-sm text-muted-foreground">{job.contentType}</p>
+                      </div>
+                      <Badge variant={job.status === 'processing' ? 'default' : 'secondary'}>
+                        {job.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* History Tab */}
         <TabsContent value="history" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Optimization History</CardTitle>
-              <CardDescription>
-                Past AI content optimization results
-              </CardDescription>
+              <CardDescription>Recently completed optimizations</CardDescription>
             </CardHeader>
             <CardContent>
               {optimizerData.history.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  No optimization history yet
+                  No history yet
                 </div>
               ) : (
                 <Table>
@@ -352,39 +437,21 @@ export function AIOptimizerPage() {
                       <TableHead>Client</TableHead>
                       <TableHead>Content</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Improvement</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead className="text-right">Improvement</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {optimizerData.history.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.clientName}</TableCell>
-                        <TableCell>{item.contentTitle || item.contentType}</TableCell>
-                        <TableCell>{getStatusBadge(item.status)}</TableCell>
+                    {optimizerData.history.slice(0, 20).map((item, idx) => (
+                      <TableRow key={item.id || idx}>
+                        <TableCell>{item.clientName || item.clientId}</TableCell>
+                        <TableCell>{item.contentType}</TableCell>
                         <TableCell>
-                          {item.improvement ? (
-                            <Badge variant="default">
-                              <TrendingUp className="h-3 w-3 mr-1" />
-                              +{item.improvement}%
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">N/A</span>
-                          )}
+                          <Badge variant={item.status === 'completed' ? 'default' : 'destructive'}>
+                            {item.status}
+                          </Badge>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {new Date(item.completedAt).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setSelectedComparison(item)}
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            View
-                          </Button>
+                        <TableCell className="text-right">
+                          {item.improvement ? `+${item.improvement}%` : 'N/A'}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -394,108 +461,7 @@ export function AIOptimizerPage() {
             </CardContent>
           </Card>
         </TabsContent>
-
-        {/* Comparisons Tab */}
-        <TabsContent value="comparisons" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Before & After Comparisons</CardTitle>
-              <CardDescription>
-                See the improvements made by AI optimization
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {selectedComparison ? (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-lg">{selectedComparison.clientName}</h3>
-                    <Button variant="outline" onClick={() => setSelectedComparison(null)}>
-                      Close
-                    </Button>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <h4 className="font-medium flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        Before Optimization
-                      </h4>
-                      <div className="border rounded-lg p-4 bg-muted/50">
-                        <p className="text-sm">{selectedComparison.beforeContent || 'Original content...'}</p>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <BarChart3 className="h-4 w-4" />
-                        Score: {selectedComparison.beforeScore || 'N/A'}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <h4 className="font-medium flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-primary" />
-                        After Optimization
-                      </h4>
-                      <div className="border rounded-lg p-4 bg-primary/5">
-                        <p className="text-sm">{selectedComparison.afterContent || 'Optimized content...'}</p>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <BarChart3 className="h-4 w-4" />
-                        Score: {selectedComparison.afterScore || 'N/A'}
-                        {selectedComparison.improvement && (
-                          <Badge variant="default">
-                            <TrendingUp className="h-3 w-3 mr-1" />
-                            +{selectedComparison.improvement}%
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {selectedComparison.suggestions && (
-                    <div className="border rounded-lg p-4 mt-4">
-                      <h4 className="font-medium mb-2">AI Suggestions Applied:</h4>
-                      <ul className="space-y-1 text-sm">
-                        {selectedComparison.suggestions.map((suggestion, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5" />
-                            <span>{suggestion}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  Select an optimization from the History tab to view comparison
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
-
-      {/* Bulk Actions Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Bulk Operations</CardTitle>
-          <CardDescription>
-            Optimize content for multiple clients at once
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">
-                Run AI optimization for all clients that need content improvements
-              </p>
-            </div>
-            <Button onClick={handleBulkOptimize} disabled={optimizing}>
-              <Zap className="h-4 w-4 mr-2" />
-              {optimizing ? 'Processing...' : 'Bulk Optimize'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

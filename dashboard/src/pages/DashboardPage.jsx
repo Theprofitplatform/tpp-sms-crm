@@ -1,42 +1,66 @@
+import { useMemo } from 'react'
 import { StatsCards } from '@/components/StatsCards'
 import { ClientsTable } from '@/components/ClientsTable'
 import { RecentActivity } from '@/components/RecentActivity'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, Download } from 'lucide-react'
-import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { RefreshCw, Download, Loader2 } from 'lucide-react'
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 
-export function DashboardPage({ data = {}, onClientClick }) {
-  const { stats = {}, clients = [], activities = [] } = data
+import { clientAPI, analyticsAPI } from '@/services/api'
+import { useAPIData } from '@/hooks/useAPIRequest'
 
-  // Sample data for charts (replace with real API data)
-  const rankingsData = [
-    { date: 'Jan', avgRank: 15, topKeywords: 12 },
-    { date: 'Feb', avgRank: 13, topKeywords: 18 },
-    { date: 'Mar', avgRank: 11, topKeywords: 22 },
-    { date: 'Apr', avgRank: 9, topKeywords: 28 },
-    { date: 'May', avgRank: 7, topKeywords: 35 },
-    { date: 'Jun', avgRank: 6, topKeywords: 42 }
-  ]
+export default function DashboardPage({ onClientClick }) {
+  // API Requests
+  const { data: dashboardData, loading: loadingDashboard, refetch: refetchDashboard } = useAPIData(
+    () => clientAPI.getAll(),
+    { autoFetch: true }
+  )
 
-  const trafficData = [
-    { date: 'Jan', organic: 1200, direct: 400, referral: 200 },
-    { date: 'Feb', organic: 1800, direct: 500, referral: 300 },
-    { date: 'Mar', organic: 2400, direct: 600, referral: 400 },
-    { date: 'Apr', organic: 3200, direct: 700, referral: 500 },
-    { date: 'May', organic: 4100, direct: 800, referral: 600 },
-    { date: 'Jun', organic: 5200, direct: 900, referral: 700 }
-  ]
+  const { data: analyticsData, loading: loadingAnalytics } = useAPIData(
+    () => analyticsAPI.getDailyStats(30),
+    { autoFetch: true }
+  )
 
-  const conversionsData = [
-    { date: 'Jan', leads: 15, conversions: 5 },
-    { date: 'Feb', leads: 22, conversions: 8 },
-    { date: 'Mar', leads: 30, conversions: 12 },
-    { date: 'Apr', leads: 42, conversions: 18 },
-    { date: 'May', leads: 55, conversions: 24 },
-    { date: 'Jun', leads: 68, conversions: 32 }
-  ]
+  const loading = loadingDashboard || loadingAnalytics
+
+  const stats = dashboardData?.stats || {}
+  const clients = dashboardData?.clients || []
+  const activities = dashboardData?.activities || []
+
+  // Transform analytics data for charts
+  const chartData = useMemo(() => {
+    const daily = analyticsData?.dailyStats || []
+    
+    return {
+      rankings: daily.map(d => ({
+        date: new Date(d.date).toLocaleDateString('en-US', { month: 'short' }),
+        avgRank: d.avgPosition || 0,
+        topKeywords: d.topKeywordsCount || 0
+      })),
+      traffic: daily.map(d => ({
+        date: new Date(d.date).toLocaleDateString('en-US', { month: 'short' }),
+        organic: d.organicTraffic || 0,
+        direct: d.directTraffic || 0,
+        referral: d.referralTraffic || 0
+      })),
+      conversions: daily.map(d => ({
+        date: new Date(d.date).toLocaleDateString('en-US', { month: 'short' }),
+        leads: d.leads || 0,
+        conversions: d.conversions || 0
+      }))
+    }
+  }, [analyticsData])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading dashboard...</span>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -49,7 +73,7 @@ export function DashboardPage({ data = {}, onClientClick }) {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={refetchDashboard}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -65,12 +89,9 @@ export function DashboardPage({ data = {}, onClientClick }) {
 
       {/* Main Content */}
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Clients Overview */}
         <div className="lg:col-span-2">
           <ClientsTable clients={clients} onClientClick={onClientClick} />
         </div>
-
-        {/* Recent Activity */}
         <RecentActivity activities={activities} />
       </div>
 
@@ -90,7 +111,7 @@ export function DashboardPage({ data = {}, onClientClick }) {
 
             <TabsContent value="rankings" className="space-y-4">
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={rankingsData}>
+                <LineChart data={chartData.rankings}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
@@ -104,7 +125,6 @@ export function DashboardPage({ data = {}, onClientClick }) {
                     stroke="#8884d8"
                     strokeWidth={2}
                     name="Average Rank"
-                    dot={{ fill: '#8884d8' }}
                   />
                   <Line
                     yAxisId="right"
@@ -113,7 +133,6 @@ export function DashboardPage({ data = {}, onClientClick }) {
                     stroke="#82ca9d"
                     strokeWidth={2}
                     name="Top 10 Keywords"
-                    dot={{ fill: '#82ca9d' }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -121,51 +140,30 @@ export function DashboardPage({ data = {}, onClientClick }) {
 
             <TabsContent value="traffic" className="space-y-4">
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={trafficData}>
+                <AreaChart data={chartData.traffic}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey="organic"
-                    stackId="1"
-                    stroke="#8884d8"
-                    fill="#8884d8"
-                    name="Organic Traffic"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="direct"
-                    stackId="1"
-                    stroke="#82ca9d"
-                    fill="#82ca9d"
-                    name="Direct Traffic"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="referral"
-                    stackId="1"
-                    stroke="#ffc658"
-                    fill="#ffc658"
-                    name="Referral Traffic"
-                  />
+                  <Area type="monotone" dataKey="organic" stackId="1" stroke="#8884d8" fill="#8884d8" name="Organic" />
+                  <Area type="monotone" dataKey="direct" stackId="1" stroke="#82ca9d" fill="#82ca9d" name="Direct" />
+                  <Area type="monotone" dataKey="referral" stackId="1" stroke="#ffc658" fill="#ffc658" name="Referral" />
                 </AreaChart>
               </ResponsiveContainer>
             </TabsContent>
 
             <TabsContent value="conversions" className="space-y-4">
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={conversionsData}>
+                <LineChart data={chartData.conversions}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="leads" fill="#8884d8" name="Leads Generated" />
-                  <Bar dataKey="conversions" fill="#82ca9d" name="Conversions" />
-                </BarChart>
+                  <Line type="monotone" dataKey="leads" stroke="#8884d8" strokeWidth={2} name="Leads" />
+                  <Line type="monotone" dataKey="conversions" stroke="#82ca9d" strokeWidth={2} name="Conversions" />
+                </LineChart>
               </ResponsiveContainer>
             </TabsContent>
           </Tabs>

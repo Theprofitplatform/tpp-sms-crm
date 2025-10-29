@@ -1,9 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useToast } from '@/hooks/use-toast'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+
+import { brandingAPI } from '@/services/api'
+import { useAPIRequest } from '@/hooks/useAPIRequest'
+import { VALIDATION_PATTERNS, FILE_LIMITS } from '@/constants'
+
 import {
   Palette,
   Upload,
@@ -13,13 +21,39 @@ import {
   Paintbrush,
   Type,
   Image as ImageIcon,
-  Layers
+  Layers,
+  Loader2,
+  AlertCircle,
+  X
 } from 'lucide-react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useToast } from '@/hooks/use-toast'
 
-export function WhiteLabelPage() {
+// SECURITY: Sanitize CSS to prevent XSS
+const sanitizeCSS = (css) => {
+  if (!css) return ''
+  
+  // Remove dangerous CSS patterns
+  const dangerous = [
+    /javascript:/gi,
+    /expression\s*\(/gi,
+    /import\s*\[/gi,
+    /@import/gi,
+    /behavior\s*:/gi,
+    /-moz-binding/gi,
+    /vbscript:/gi,
+    /data:text\/html/gi
+  ]
+
+  let sanitized = css
+  dangerous.forEach(pattern => {
+    sanitized = sanitized.replace(pattern, '')
+  })
+
+  return sanitized
+}
+
+export default function WhiteLabelPage() {
   const { toast } = useToast()
+  
   const [loading, setLoading] = useState(true)
   const [hasChanges, setHasChanges] = useState(false)
   const [branding, setBranding] = useState({
@@ -38,46 +72,181 @@ export function WhiteLabelPage() {
     reportHeader: '',
     reportFooter: ''
   })
-
+  
   const [preview, setPreview] = useState(false)
+  const [errors, setErrors] = useState({})
 
+  // Refs for cleanup
+  const fileReadersRef = useRef([])
+  const abortControllerRef = useRef(null)
+
+  const { execute: saveBranding, loading: saving } = useAPIRequest()
+  const { execute: uploadImage, loading: uploading } = useAPIRequest()
+
+  // Load branding settings
   useEffect(() => {
-    fetchBrandingSettings()
+    const loadSettings = async () => {
+      // Cancel any pending request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+
+      abortControllerRef.current = new AbortController()
+
+      try {
+        const response = await fetch('/api/branding', {
+          signal: abortControllerRef.current.signal
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setBranding(data)
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Error loading branding:', err)
+        }
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadSettings()
+
+    // Cleanup
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
   }, [])
 
-  const fetchBrandingSettings = async () => {
-    setLoading(false)
-    // In real implementation, fetch from backend
-    // For now, using default values above
-  }
-
-  const handleInputChange = (field, value) => {
-    setBranding({ ...branding, [field]: value })
-    setHasChanges(true)
-  }
-
-  const handleFileUpload = (field, event) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setBranding({ ...branding, [field]: reader.result })
-        setHasChanges(true)
-      }
-      reader.readAsDataURL(file)
+  // Cleanup FileReaders on unmount
+  useEffect(() => {
+    return () => {
+      // Abort all active FileReaders
+      fileReadersRef.current.forEach(reader => {
+        if (reader && reader.readyState === 1) {
+          reader.abort()
+        }
+      })
+      fileReadersRef.current = []
     }
-  }
+  }, [])
 
-  const handleSave = () => {
-    // In real implementation, save to backend
-    toast({
-      title: "Branding Saved",
-      description: "Your white-label settings have been updated successfully.",
+  const validateColor = useCallback((color) => {
+    return VALIDATION_PATTERNS.HEX_COLOR.test(color)
+  }, [])
+
+  const handleInputChange = useCallback((field, value) => {
+    // Validate hex colors
+    if (field.includes('Color') && !validateColor(value)) {
+      setErrors(prev => ({ ...prev, [field]: 'Invalid hex color format' }))
+      return
+    }
+
+    // Clear error for this field
+    setErrors(prev => {
+      const newErrors = { ...prev }
+      delete newErrors[field]
+      return newErrors
     })
-    setHasChanges(false)
-  }
 
-  const handleReset = () => {
+    // SECURITY: Sanitize CSS input
+    if (field === 'customCSS') {
+      value = sanitizeCSS(value)
+    }
+
+    setBranding(prev => ({ ...prev, [field]: value }))
+    setHasChanges(true)
+  }, [validateColor])
+
+  const handleFileUpload = useCallback((field, event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Validate file size
+    const maxSize = field === 'logo' || field === 'favicon' ? FILE_LIMITS.MAX_IMAGE_SIZE : FILE_LIMITS.MAX_SIZE
+    if (file.size > maxSize) {
+      toast({
+        title: 'File Too Large',
+        description: `File must be smaller than ${maxSize / (1024 * 1024)}MB`,
+        variant: 'destructive'
+      })
+      return
+    }
+
+    // Validate file type
+    if (!FILE_LIMITS.ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      toast({
+        title: 'Invalid File Type',
+        description: 'Please upload an image file (JPEG, PNG, GIF, WebP, or SVG)',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    const reader = new FileReader()
+    
+    // Track FileReader for cleanup
+    fileReadersRef.current.push(reader)
+
+    reader.onloadend = () => {
+      setBranding(prev => ({ ...prev, [field]: reader.result }))
+      setHasChanges(true)
+      
+      // Remove from tracking array
+      fileReadersRef.current = fileReadersRef.current.filter(r => r !== reader)
+    }
+
+    reader.onerror = () => {
+      toast({
+        title: 'Upload Failed',
+        description: 'Failed to read file',
+        variant: 'destructive'
+      })
+      
+      // Remove from tracking array
+      fileReadersRef.current = fileReadersRef.current.filter(r => r !== reader)
+    }
+
+    reader.readAsDataURL(file)
+  }, [toast])
+
+  const handleSave = useCallback(async () => {
+    // Validate all colors
+    const colorFields = ['primaryColor', 'secondaryColor', 'accentColor', 'textColor', 'backgroundColor', 'sidebarColor']
+    const colorErrors = {}
+    
+    colorFields.forEach(field => {
+      if (!validateColor(branding[field])) {
+        colorErrors[field] = 'Invalid hex color format'
+      }
+    })
+
+    if (Object.keys(colorErrors).length > 0) {
+      setErrors(colorErrors)
+      toast({
+        title: 'Validation Error',
+        description: 'Please fix the color format errors',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    await saveBranding(
+      () => brandingAPI.updateSettings(branding),
+      {
+        showSuccessToast: true,
+        successMessage: 'Branding settings saved successfully',
+        onSuccess: () => {
+          setHasChanges(false)
+        }
+      }
+    )
+  }, [branding, saveBranding, validateColor, toast])
+
+  const handleReset = useCallback(() => {
     setBranding({
       companyName: 'SEO Expert',
       logo: null,
@@ -95,33 +264,18 @@ export function WhiteLabelPage() {
       reportFooter: ''
     })
     setHasChanges(false)
+    setErrors({})
     toast({
-      title: "Reset to Defaults",
-      description: "All branding settings have been reset.",
-      variant: "destructive"
+      title: 'Reset to Defaults',
+      description: 'All branding settings have been reset.'
     })
-  }
-
-  const fontOptions = [
-    { value: 'Inter', label: 'Inter (Modern Sans-serif)' },
-    { value: 'Roboto', label: 'Roboto (Google Sans-serif)' },
-    { value: 'Open Sans', label: 'Open Sans (Clean & Professional)' },
-    { value: 'Lato', label: 'Lato (Corporate)' },
-    { value: 'Poppins', label: 'Poppins (Modern)' },
-    { value: 'Montserrat', label: 'Montserrat (Elegant)' },
-    { value: 'Source Sans Pro', label: 'Source Sans Pro (Technical)' },
-    { value: 'Georgia', label: 'Georgia (Serif)' }
-  ]
+  }, [toast])
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">White-Label Branding</h1>
-            <p className="text-muted-foreground">Loading settings...</p>
-          </div>
-        </div>
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading branding settings...</span>
       </div>
     )
   }
@@ -131,451 +285,217 @@ export function WhiteLabelPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">White-Label Branding</h1>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Palette className="h-8 w-8" />
+            White Label Branding
+          </h1>
           <p className="text-muted-foreground">
-            Customize the appearance and branding of your dashboard
+            Customize the look and feel of your platform
           </p>
         </div>
 
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setPreview(!preview)}
-          >
-            <Eye className="h-4 w-4 mr-2" />
-            {preview ? 'Edit' : 'Preview'}
-          </Button>
-          {hasChanges && (
-            <>
-              <Button variant="outline" onClick={handleReset}>
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Reset
-              </Button>
-              <Button onClick={handleSave}>
-                <Save className="h-4 w-4 mr-2" />
-                Save Changes
-              </Button>
-            </>
-          )}
-        </div>
+        {hasChanges && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleReset} disabled={saving}>
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reset
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
 
+      {/* Unsaved changes alert */}
       {hasChanges && (
-        <Card className="border-yellow-500 bg-yellow-50">
-          <CardContent className="py-4">
-            <div className="flex items-center gap-2 text-yellow-900">
-              <Palette className="h-5 w-5" />
-              <p className="font-medium">You have unsaved changes</p>
-            </div>
-          </CardContent>
-        </Card>
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            You have unsaved changes. Don't forget to save before leaving.
+          </AlertDescription>
+        </Alert>
       )}
 
-      <Tabs defaultValue="branding" className="space-y-4">
+      <Tabs defaultValue="general">
         <TabsList>
-          <TabsTrigger value="branding">Branding</TabsTrigger>
+          <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="colors">Colors</TabsTrigger>
-          <TabsTrigger value="typography">Typography</TabsTrigger>
           <TabsTrigger value="assets">Assets</TabsTrigger>
-          <TabsTrigger value="custom">Custom Code</TabsTrigger>
+          <TabsTrigger value="custom">Custom CSS</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="branding" className="space-y-4">
+        {/* General Settings */}
+        <TabsContent value="general" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Company Information</CardTitle>
-              <CardDescription>
-                Set your company name and basic branding information
-              </CardDescription>
+              <CardDescription>Basic company branding details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="companyName">Company Name</Label>
+                <Label htmlFor="company-name">Company Name</Label>
                 <Input
-                  id="companyName"
+                  id="company-name"
                   value={branding.companyName}
                   onChange={(e) => handleInputChange('companyName', e.target.value)}
                   placeholder="Your Company Name"
                 />
-                <p className="text-xs text-muted-foreground">
-                  This will appear in the header, emails, and reports
-                </p>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="logo">Company Logo</Label>
-                  <div className="flex items-center gap-4">
-                    {branding.logo && (
-                      <div className="w-32 h-32 border rounded-lg flex items-center justify-center bg-muted overflow-hidden">
-                        <img src={branding.logo} alt="Logo" className="max-w-full max-h-full" />
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <Button variant="outline" className="w-full" asChild>
-                        <label htmlFor="logo-upload" className="cursor-pointer">
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload Logo
-                        </label>
-                      </Button>
-                      <input
-                        id="logo-upload"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => handleFileUpload('logo', e)}
-                      />
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Recommended: 200x200px PNG with transparent background
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="favicon">Favicon</Label>
-                  <div className="flex items-center gap-4">
-                    {branding.favicon && (
-                      <div className="w-16 h-16 border rounded-lg flex items-center justify-center bg-muted overflow-hidden">
-                        <img src={branding.favicon} alt="Favicon" className="max-w-full max-h-full" />
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <Button variant="outline" className="w-full" asChild>
-                        <label htmlFor="favicon-upload" className="cursor-pointer">
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload Favicon
-                        </label>
-                      </Button>
-                      <input
-                        id="favicon-upload"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => handleFileUpload('favicon', e)}
-                      />
-                      <p className="text-xs text-muted-foreground mt-2">
-                        32x32px or 64x64px PNG/ICO
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="font-family">Font Family</Label>
+                <select
+                  id="font-family"
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                  value={branding.fontFamily}
+                  onChange={(e) => handleInputChange('fontFamily', e.target.value)}
+                >
+                  <option value="Inter">Inter</option>
+                  <option value="Roboto">Roboto</option>
+                  <option value="Open Sans">Open Sans</option>
+                  <option value="Lato">Lato</option>
+                  <option value="Poppins">Poppins</option>
+                </select>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* Colors */}
         <TabsContent value="colors" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Color Scheme</CardTitle>
-              <CardDescription>
-                Customize the color palette of your dashboard
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="primaryColor">Primary Color</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="primaryColor"
-                      type="color"
-                      value={branding.primaryColor}
-                      onChange={(e) => handleInputChange('primaryColor', e.target.value)}
-                      className="w-20 h-10 cursor-pointer"
-                    />
-                    <Input
-                      value={branding.primaryColor}
-                      onChange={(e) => handleInputChange('primaryColor', e.target.value)}
-                      placeholder="#3b82f6"
-                      className="flex-1"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Main buttons, links, and highlights
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="secondaryColor">Secondary Color</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="secondaryColor"
-                      type="color"
-                      value={branding.secondaryColor}
-                      onChange={(e) => handleInputChange('secondaryColor', e.target.value)}
-                      className="w-20 h-10 cursor-pointer"
-                    />
-                    <Input
-                      value={branding.secondaryColor}
-                      onChange={(e) => handleInputChange('secondaryColor', e.target.value)}
-                      placeholder="#8b5cf6"
-                      className="flex-1"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Secondary actions and accents
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="accentColor">Accent Color</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="accentColor"
-                      type="color"
-                      value={branding.accentColor}
-                      onChange={(e) => handleInputChange('accentColor', e.target.value)}
-                      className="w-20 h-10 cursor-pointer"
-                    />
-                    <Input
-                      value={branding.accentColor}
-                      onChange={(e) => handleInputChange('accentColor', e.target.value)}
-                      placeholder="#10b981"
-                      className="flex-1"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Success states and call-outs
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="textColor">Text Color</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="textColor"
-                      type="color"
-                      value={branding.textColor}
-                      onChange={(e) => handleInputChange('textColor', e.target.value)}
-                      className="w-20 h-10 cursor-pointer"
-                    />
-                    <Input
-                      value={branding.textColor}
-                      onChange={(e) => handleInputChange('textColor', e.target.value)}
-                      placeholder="#1f2937"
-                      className="flex-1"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Primary text color
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="backgroundColor">Background Color</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="backgroundColor"
-                      type="color"
-                      value={branding.backgroundColor}
-                      onChange={(e) => handleInputChange('backgroundColor', e.target.value)}
-                      className="w-20 h-10 cursor-pointer"
-                    />
-                    <Input
-                      value={branding.backgroundColor}
-                      onChange={(e) => handleInputChange('backgroundColor', e.target.value)}
-                      placeholder="#ffffff"
-                      className="flex-1"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Main background color
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="sidebarColor">Sidebar Color</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="sidebarColor"
-                      type="color"
-                      value={branding.sidebarColor}
-                      onChange={(e) => handleInputChange('sidebarColor', e.target.value)}
-                      className="w-20 h-10 cursor-pointer"
-                    />
-                    <Input
-                      value={branding.sidebarColor}
-                      onChange={(e) => handleInputChange('sidebarColor', e.target.value)}
-                      placeholder="#f9fafb"
-                      className="flex-1"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Sidebar background color
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-6 p-4 border rounded-lg bg-muted/50">
-                <h4 className="font-semibold mb-3">Color Preview</h4>
-                <div className="flex gap-2">
-                  <div
-                    className="w-16 h-16 rounded-lg border"
-                    style={{ backgroundColor: branding.primaryColor }}
-                    title="Primary"
-                  />
-                  <div
-                    className="w-16 h-16 rounded-lg border"
-                    style={{ backgroundColor: branding.secondaryColor }}
-                    title="Secondary"
-                  />
-                  <div
-                    className="w-16 h-16 rounded-lg border"
-                    style={{ backgroundColor: branding.accentColor }}
-                    title="Accent"
-                  />
-                  <div
-                    className="w-16 h-16 rounded-lg border"
-                    style={{ backgroundColor: branding.textColor }}
-                    title="Text"
-                  />
-                  <div
-                    className="w-16 h-16 rounded-lg border"
-                    style={{ backgroundColor: branding.backgroundColor }}
-                    title="Background"
-                  />
-                  <div
-                    className="w-16 h-16 rounded-lg border"
-                    style={{ backgroundColor: branding.sidebarColor }}
-                    title="Sidebar"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="typography" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Typography</CardTitle>
-              <CardDescription>
-                Choose fonts and text styles for your dashboard
-              </CardDescription>
+              <CardDescription>Customize your brand colors</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="fontFamily">Font Family</Label>
-                <select
-                  id="fontFamily"
-                  value={branding.fontFamily}
-                  onChange={(e) => handleInputChange('fontFamily', e.target.value)}
-                  className="w-full h-10 px-3 border rounded-md bg-background"
-                >
-                  {fontOptions.map(font => (
-                    <option key={font.value} value={font.value}>
-                      {font.label}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-muted-foreground">
-                  This font will be used throughout the dashboard
-                </p>
-              </div>
-
-              <div className="p-6 border rounded-lg bg-muted/50" style={{ fontFamily: branding.fontFamily }}>
-                <h2 className="text-2xl font-bold mb-2">Preview Heading</h2>
-                <p className="text-base mb-2">
-                  This is how regular paragraph text will appear in the dashboard using your selected font family.
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Small text and descriptions will look like this.
-                </p>
-              </div>
+              {[
+                { field: 'primaryColor', label: 'Primary Color' },
+                { field: 'secondaryColor', label: 'Secondary Color' },
+                { field: 'accentColor', label: 'Accent Color' },
+                { field: 'textColor', label: 'Text Color' },
+                { field: 'backgroundColor', label: 'Background Color' },
+                { field: 'sidebarColor', label: 'Sidebar Color' }
+              ].map(({ field, label }) => (
+                <div key={field} className="space-y-2">
+                  <Label htmlFor={field}>{label}</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id={field}
+                      type="color"
+                      value={branding[field]}
+                      onChange={(e) => handleInputChange(field, e.target.value)}
+                      className="w-20 h-10"
+                    />
+                    <Input
+                      value={branding[field]}
+                      onChange={(e) => handleInputChange(field, e.target.value)}
+                      placeholder="#000000"
+                      pattern="^#[0-9A-Fa-f]{6}$"
+                      aria-invalid={!!errors[field]}
+                    />
+                  </div>
+                  {errors[field] && (
+                    <p className="text-sm text-red-500">{errors[field]}</p>
+                  )}
+                </div>
+              ))}
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* Assets */}
         <TabsContent value="assets" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Email & Report Templates</CardTitle>
-              <CardDescription>
-                Customize headers and footers for emails and reports
-              </CardDescription>
+              <CardTitle>Brand Assets</CardTitle>
+              <CardDescription>Upload your logo and favicon</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="emailFooter">Email Footer HTML</Label>
-                <textarea
-                  id="emailFooter"
-                  value={branding.emailFooter}
-                  onChange={(e) => handleInputChange('emailFooter', e.target.value)}
-                  className="w-full min-h-[150px] p-3 border rounded-md font-mono text-sm"
-                  placeholder="<footer>&#10;  <p>&copy; 2024 Your Company. All rights reserved.</p>&#10;</footer>"
-                />
-                <p className="text-xs text-muted-foreground">
-                  This HTML will be added to the bottom of all emails
-                </p>
+                <Label>Company Logo</Label>
+                <div className="flex items-center gap-4">
+                  {branding.logo && (
+                    <img src={branding.logo} alt="Logo" className="h-16 w-16 object-contain border rounded" />
+                  )}
+                  <div>
+                    <input
+                      type="file"
+                      id="logo-upload"
+                      accept="image/*"
+                      onChange={(e) => handleFileUpload('logo', e)}
+                      className="hidden"
+                    />
+                    <Button asChild variant="outline">
+                      <label htmlFor="logo-upload" className="cursor-pointer">
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload Logo
+                      </label>
+                    </Button>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="reportHeader">Report Header HTML</Label>
-                <textarea
-                  id="reportHeader"
-                  value={branding.reportHeader}
-                  onChange={(e) => handleInputChange('reportHeader', e.target.value)}
-                  className="w-full min-h-[150px] p-3 border rounded-md font-mono text-sm"
-                  placeholder="<header>&#10;  <h1>SEO Performance Report</h1>&#10;</header>"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Appears at the top of generated reports
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="reportFooter">Report Footer HTML</Label>
-                <textarea
-                  id="reportFooter"
-                  value={branding.reportFooter}
-                  onChange={(e) => handleInputChange('reportFooter', e.target.value)}
-                  className="w-full min-h-[150px] p-3 border rounded-md font-mono text-sm"
-                  placeholder="<footer>&#10;  <p>Report generated by Your Company</p>&#10;</footer>"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Appears at the bottom of generated reports
-                </p>
+                <Label>Favicon</Label>
+                <div className="flex items-center gap-4">
+                  {branding.favicon && (
+                    <img src={branding.favicon} alt="Favicon" className="h-8 w-8 object-contain border rounded" />
+                  )}
+                  <div>
+                    <input
+                      type="file"
+                      id="favicon-upload"
+                      accept="image/*"
+                      onChange={(e) => handleFileUpload('favicon', e)}
+                      className="hidden"
+                    />
+                    <Button asChild variant="outline">
+                      <label htmlFor="favicon-upload" className="cursor-pointer">
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload Favicon
+                      </label>
+                    </Button>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* Custom CSS */}
         <TabsContent value="custom" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Custom CSS</CardTitle>
-              <CardDescription>
-                Add custom CSS to further customize the dashboard appearance
-              </CardDescription>
+              <CardDescription>Add custom styling (sanitized for security)</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="customCSS">Custom CSS Code</Label>
-                <textarea
-                  id="customCSS"
-                  value={branding.customCSS}
-                  onChange={(e) => handleInputChange('customCSS', e.target.value)}
-                  className="w-full min-h-[300px] p-3 border rounded-md font-mono text-sm"
-                  placeholder="/* Add your custom CSS here */&#10;.sidebar {&#10;  background-color: #1a1a1a;&#10;}&#10;&#10;.button-primary {&#10;  border-radius: 8px;&#10;}"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Advanced customization using CSS. Changes will be applied globally.
-                </p>
-              </div>
-
-              <Card className="border-yellow-500 bg-yellow-50">
-                <CardContent className="py-4">
-                  <div className="flex gap-2 text-yellow-900 text-sm">
-                    <Layers className="h-5 w-5 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium mb-1">Advanced Feature</p>
-                      <p>Be careful when adding custom CSS. Invalid CSS may break the dashboard appearance. Always test changes before saving.</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+            <CardContent>
+              <Alert className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Custom CSS is automatically sanitized to prevent security vulnerabilities.
+                  Dangerous patterns like javascript:, expression(), and @import are blocked.
+                </AlertDescription>
+              </Alert>
+              
+              <textarea
+                className="flex min-h-[200px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
+                placeholder=".custom-class { color: #333; }"
+                value={branding.customCSS}
+                onChange={(e) => handleInputChange('customCSS', e.target.value)}
+              />
             </CardContent>
           </Card>
         </TabsContent>

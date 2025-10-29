@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useToast } from '@/hooks/use-toast'
 import {
   Bell,
   Mail,
@@ -12,13 +13,16 @@ import {
   Smartphone,
   CheckCircle2,
   Settings,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react'
-import { LoadingState } from '@/components/LoadingState'
 
-export function NotificationCenterPage() {
+import { notificationsAPI } from '@/services/api'
+import { useAPIRequest } from '@/hooks/useAPIRequest'
+
+export default function NotificationCenterPage() {
+  const { toast } = useToast()
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [settings, setSettings] = useState({
     email: {
       enabled: true,
@@ -39,41 +43,64 @@ export function NotificationCenterPage() {
     }
   })
 
-  useEffect(() => {
-    fetchSettings()
-  }, [])
+  const abortControllerRef = useRef(null)
+  const { execute: saveSettings, loading: saving } = useAPIRequest()
 
-  const fetchSettings = async () => {
+  // Memoized fetch function
+  const fetchSettings = useCallback(async () => {
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    abortControllerRef.current = new AbortController()
+
     setLoading(true)
     try {
-      const response = await fetch('/api/notifications/settings')
+      const response = await fetch('/api/notifications/settings', {
+        signal: abortControllerRef.current.signal
+      })
+      
       if (response.ok) {
         const data = await response.json()
         setSettings(data.settings || settings)
       }
     } catch (err) {
-      console.error('Error fetching notification settings:', err)
+      if (err.name !== 'AbortError') {
+        console.error('Error fetching notification settings:', err)
+        toast({
+          title: 'Failed to Load',
+          description: 'Could not load notification settings.',
+          variant: 'destructive'
+        })
+      }
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
 
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      await fetch('/api/notifications/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings)
-      })
-    } catch (err) {
-      console.error('Error saving settings:', err)
-    } finally {
-      setSaving(false)
+  useEffect(() => {
+    fetchSettings()
+
+    // Cleanup
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
     }
-  }
+  }, [fetchSettings])
 
-  const updateSetting = (channel, key, value) => {
+  const handleSave = useCallback(async () => {
+    await saveSettings(
+      () => notificationsAPI.updateSettings(settings),
+      {
+        showSuccessToast: true,
+        successMessage: 'Notification settings saved successfully'
+      }
+    )
+  }, [settings, saveSettings])
+
+  const updateSetting = useCallback((channel, key, value) => {
     setSettings(prev => ({
       ...prev,
       [channel]: {
@@ -81,9 +108,16 @@ export function NotificationCenterPage() {
         [key]: value
       }
     }))
-  }
+  }, [])
 
-  if (loading) return <LoadingState message="Loading notification settings..." />
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading notification settings...</span>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

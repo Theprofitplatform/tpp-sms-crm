@@ -16,7 +16,9 @@ import {
   Clock,
   CheckCircle,
   Eye,
-  Copy
+  Copy,
+  Zap,
+  Loader2
 } from 'lucide-react'
 import {
   Dialog,
@@ -35,12 +37,13 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/use-toast'
+import { emailAPI } from '@/services/api'
+import { useAPIRequest, useAPIData } from '@/hooks/useAPIRequest'
 
-export function EmailCampaignsPage() {
+export default function EmailCampaignsPage() {
   const { toast } = useToast()
-  const [campaigns, setCampaigns] = useState([])
-  const [templates, setTemplates] = useState([])
-  const [loading, setLoading] = useState(true)
+  
+  // State
   const [showNewCampaignModal, setShowNewCampaignModal] = useState(false)
   const [showNewTemplateModal, setShowNewTemplateModal] = useState(false)
   const [selectedCampaign, setSelectedCampaign] = useState(null)
@@ -58,9 +61,22 @@ export function EmailCampaignsPage() {
     content: ''
   })
 
-  useEffect(() => {
-    fetchCampaignsData()
-  }, [])
+  // API Requests
+  const { data: campaigns, loading: loadingCampaigns, refetch: refetchCampaigns } = useAPIData(
+    () => emailAPI.getCampaigns(),
+    { autoFetch: true, initialData: [] }
+  )
+
+  const { data: templates, loading: loadingTemplates, refetch: refetchTemplates } = useAPIData(
+    () => emailAPI.getTemplates(),
+    { autoFetch: true, initialData: [] }
+  )
+
+  const { execute: createCampaign, loading: creatingCampaign } = useAPIRequest()
+  const { execute: sendCampaign, loading: sendingCampaign } = useAPIRequest()
+  const { execute: deleteCampaignRequest } = useAPIRequest()
+
+  const loading = loadingCampaigns || loadingTemplates
 
   const fetchCampaignsData = async () => {
     setLoading(true)

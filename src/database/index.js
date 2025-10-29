@@ -2356,6 +2356,9 @@ export const whiteLabelOps = {
 // Initialize on import
 initializeDatabase();
 
+// Get DB instance function
+export const getDB = () => db;
+
 // Export database instance for custom queries
 export { db };
 
@@ -2376,5 +2379,6 @@ export default {
   leadOps,
   emailOps,
   whiteLabelOps,
-  db
+  db,
+  getDB
 };

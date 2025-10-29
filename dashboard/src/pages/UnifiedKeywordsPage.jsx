@@ -1,27 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Progress } from '@/components/ui/progress';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useToast } from '@/hooks/use-toast';
+
+import { keywordAPI } from '@/services/api';
+import { useAPIRequest, useAPIData } from '@/hooks/useAPIRequest';
+import { useDebounce } from '@/hooks/useDebounce';
+import { POLLING_INTERVALS } from '@/constants';
+
 import {
   Search,
   Filter,
@@ -33,70 +23,79 @@ import {
   Eye,
   BarChart3,
   Zap,
-  Database
+  Database,
+  Loader2
 } from 'lucide-react';
 
 export default function UnifiedKeywordsPage() {
-  const [keywords, setKeywords] = useState([]);
-  const [projects, setProjects] = useState([]);
-  const [syncStatus, setSyncStatus] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { toast } = useToast()
   const [selectedTab, setSelectedTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [stats, setStats] = useState({
-    total: 0,
-    tracking: 0,
-    research: 0,
-    opportunities: 0
-  });
+  const pollInterval = useRef(null)
 
-  // Fetch data on mount
+  const debouncedSearch = useDebounce(searchQuery, 300)
+
+  // API Requests
+  const { data: keywordsData, loading: loadingKeywords, refetch: refetchKeywords } = useAPIData(
+    () => keywordAPI.getAll(100),
+    { autoFetch: true }
+  )
+
+  const { data: projectsData, loading: loadingProjects } = useAPIData(
+    () => keywordAPI.listProjects(),
+    { autoFetch: true }
+  )
+
+  const { data: statsData, loading: loadingStats } = useAPIData(
+    () => keywordAPI.getStats(),
+    { autoFetch: true }
+  )
+
+  const { data: syncStatus, loading: loadingSync, refetch: refetchSync } = useAPIData(
+    () => keywordAPI.getSyncStatus(),
+    { autoFetch: true }
+  )
+
+  const { execute: triggerSync, loading: syncing } = useAPIRequest()
+
+  const keywords = keywordsData?.keywords || []
+  const projects = projectsData?.projects || []
+  const stats = statsData?.stats || { total: 0, tracking: 0, research: 0, opportunities: 0 }
+  const loading = loadingKeywords || loadingProjects || loadingStats || loadingSync
+
+  // Poll sync status
   useEffect(() => {
-    loadData();
-    loadSyncStatus();
-
-    // Refresh sync status every 30 seconds
-    const interval = setInterval(loadSyncStatus, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-
-      // Fetch keywords
-      const keywordsRes = await fetch('/api/v2/keywords?per_page=100');
-      const keywordsData = await keywordsRes.json();
-      setKeywords(keywordsData.keywords || []);
-
-      // Fetch projects
-      const projectsRes = await fetch('/api/v2/research/projects');
-      const projectsData = await projectsRes.json();
-      setProjects(projectsData.projects || []);
-
-      // Fetch stats
-      const statsRes = await fetch('/api/v2/keywords/stats');
-      const statsData = await statsRes.json();
-      setStats(statsData.stats || stats);
-
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setLoading(false);
+    if (syncStatus?.syncing) {
+      pollInterval.current = setInterval(() => {
+        refetchSync()
+      }, POLLING_INTERVALS.MEDIUM)
+    } else if (pollInterval.current) {
+      clearInterval(pollInterval.current)
+      pollInterval.current = null
     }
-  };
 
-  const loadSyncStatus = async () => {
-    try {
-      const res = await fetch('/api/v2/sync/status');
-      const data = await res.json();
-      setSyncStatus(data);
-    } catch (error) {
-      console.error('Error loading sync status:', error);
+    return () => {
+      if (pollInterval.current) {
+        clearInterval(pollInterval.current)
+      }
     }
-  };
+  }, [syncStatus?.syncing, refetchSync])
 
-  const triggerSync = async () => {
+  const handleTriggerSync = useCallback(async () => {
+    await triggerSync(
+      () => keywordAPI.triggerSync(),
+      {
+        showSuccessToast: true,
+        successMessage: 'Sync started successfully',
+        onSuccess: () => {
+          refetchSync()
+          refetchKeywords()
+        }
+      }
+    )
+  }, [triggerSync, refetchSync, refetchKeywords])
+
+  const handleManualSync = async () => {
     try {
       const res = await fetch('/api/v2/sync/trigger', { method: 'POST' });
       const data = await res.json();

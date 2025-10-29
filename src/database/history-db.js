@@ -286,6 +286,227 @@ export function clearOldData(daysToKeep = 90) {
   return true;
 }
 
+/**
+ * ============================================
+ * AI OPTIMIZATION TRACKING
+ * ============================================
+ */
+
+/**
+ * Add optimization record
+ */
+export function addOptimization(data) {
+  const db = readDB();
+  
+  if (!db.optimizations) {
+    db.optimizations = [];
+  }
+  
+  const record = {
+    id: `opt_${Date.now()}_${data.clientId}_${data.contentType}`,
+    clientId: data.clientId,
+    clientName: data.clientName,
+    
+    // Content Info
+    contentType: data.contentType, // 'post' | 'page' | 'homepage'
+    contentId: data.contentId,
+    contentTitle: data.contentTitle,
+    contentUrl: data.contentUrl,
+    
+    // Status
+    status: data.status || 'pending', // 'pending' | 'processing' | 'completed' | 'failed'
+    queuedAt: new Date().toISOString(),
+    startedAt: data.startedAt || null,
+    completedAt: data.completedAt || null,
+    
+    // Before State (filled when processing starts)
+    beforeScore: data.beforeScore || null,
+    beforeTitle: data.beforeTitle || null,
+    beforeMeta: data.beforeMeta || null,
+    beforeContent: data.beforeContent || null,
+    beforeIssues: data.beforeIssues || [],
+    
+    // After State (filled when processing completes)
+    afterScore: data.afterScore || null,
+    afterTitle: data.afterTitle || null,
+    afterMeta: data.afterMeta || null,
+    afterContent: data.afterContent || null,
+    improvementsApplied: data.improvementsApplied || [],
+    
+    // AI Details
+    aiProvider: data.aiProvider || null,
+    aiSuggestions: data.aiSuggestions || [],
+    
+    // Metrics
+    improvement: data.improvement || 0,
+    keywordsAdded: data.keywordsAdded || [],
+    readabilityBefore: data.readabilityBefore || null,
+    readabilityAfter: data.readabilityAfter || null,
+    
+    // Cost Tracking
+    costUSD: data.costUSD || 0,
+    tokensUsed: data.tokensUsed || 0,
+    
+    // Application Status
+    autoApplied: false,
+    reviewedBy: null,
+    appliedAt: null,
+    
+    // Error info
+    error: data.error || null
+  };
+  
+  db.optimizations.push(record);
+  
+  // Keep only last 500 optimizations
+  if (db.optimizations.length > 500) {
+    db.optimizations = db.optimizations.slice(-500);
+  }
+  
+  writeDB(db);
+  return record;
+}
+
+/**
+ * Get optimization history
+ */
+export function getOptimizationHistory(limit = 100) {
+  const db = readDB();
+  
+  if (!db.optimizations) {
+    return [];
+  }
+  
+  return db.optimizations
+    .sort((a, b) => new Date(b.queuedAt) - new Date(a.queuedAt))
+    .slice(0, limit);
+}
+
+/**
+ * Get optimization by ID
+ */
+export function getOptimizationById(id) {
+  const db = readDB();
+  
+  if (!db.optimizations) {
+    return null;
+  }
+  
+  return db.optimizations.find(opt => opt.id === id);
+}
+
+/**
+ * Update optimization status
+ */
+export function updateOptimizationStatus(id, status, error = null) {
+  const db = readDB();
+  
+  if (!db.optimizations) {
+    return false;
+  }
+  
+  const optimization = db.optimizations.find(opt => opt.id === id);
+  
+  if (!optimization) {
+    return false;
+  }
+  
+  optimization.status = status;
+  
+  if (status === 'processing' && !optimization.startedAt) {
+    optimization.startedAt = new Date().toISOString();
+  }
+  
+  if (status === 'completed' || status === 'failed') {
+    optimization.completedAt = new Date().toISOString();
+  }
+  
+  if (error) {
+    optimization.error = error;
+  }
+  
+  writeDB(db);
+  return true;
+}
+
+/**
+ * Update optimization with results
+ */
+export function updateOptimizationResults(id, results) {
+  const db = readDB();
+  
+  if (!db.optimizations) {
+    return false;
+  }
+  
+  const optimization = db.optimizations.find(opt => opt.id === id);
+  
+  if (!optimization) {
+    return false;
+  }
+  
+  // Update all fields
+  Object.assign(optimization, results);
+  
+  writeDB(db);
+  return true;
+}
+
+/**
+ * Mark optimization as applied
+ */
+export function updateOptimizationApplied(id, applied, reviewedBy = null) {
+  const db = readDB();
+  
+  if (!db.optimizations) {
+    return false;
+  }
+  
+  const optimization = db.optimizations.find(opt => opt.id === id);
+  
+  if (!optimization) {
+    return false;
+  }
+  
+  optimization.autoApplied = applied;
+  optimization.appliedAt = applied ? new Date().toISOString() : null;
+  optimization.reviewedBy = reviewedBy;
+  
+  writeDB(db);
+  return true;
+}
+
+/**
+ * Get optimization queue
+ */
+export function getOptimizationQueue() {
+  const db = readDB();
+  
+  if (!db.optimizations) {
+    return [];
+  }
+  
+  return db.optimizations
+    .filter(opt => opt.status === 'pending' || opt.status === 'processing')
+    .sort((a, b) => new Date(a.queuedAt) - new Date(b.queuedAt));
+}
+
+/**
+ * Get client optimization history
+ */
+export function getClientOptimizationHistory(clientId, limit = 50) {
+  const db = readDB();
+  
+  if (!db.optimizations) {
+    return [];
+  }
+  
+  return db.optimizations
+    .filter(opt => opt.clientId === clientId)
+    .sort((a, b) => new Date(b.queuedAt) - new Date(a.queuedAt))
+    .slice(0, limit);
+}
+
 export default {
   addAuditRecord,
   getClientAuditHistory,
@@ -299,5 +520,14 @@ export default {
   getClientMetrics,
   getAllClientMetrics,
   getAnalyticsSummary,
-  clearOldData
+  clearOldData,
+  // AI Optimization functions
+  addOptimization,
+  getOptimizationHistory,
+  getOptimizationById,
+  updateOptimizationStatus,
+  updateOptimizationResults,
+  updateOptimizationApplied,
+  getOptimizationQueue,
+  getClientOptimizationHistory
 };

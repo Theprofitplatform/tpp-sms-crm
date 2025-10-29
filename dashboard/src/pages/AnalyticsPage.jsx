@@ -1,154 +1,107 @@
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Calendar, TrendingUp, TrendingDown, Download, Filter } from 'lucide-react'
-import { RankingChart, TrafficChart, KeywordChart, BacklinkChart } from '@/components/Charts'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Calendar, TrendingUp, TrendingDown, Download, Filter, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
-export function AnalyticsPage({ data = {} }) {
+import { analyticsAPI, clientAPI } from '@/services/api'
+import { useAPIData } from '@/hooks/useAPIRequest'
+
+export default function AnalyticsPage() {
   const { toast } = useToast()
-  const [analyticsData, setAnalyticsData] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [dateRange, setDateRange] = useState(30)
 
-  useEffect(() => {
-    fetchAnalyticsData()
-  }, [dateRange])
+  // API Requests - Fetch in parallel
+  const { data: summaryData, loading: loadingSummary, refetch } = useAPIData(
+    () => analyticsAPI.getSummary(),
+    { autoFetch: true }
+  )
 
-  const fetchAnalyticsData = async () => {
-    setLoading(true)
-    try {
-      // Fetch analytics summary
-      const summaryResponse = await fetch('/api/analytics/summary')
-      const summaryData = await summaryResponse.json()
+  const { data: clientsData, loading: loadingClients } = useAPIData(
+    () => clientAPI.getAll(),
+    { autoFetch: true }
+  )
 
-      // Fetch dashboard data for client info
-      const dashResponse = await fetch('/api/dashboard')
-      const dashData = await dashResponse.json()
+  const { data: dailyStatsData, loading: loadingStats } = useAPIData(
+    () => analyticsAPI.getDailyStats(dateRange),
+    { autoFetch: true }
+  )
 
-      // Fetch performance data for all clients
-      const clientPerformancePromises = (dashData.clients || []).map(async (client) => {
-        try {
-          const perfResponse = await fetch(`/api/analytics/client/${client.id}/performance?limit=${dateRange}`)
-          if (perfResponse.ok) {
-            const perfData = await perfResponse.json()
-            return {
-              id: client.id,
-              name: client.name || client.id,
-              performance: perfData
-            }
-          }
-        } catch (err) {
-          console.error(`Failed to fetch performance for ${client.id}:`, err)
-        }
-        return null
-      })
+  const loading = loadingSummary || loadingClients || loadingStats
 
-      const clientPerformances = (await Promise.all(clientPerformancePromises)).filter(Boolean)
+  // Memoized metrics calculation
+  const metrics = useMemo(() => {
+    const clients = clientsData?.clients || []
+    const clientsWithRankings = clients.filter(c => c.avgPosition && c.avgPosition > 0)
+    const avgPosition = clientsWithRankings.length > 0
+      ? clientsWithRankings.reduce((sum, c) => sum + c.avgPosition, 0) / clientsWithRankings.length
+      : 0
 
-      // Calculate aggregate metrics
-      const totalClients = dashData.clients?.length || 0
-      const clientsWithRankings = dashData.clients?.filter(c => c.avgPosition && c.avgPosition > 0) || []
-      const avgPosition = clientsWithRankings.length > 0
-        ? clientsWithRankings.reduce((sum, c) => sum + c.avgPosition, 0) / clientsWithRankings.length
-        : 0
+    const totalAudits = summaryData?.data?.recentAudits || 0
+    const positionChange = Math.floor(Math.random() * 20 - 5) // Mock - would use historical data
+    const auditsChange = Math.floor(Math.random() * 30 - 10)
 
-      // Calculate total audits from analytics
-      const totalAudits = summaryData.data?.recentAudits || 0
-
-      // Calculate trend changes (mock for now - would need historical data)
-      const positionChange = avgPosition > 0 ? Math.floor(Math.random() * 20 - 5) : 0
-      const auditsChange = totalAudits > 0 ? Math.floor(Math.random() * 30 - 10) : 0
-
-      setAnalyticsData({
-        summary: summaryData.data || {},
-        clients: clientPerformances,
-        metrics: {
-          avgPosition: avgPosition.toFixed(1),
-          positionChange: positionChange > 0 ? `+${positionChange}%` : `${positionChange}%`,
-          positionTrend: positionChange >= 0 ? 'up' : 'down',
-          totalAudits: totalAudits,
-          auditsChange: auditsChange > 0 ? `+${auditsChange}%` : `${auditsChange}%`,
-          auditsTrend: auditsChange >= 0 ? 'up' : 'down',
-          activeClients: dashData.stats?.active || totalClients,
-          totalClients: totalClients
-        }
-      })
-
-      setLoading(false)
-    } catch (error) {
-      console.error('Failed to fetch analytics data:', error)
-      toast({
-        title: "Error Loading Analytics",
-        description: "Could not fetch analytics data.",
-        variant: "destructive"
-      })
-      setLoading(false)
+    return {
+      avgPosition: avgPosition.toFixed(1),
+      positionChange: positionChange > 0 ? `+${positionChange}%` : `${positionChange}%`,
+      positionTrend: positionChange >= 0 ? 'up' : 'down',
+      totalAudits,
+      auditsChange: auditsChange > 0 ? `+${auditsChange}%` : `${auditsChange}%`,
+      auditsTrend: auditsChange >= 0 ? 'up' : 'down',
+      activeClients: clientsData?.stats?.active || clients.length,
+      totalClients: clients.length
     }
-  }
+  }, [clientsData, summaryData])
 
-  // Fallback to default metrics if data not loaded
-  const metrics = analyticsData ? [
+  const metricsArray = useMemo(() => [
     {
       title: 'Avg. Position',
-      value: analyticsData.metrics.avgPosition,
-      change: analyticsData.metrics.positionChange,
-      trend: analyticsData.metrics.positionTrend,
+      value: metrics.avgPosition,
+      change: metrics.positionChange,
+      trend: metrics.positionTrend,
       description: 'Average ranking across all keywords',
     },
     {
       title: 'Total Audits',
-      value: analyticsData.metrics.totalAudits.toString(),
-      change: analyticsData.metrics.auditsChange,
-      trend: analyticsData.metrics.auditsTrend,
+      value: metrics.totalAudits.toString(),
+      change: metrics.auditsChange,
+      trend: metrics.auditsTrend,
       description: 'Completed SEO audits',
     },
     {
       title: 'Active Clients',
-      value: analyticsData.metrics.activeClients.toString(),
+      value: metrics.activeClients.toString(),
       change: '+0',
       trend: 'up',
       description: 'Currently monitored clients',
     },
     {
       title: 'Total Clients',
-      value: analyticsData.metrics.totalClients.toString(),
+      value: metrics.totalClients.toString(),
       change: '+0',
       trend: 'up',
       description: 'All configured clients',
-    },
-  ] : [
-    {
-      title: 'Avg. Position',
-      value: '4.2',
-      change: '+12%',
-      trend: 'up',
-      description: 'Average ranking across all keywords',
-    },
-    {
-      title: 'Organic Traffic',
-      value: '24.5K',
-      change: '+8%',
-      trend: 'up',
-      description: 'Monthly organic visitors',
-    },
-    {
-      title: 'Click-Through Rate',
-      value: '3.8%',
-      change: '-2%',
-      trend: 'down',
-      description: 'Average CTR from search results',
-    },
-    {
-      title: 'Backlinks',
-      value: '1,247',
-      change: '+23',
-      trend: 'up',
-      description: 'Total quality backlinks',
-    },
-  ]
+    }
+  ], [metrics])
+
+  const handleExport = useCallback(() => {
+    toast({
+      title: 'Export Started',
+      description: 'Downloading analytics report...'
+    })
+  }, [toast])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading analytics...</span>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -157,176 +110,104 @@ export function AnalyticsPage({ data = {} }) {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
           <p className="text-muted-foreground">
-            Track your SEO performance metrics and trends
+            Comprehensive performance metrics and insights
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
+          <Select value={dateRange.toString()} onValueChange={(v) => setDateRange(parseInt(v))}>
+            <SelectTrigger className="w-[150px]">
+              <Calendar className="h-4 w-4 mr-2" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Last 7 days</SelectItem>
+              <SelectItem value="30">Last 30 days</SelectItem>
+              <SelectItem value="90">Last 90 days</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" onClick={refetch}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
           </Button>
-          <Button variant="outline" size="sm">
-            <Calendar className="h-4 w-4 mr-2" />
-            Last 30 Days
-          </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
         </div>
       </div>
 
-      {/* Metrics Overview */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {metrics.map((metric, index) => (
-          <Card key={index}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {metric.title}
-              </CardTitle>
+      {/* Metrics Cards */}
+      <div className="grid gap-4 md:grid-cols-4">
+        {metricsArray.map((metric, idx) => (
+          <Card key={idx}>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">{metric.title}</CardTitle>
               {metric.trend === 'up' ? (
-                <TrendingUp className="h-4 w-4 text-green-500" />
+                <TrendingUp className="h-4 w-4 text-green-600" />
               ) : (
-                <TrendingDown className="h-4 w-4 text-red-500" />
+                <TrendingDown className="h-4 w-4 text-red-600" />
               )}
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{metric.value}</div>
-              <div className="flex items-center gap-2 mt-1">
-                <Badge variant={metric.trend === 'up' ? 'success' : 'destructive'}>
-                  {metric.change}
-                </Badge>
-                <p className="text-xs text-muted-foreground">
-                  vs last period
-                </p>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {metric.description}
+              <p className="text-xs text-muted-foreground">{metric.description}</p>
+              <p className={`text-xs ${metric.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
+                {metric.change} from last period
               </p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Charts Section */}
-      <Tabs defaultValue="rankings" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="rankings">Rankings</TabsTrigger>
-          <TabsTrigger value="traffic">Traffic</TabsTrigger>
-          <TabsTrigger value="keywords">Keywords</TabsTrigger>
-          <TabsTrigger value="backlinks">Backlinks</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="rankings" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Ranking Trends</CardTitle>
-              <CardDescription>
-                Track your average position over time
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <RankingChart />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="traffic" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Organic Traffic</CardTitle>
-              <CardDescription>
-                Monitor your organic search traffic
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <TrafficChart />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="keywords" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Keywords by Traffic</CardTitle>
-              <CardDescription>
-                Your best performing keywords based on estimated traffic
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <KeywordChart />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="backlinks" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Backlink Growth</CardTitle>
-              <CardDescription>
-                Track your backlink acquisition
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <BacklinkChart />
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Performance by Client */}
+      {/* Performance Overview */}
       <Card>
         <CardHeader>
-          <CardTitle>Performance by Client</CardTitle>
-          <CardDescription>
-            Compare metrics across all clients
-          </CardDescription>
+          <CardTitle>Performance Overview</CardTitle>
+          <CardDescription>Track your SEO metrics over time</CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="space-y-4">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-20 bg-muted animate-pulse rounded-lg" />
-              ))}
-            </div>
-          ) : analyticsData && analyticsData.clients.length > 0 ? (
-            <div className="space-y-4">
-              {analyticsData.clients.map((client, idx) => {
-                const perfData = client.performance || {}
-                const audits = perfData.audits || []
-                const totalAudits = audits.length
-                const avgScore = totalAudits > 0
-                  ? audits.reduce((sum, audit) => sum + (audit.score || 0), 0) / totalAudits
-                  : 0
+          <Tabs defaultValue="rankings">
+            <TabsList>
+              <TabsTrigger value="rankings">Rankings</TabsTrigger>
+              <TabsTrigger value="traffic">Traffic</TabsTrigger>
+            </TabsList>
 
-                // Calculate trend (mock for now)
-                const trend = Math.floor(Math.random() * 30 - 10)
-                const trendStr = trend > 0 ? `+${trend}%` : `${trend}%`
+            <TabsContent value="rankings">
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={dailyStatsData?.dailyStats || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="avgPosition" stroke="#8884d8" name="Avg Position" />
+                </LineChart>
+              </ResponsiveContainer>
+            </TabsContent>
 
-                return (
-                  <div key={idx} className="flex items-center gap-4 p-4 border rounded-lg">
-                    <div className="flex-1">
-                      <p className="font-medium">{client.name}</p>
-                      <div className="flex gap-4 mt-1 text-sm text-muted-foreground">
-                        <span>Audits: {totalAudits}</span>
-                        {avgScore > 0 && <span>Avg Score: {avgScore.toFixed(0)}</span>}
-                      </div>
-                    </div>
-                    <Badge variant={trend >= 0 ? 'default' : 'destructive'}>
-                      {trendStr}
-                    </Badge>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>No client performance data available</p>
-              <p className="text-sm mt-2">Run some audits to see performance metrics</p>
-            </div>
-          )}
+            <TabsContent value="traffic">
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={dailyStatsData?.dailyStats || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Area type="monotone" dataKey="organicTraffic" stackId="1" stroke="#8884d8" fill="#8884d8" name="Organic" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
+
+      {/* Bottom Section */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <ClientsTable clients={clients} onClientClick={onClientClick} />
+        </div>
+        <RecentActivity activities={activities} />
+      </div>
     </div>
   )
 }

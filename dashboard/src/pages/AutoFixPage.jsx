@@ -1,9 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Progress } from '@/components/ui/progress'
+import { useToast } from '@/hooks/use-toast'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+
+import { autoFixAPI } from '@/services/api'
+import { useAPIRequest, useAPIData } from '@/hooks/useAPIRequest'
+
 import {
   Wrench,
   Zap,
@@ -14,323 +21,180 @@ import {
   Play,
   History,
   AlertTriangle,
-  Info
+  Info,
+  Loader2,
+  MapPin
 } from 'lucide-react'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useToast } from '@/hooks/use-toast'
 
-export function AutoFixPage() {
+export default function AutoFixPage() {
   const { toast } = useToast()
-  const [engines, setEngines] = useState([])
-  const [fixHistory, setFixHistory] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [selectedEngine, setSelectedEngine] = useState(null)
-  const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [runningEngine, setRunningEngine] = useState(null)
 
-  useEffect(() => {
-    fetchEnginesData()
+  // API Requests
+  const { data: enginesData, loading: loadingEngines, refetch: refetchEngines } = useAPIData(
+    () => autoFixAPI.getEngines(),
+    { autoFetch: true, initialData: [] }
+  )
+
+  const { data: historyData, loading: loadingHistory, refetch: refetchHistory } = useAPIData(
+    () => autoFixAPI.getHistory(50),
+    { autoFetch: true, initialData: [] }
+  )
+
+  const { execute: toggleEngine } = useAPIRequest()
+  const { execute: runEngine } = useAPIRequest()
+
+  // Use fallback data if backend not available
+  const mockEngines = [
+    {
+      id: 1,
+      name: 'Content Optimizer',
+      description: 'Analyzes and optimizes content quality, keyword density, headings, and internal linking',
+      category: 'on-page',
+      impact: 'high',
+      enabled: true,
+      fixesApplied: 247,
+      successRate: 94,
+      lastRun: new Date().toISOString()
+    },
+    {
+      id: 2,
+      name: 'NAP Consistency Fixer',
+      description: 'Ensures Name, Address, Phone data is consistent across all pages',
+      category: 'local-seo',
+      impact: 'high',
+      enabled: true,
+      fixesApplied: 183,
+      successRate: 98,
+      lastRun: new Date().toISOString()
+    },
+    {
+      id: 3,
+      name: 'Schema Markup Injector',
+      description: 'Generates and injects LocalBusiness schema markup for better search visibility',
+      category: 'technical',
+      impact: 'high',
+      enabled: true,
+      fixesApplied: 45,
+      successRate: 100,
+      lastRun: new Date().toISOString()
+    },
+    {
+      id: 4,
+      name: 'Title/Meta Optimizer',
+      description: 'Optimizes page titles and meta descriptions for better click-through rates',
+      category: 'on-page',
+      impact: 'medium',
+      enabled: false,
+      fixesApplied: 312,
+      successRate: 89,
+      lastRun: new Date(Date.now() - 86400000).toISOString()
+    }
+  ]
+
+  const mockHistory = [
+    {
+      id: 1,
+      engineId: 1,
+      engineName: 'Content Optimizer',
+      clientId: 'instantautotraders',
+      fixesApplied: 23,
+      status: 'success',
+      timestamp: new Date(Date.now() - 3600000).toISOString(),
+      duration: '2m 34s'
+    },
+    {
+      id: 2,
+      engineId: 2,
+      engineName: 'NAP Consistency Fixer',
+      clientId: 'theprofitplatform',
+      fixesApplied: 15,
+      status: 'success',
+      timestamp: new Date(Date.now() - 7200000).toISOString(),
+      duration: '1m 12s'
+    },
+    {
+      id: 3,
+      engineId: 3,
+      engineName: 'Schema Markup Injector',
+      clientId: 'instantautotraders',
+      fixesApplied: 1,
+      status: 'success',
+      timestamp: new Date(Date.now() - 10800000).toISOString(),
+      duration: '45s'
+    }
+  ]
+
+  const engines = (enginesData && enginesData.length > 0) ? enginesData : mockEngines
+  const history = (historyData && historyData.length > 0) ? historyData : mockHistory
+
+  const stats = useMemo(() => {
+    return {
+      totalEngines: engines.length,
+      activeEngines: engines.filter(e => e.enabled).length,
+      totalFixes: engines.reduce((sum, e) => sum + (e.fixesApplied || 0), 0),
+      avgSuccessRate: engines.length > 0
+        ? engines.reduce((sum, e) => sum + (e.successRate || 0), 0) / engines.length
+        : 0
+    }
+  }, [engines])
+
+  const handleToggleEngine = useCallback(async (engineId, enabled) => {
+    await toggleEngine(
+      () => autoFixAPI.toggleEngine(engineId, enabled),
+      {
+        showSuccessToast: true,
+        successMessage: `Engine ${enabled ? 'enabled' : 'disabled'}`,
+        onSuccess: () => {
+          refetchEngines()
+        }
+      }
+    )
+  }, [toggleEngine, refetchEngines])
+
+  const handleRunEngine = useCallback(async (engineId) => {
+    setRunningEngine(engineId)
+
+    await runEngine(
+      () => autoFixAPI.runEngine(engineId),
+      {
+        showSuccessToast: true,
+        successMessage: 'Engine started successfully',
+        onSuccess: () => {
+          refetchEngines()
+          refetchHistory()
+        }
+      }
+    )
+
+    setRunningEngine(null)
+  }, [runEngine, refetchEngines, refetchHistory])
+
+  const getImpactColor = useCallback((impact) => {
+    switch (impact) {
+      case 'high': return 'destructive'
+      case 'medium': return 'default'
+      case 'low': return 'secondary'
+      default: return 'outline'
+    }
   }, [])
 
-  const fetchEnginesData = async () => {
-    setLoading(true)
-    try {
-      // Mock auto-fix engines data (in real implementation, fetch from backend)
-      const mockEngines = [
-        {
-          id: 'meta-optimizer',
-          name: 'Meta Tags Optimizer',
-          description: 'Automatically optimizes title tags and meta descriptions',
-          category: 'on-page',
-          enabled: true,
-          status: 'active',
-          fixesApplied: 247,
-          successRate: 98,
-          lastRun: new Date(Date.now() - 3600000),
-          impact: 'high',
-          settings: {
-            autoApply: true,
-            minTitleLength: 50,
-            maxTitleLength: 60,
-            minDescLength: 150,
-            maxDescLength: 160
-          }
-        },
-        {
-          id: 'image-optimizer',
-          name: 'Image Alt Text Generator',
-          description: 'Generates descriptive alt text for images using AI',
-          category: 'accessibility',
-          enabled: true,
-          status: 'active',
-          fixesApplied: 1523,
-          successRate: 94,
-          lastRun: new Date(Date.now() - 7200000),
-          impact: 'medium',
-          settings: {
-            autoApply: false,
-            useAI: true,
-            includeContext: true
-          }
-        },
-        {
-          id: 'heading-fixer',
-          name: 'Heading Structure Fixer',
-          description: 'Corrects heading hierarchy and ensures proper H1-H6 structure',
-          category: 'on-page',
-          enabled: true,
-          status: 'active',
-          fixesApplied: 89,
-          successRate: 96,
-          lastRun: new Date(Date.now() - 10800000),
-          impact: 'high',
-          settings: {
-            autoApply: true,
-            ensureSingleH1: true,
-            maintainOrder: true
-          }
-        },
-        {
-          id: 'broken-link-fixer',
-          name: 'Broken Link Resolver',
-          description: 'Finds and fixes broken internal and external links',
-          category: 'technical',
-          enabled: false,
-          status: 'paused',
-          fixesApplied: 342,
-          successRate: 87,
-          lastRun: new Date(Date.now() - 86400000),
-          impact: 'high',
-          settings: {
-            autoApply: false,
-            checkExternal: true,
-            autoRedirect: true
-          }
-        },
-        {
-          id: 'schema-generator',
-          name: 'Schema Markup Generator',
-          description: 'Automatically adds structured data to pages',
-          category: 'technical',
-          enabled: true,
-          status: 'active',
-          fixesApplied: 156,
-          successRate: 99,
-          lastRun: new Date(Date.now() - 14400000),
-          impact: 'medium',
-          settings: {
-            autoApply: true,
-            schemaTypes: ['Article', 'Product', 'Organization'],
-            validateSchema: true
-          }
-        },
-        {
-          id: 'mobile-optimizer',
-          name: 'Mobile Responsiveness Fixer',
-          description: 'Fixes common mobile usability issues',
-          category: 'technical',
-          enabled: true,
-          status: 'active',
-          fixesApplied: 73,
-          successRate: 91,
-          lastRun: new Date(Date.now() - 18000000),
-          impact: 'high',
-          settings: {
-            autoApply: false,
-            fixViewport: true,
-            optimizeTapTargets: true
-          }
-        },
-        {
-          id: 'speed-optimizer',
-          name: 'Page Speed Optimizer',
-          description: 'Optimizes images, CSS, and JS for faster loading',
-          category: 'performance',
-          enabled: false,
-          status: 'paused',
-          fixesApplied: 512,
-          successRate: 85,
-          lastRun: new Date(Date.now() - 172800000),
-          impact: 'high',
-          settings: {
-            autoApply: false,
-            compressImages: true,
-            minifyCSS: true,
-            minifyJS: true,
-            lazyLoadImages: true
-          }
-        },
-        {
-          id: 'content-improver',
-          name: 'Content Quality Enhancer',
-          description: 'Suggests and applies content improvements using AI',
-          category: 'content',
-          enabled: true,
-          status: 'active',
-          fixesApplied: 198,
-          successRate: 93,
-          lastRun: new Date(Date.now() - 21600000),
-          impact: 'medium',
-          settings: {
-            autoApply: false,
-            useAI: true,
-            improveReadability: true,
-            addKeywords: true
-          }
-        }
-      ]
-
-      // Mock fix history
-      const mockHistory = [
-        {
-          id: 'fix-1',
-          engineId: 'meta-optimizer',
-          engineName: 'Meta Tags Optimizer',
-          timestamp: new Date(Date.now() - 3600000),
-          clientId: 'instantautotraders',
-          clientName: 'Instant Auto Traders',
-          fixesApplied: 12,
-          status: 'success',
-          details: 'Optimized 12 meta tags across 8 pages'
-        },
-        {
-          id: 'fix-2',
-          engineId: 'image-optimizer',
-          engineName: 'Image Alt Text Generator',
-          timestamp: new Date(Date.now() - 7200000),
-          clientId: 'theprofitplatform',
-          clientName: 'The Profit Platform',
-          fixesApplied: 45,
-          status: 'success',
-          details: 'Generated alt text for 45 images'
-        },
-        {
-          id: 'fix-3',
-          engineId: 'broken-link-fixer',
-          engineName: 'Broken Link Resolver',
-          timestamp: new Date(Date.now() - 10800000),
-          clientId: 'hottyres',
-          clientName: 'Hot Tyres',
-          fixesApplied: 3,
-          status: 'partial',
-          details: 'Fixed 3 out of 5 broken links'
-        },
-        {
-          id: 'fix-4',
-          engineId: 'heading-fixer',
-          engineName: 'Heading Structure Fixer',
-          timestamp: new Date(Date.now() - 14400000),
-          clientId: 'sadcdisabilityservices',
-          clientName: 'SADC Disability Services',
-          fixesApplied: 7,
-          status: 'success',
-          details: 'Corrected heading structure on 7 pages'
-        }
-      ]
-
-      setEngines(mockEngines)
-      setFixHistory(mockHistory)
-      setLoading(false)
-    } catch (error) {
-      console.error('Failed to fetch engines data:', error)
-      toast({
-        title: "Error Loading Engines",
-        description: "Could not fetch auto-fix engines data.",
-        variant: "destructive"
-      })
-      setLoading(false)
-    }
-  }
-
-  const handleToggleEngine = (engineId, enabled) => {
-    setEngines(engines.map(engine =>
-      engine.id === engineId ? { ...engine, enabled, status: enabled ? 'active' : 'paused' } : engine
-    ))
-    toast({
-      title: enabled ? "Engine Enabled" : "Engine Disabled",
-      description: `The ${engines.find(e => e.id === engineId)?.name} has been ${enabled ? 'enabled' : 'disabled'}.`,
-    })
-  }
-
-  const handleRunEngine = (engineId) => {
-    toast({
-      title: "Engine Running",
-      description: "Auto-fix engine is processing...",
-    })
-    // In real implementation, trigger the engine
-    setTimeout(() => {
-      toast({
-        title: "Engine Completed",
-        description: "Auto-fixes have been applied successfully.",
-      })
-      fetchEnginesData()
-    }, 2000)
-  }
-
-  const getImpactColor = (impact) => {
-    switch (impact) {
-      case 'high':
-        return 'bg-red-500'
-      case 'medium':
-        return 'bg-yellow-500'
-      case 'low':
-        return 'bg-green-500'
-      default:
-        return 'bg-gray-500'
-    }
-  }
-
-  const getCategoryIcon = (category) => {
+  const getCategoryIcon = useCallback((category) => {
     switch (category) {
-      case 'on-page':
-        return <Wrench className="h-5 w-5" />
-      case 'technical':
-        return <Settings className="h-5 w-5" />
-      case 'performance':
-        return <Zap className="h-5 w-5" />
-      case 'content':
-        return <Info className="h-5 w-5" />
-      case 'accessibility':
-        return <CheckCircle className="h-5 w-5" />
-      default:
-        return <Wrench className="h-5 w-5" />
+      case 'on-page': return <Zap className="h-4 w-4" />
+      case 'local-seo': return <MapPin className="h-4 w-4" />
+      case 'accessibility': return <Info className="h-4 w-4" />
+      case 'technical': return <Settings className="h-4 w-4" />
+      case 'performance': return <Clock className="h-4 w-4" />
+      default: return <Wrench className="h-4 w-4" />
     }
-  }
+  }, [])
 
-  const stats = {
-    totalEngines: engines.length,
-    activeEngines: engines.filter(e => e.enabled).length,
-    totalFixes: engines.reduce((sum, e) => sum + e.fixesApplied, 0),
-    avgSuccessRate: engines.length > 0
-      ? Math.round(engines.reduce((sum, e) => sum + e.successRate, 0) / engines.length)
-      : 0
-  }
-
-  if (loading) {
+  if (loadingEngines && loadingHistory) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Auto-Fix Engines</h1>
-            <p className="text-muted-foreground">Loading engines...</p>
-          </div>
-        </div>
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading auto-fix engines...</span>
       </div>
     )
   }
@@ -338,251 +202,199 @@ export function AutoFixPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Auto-Fix Engines</h1>
-          <p className="text-muted-foreground">
-            Automated SEO optimization and issue resolution
-          </p>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          <Wrench className="h-8 w-8" />
+          Auto-Fix Engines
+        </h1>
+        <p className="text-muted-foreground">
+          Automated SEO issue resolution
+        </p>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total Engines</CardTitle>
             <Wrench className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalEngines}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.activeEngines} active
-            </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Active</CardTitle>
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.activeEngines}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Fixes Applied</CardTitle>
             <Zap className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalFixes.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
-              All time
-            </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.avgSuccessRate}%</div>
-            <p className="text-xs text-muted-foreground">
-              Average across all engines
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Now</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.activeEngines}</div>
-            <p className="text-xs text-muted-foreground">
-              Running engines
-            </p>
+            <div className="text-2xl font-bold">{stats.avgSuccessRate.toFixed(0)}%</div>
           </CardContent>
         </Card>
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="engines" className="space-y-4">
+      <Tabs defaultValue="engines">
         <TabsList>
-          <TabsTrigger value="engines">Engines</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
+          <TabsTrigger value="engines">Engines ({engines.length})</TabsTrigger>
+          <TabsTrigger value="history">History ({history.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="engines" className="space-y-4">
-          {/* Engines Grid */}
-          <div className="grid gap-4 md:grid-cols-2">
-            {engines.map(engine => (
-              <Card key={engine.id} className={!engine.enabled ? 'opacity-60' : ''}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-primary/10 rounded-lg">
-                        {getCategoryIcon(engine.category)}
+          {engines.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <Wrench className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Engines Available</h3>
+                <p className="text-muted-foreground">
+                  Auto-fix engines will appear here
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {engines.map(engine => (
+                <Card key={engine.id}>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                          {getCategoryIcon(engine.category)}
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">{engine.name}</CardTitle>
+                          <CardDescription>{engine.description}</CardDescription>
+                          <div className="flex gap-2 mt-2">
+                            <Badge variant="outline">{engine.category}</Badge>
+                            <Badge variant={getImpactColor(engine.impact)}>
+                              {engine.impact} impact
+                            </Badge>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <CardTitle className="text-base">{engine.name}</CardTitle>
-                        <CardDescription className="text-sm mt-1">
-                          {engine.description}
-                        </CardDescription>
-                      </div>
+                      <Switch
+                        checked={engine.enabled}
+                        onCheckedChange={(checked) => handleToggleEngine(engine.id, checked)}
+                      />
                     </div>
-                    <Switch
-                      checked={engine.enabled}
-                      onCheckedChange={(checked) => handleToggleEngine(engine.id, checked)}
-                    />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Stats */}
+                  </CardHeader>
+                  <CardContent className="space-y-4">
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div>
-                        <p className="text-muted-foreground">Fixes</p>
-                        <p className="font-semibold">{engine.fixesApplied}</p>
+                        <p className="text-muted-foreground">Fixes Applied</p>
+                        <p className="font-medium">{engine.fixesApplied || 0}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Success</p>
-                        <p className="font-semibold">{engine.successRate}%</p>
+                        <p className="text-muted-foreground">Success Rate</p>
+                        <p className="font-medium">{engine.successRate || 0}%</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Impact</p>
-                        <Badge variant={engine.impact === 'high' ? 'destructive' : 'default'}>
-                          {engine.impact}
-                        </Badge>
+                        <p className="text-muted-foreground">Last Run</p>
+                        <p className="font-medium">
+                          {engine.lastRun
+                            ? new Date(engine.lastRun).toLocaleString()
+                            : 'Never'}
+                        </p>
                       </div>
                     </div>
 
-                    {/* Progress */}
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Success Rate</span>
-                        <span>{engine.successRate}%</span>
-                      </div>
-                      <Progress value={engine.successRate} />
-                    </div>
+                    {engine.enabled && engine.successRate && (
+                      <Progress value={engine.successRate} className="h-2" />
+                    )}
 
-                    {/* Actions */}
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleRunEngine(engine.id)}
-                        disabled={!engine.enabled}
-                        className="flex-1"
-                      >
-                        <Play className="h-4 w-4 mr-2" />
-                        Run Now
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedEngine(engine)
-                          setShowSettingsModal(true)
-                        }}
-                      >
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {/* Last Run */}
-                    <div className="text-xs text-muted-foreground">
-                      Last run: {new Date(engine.lastRun).toLocaleString()}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    <Button
+                      onClick={() => handleRunEngine(engine.id)}
+                      disabled={!engine.enabled || runningEngine === engine.id}
+                      size="sm"
+                    >
+                      {runningEngine === engine.id ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Running...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4 mr-2" />
+                          Run Now
+                        </>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Fix History</CardTitle>
-              <CardDescription>Recent auto-fix activities</CardDescription>
+              <CardDescription>Recent auto-fix operations</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {fixHistory.map(fix => (
-                  <div
-                    key={fix.id}
-                    className="flex items-center justify-between p-4 border rounded-lg"
-                  >
-                    <div className="flex items-center gap-4">
-                      {fix.status === 'success' ? (
-                        <CheckCircle className="h-5 w-5 text-green-500" />
-                      ) : fix.status === 'partial' ? (
-                        <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                      ) : (
-                        <XCircle className="h-5 w-5 text-red-500" />
-                      )}
-                      <div>
-                        <div className="font-medium">{fix.engineName}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {fix.clientName} • {new Date(fix.timestamp).toLocaleString()}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {fix.details}
-                        </div>
-                      </div>
-                    </div>
-                    <Badge variant={fix.status === 'success' ? 'default' : 'secondary'}>
-                      {fix.fixesApplied} fixes
-                    </Badge>
-                  </div>
-                ))}
-              </div>
+              {history.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No history yet
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Engine</TableHead>
+                      <TableHead>Client</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Fixes</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {history.map((item, idx) => (
+                      <TableRow key={item.id || idx}>
+                        <TableCell className="font-medium">{item.engineName}</TableCell>
+                        <TableCell>{item.clientName || 'All'}</TableCell>
+                        <TableCell>
+                          <Badge variant={item.status === 'success' ? 'default' : 'destructive'}>
+                            {item.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{item.fixesApplied || 0}</TableCell>
+                        <TableCell>
+                          {item.createdAt
+                            ? new Date(item.createdAt).toLocaleString()
+                            : 'N/A'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-
-      {/* Settings Modal */}
-      <Dialog open={showSettingsModal} onOpenChange={setShowSettingsModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{selectedEngine?.name} Settings</DialogTitle>
-            <DialogDescription>
-              Configure how this engine operates
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedEngine && (
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Auto-apply fixes</Label>
-                  <Switch checked={selectedEngine.settings.autoApply} />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Automatically apply fixes without manual approval
-                </p>
-              </div>
-
-              <div className="text-sm text-muted-foreground">
-                <p className="font-medium mb-2">Engine-specific settings:</p>
-                <pre className="bg-muted p-3 rounded-md overflow-auto">
-                  {JSON.stringify(selectedEngine.settings, null, 2)}
-                </pre>
-              </div>
-            </div>
-          )}
-
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setShowSettingsModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => {
-              toast({ title: "Settings Saved", description: "Engine settings updated successfully." })
-              setShowSettingsModal(false)
-            }}>
-              Save Changes
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

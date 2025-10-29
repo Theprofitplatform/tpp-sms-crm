@@ -1,29 +1,34 @@
 import { useState, useEffect } from 'react'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { Sidebar } from './components/Sidebar'
-import { DashboardPage } from './pages/DashboardPage'
-import { ClientsPage } from './pages/ClientsPage'
-import { ReportsPage } from './pages/ReportsPage'
-import { ControlCenterPage } from './pages/ControlCenterPage'
-import { AutoFixPage } from './pages/AutoFixPage'
-import { RecommendationsPage } from './pages/RecommendationsPage'
-import { KeywordResearchPage } from './pages/KeywordResearchPage'
+import DashboardPage from './pages/DashboardPage'
+import ClientsPage from './pages/ClientsPage'
+import ReportsPage from './pages/ReportsPage'
+import ControlCenterPage from './pages/ControlCenterPage'
+import PositionTrackingPage from './pages/PositionTrackingPage'
+import DomainsPage from './pages/DomainsPage'
+import KeywordsPage from './pages/KeywordsPage'
+import AutoFixPage from './pages/AutoFixPage'
+import RecommendationsPage from './pages/RecommendationsPage'
+import KeywordResearchPage from './pages/KeywordResearchPage'
 import UnifiedKeywordsPage from './pages/UnifiedKeywordsPage'
-import { GoalsPage } from './pages/GoalsPage'
-import { EmailCampaignsPage } from './pages/EmailCampaignsPage'
-import { WebhooksPage } from './pages/WebhooksPage'
-import { WhiteLabelPage } from './pages/WhiteLabelPage'
-import { AnalyticsPage } from './pages/AnalyticsPage'
-import { SettingsPage } from './pages/SettingsPage'
-import { ClientDetailPage } from './pages/ClientDetailPage'
-import { GoogleSearchConsolePage } from './pages/GoogleSearchConsolePage'
-import { LocalSEOPage } from './pages/LocalSEOPage'
-import { AIOptimizerPage } from './pages/AIOptimizerPage'
-import { WordPressManagerPage } from './pages/WordPressManagerPage'
-import { SchedulerPage } from './pages/SchedulerPage'
-import { BulkOperationsPage } from './pages/BulkOperationsPage'
-import { ExportBackupPage } from './pages/ExportBackupPage'
-import { NotificationCenterPage } from './pages/NotificationCenterPage'
-import { APIDocumentationPage } from './pages/APIDocumentationPage'
+import GoalsPage from './pages/GoalsPage'
+import EmailCampaignsPage from './pages/EmailCampaignsPage'
+import WebhooksPage from './pages/WebhooksPage'
+import WhiteLabelPage from './pages/WhiteLabelPage'
+import AnalyticsPage from './pages/AnalyticsPage'
+import SettingsPage from './pages/SettingsPage'
+import ClientDetailPage from './pages/ClientDetailPage'
+import GoogleSearchConsolePage from './pages/GoogleSearchConsolePage'
+import LocalSEOPage from './pages/LocalSEOPage'
+import AIOptimizerPage from './pages/AIOptimizerPage'
+import WordPressManagerPage from './pages/WordPressManagerPage'
+import SchedulerPage from './pages/SchedulerPage'
+import BulkOperationsPage from './pages/BulkOperationsPage'
+import ExportBackupPage from './pages/ExportBackupPage'
+import NotificationCenterPage from './pages/NotificationCenterPage'
+import APIDocumentationPage from './pages/APIDocumentationPage'
+import ActivityLogPage from './pages/ActivityLogPage'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { Bell, Search, Moon, Sun } from 'lucide-react'
@@ -190,9 +195,10 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Sidebar */}
-      <Sidebar currentSection={currentSection} onNavigate={handleNavigate} />
+    <ErrorBoundary>
+      <div className="flex h-screen bg-background">
+        {/* Sidebar */}
+        <Sidebar currentSection={currentSection} onNavigate={handleNavigate} />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -271,9 +277,13 @@ function App() {
           {currentSection === 'reports' && <ReportsPage />}
           {currentSection === 'automation' && <ControlCenterPage />}
           {currentSection === 'autofix' && <AutoFixPage />}
+          {currentSection === 'activity-log' && <ActivityLogPage />}
           {currentSection === 'ai-optimizer' && <AIOptimizerPage />}
           {currentSection === 'scheduler' && <SchedulerPage />}
           {currentSection === 'bulk-operations' && <BulkOperationsPage />}
+          {currentSection === 'position-tracking' && <PositionTrackingPage />}
+          {currentSection === 'domains' && <DomainsPage />}
+          {currentSection === 'keywords' && <KeywordsPage />}
           {currentSection === 'google-console' && <GoogleSearchConsolePage />}
           {currentSection === 'local-seo' && <LocalSEOPage />}
           {currentSection === 'wordpress' && <WordPressManagerPage />}
@@ -292,8 +302,8 @@ function App() {
           {currentSection === 'client-detail' && (
             <ClientDetailPage clientId={selectedClient} onBack={handleBackToDashboard} />
           )}
-          {!['dashboard', 'clients', 'reports', 'automation', 'autofix', 'ai-optimizer', 'scheduler',
-              'bulk-operations', 'google-console', 'local-seo', 'wordpress', 'recommendations',
+          {!['dashboard', 'clients', 'reports', 'automation', 'autofix', 'activity-log', 'ai-optimizer', 'scheduler',
+              'bulk-operations', 'position-tracking', 'domains', 'keywords', 'google-console', 'local-seo', 'wordpress', 'recommendations',
               'keyword-research', 'unified-keywords', 'goals', 'emails', 'notifications', 'webhooks',
               'api-docs', 'export-backup', 'whitelabel', 'analytics', 'settings', 'client-detail'].includes(currentSection) && (
             <div className="h-full flex items-center justify-center">
@@ -314,6 +324,7 @@ function App() {
       </div>
       <Toaster />
     </div>
+    </ErrorBoundary>
   )
 }
 

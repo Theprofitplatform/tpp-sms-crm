@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useToast } from '@/hooks/use-toast'
+
 import {
   Code,
   Book,
@@ -12,14 +14,19 @@ import {
   CheckCircle2
 } from 'lucide-react'
 
-export function APIDocumentationPage() {
+export default function APIDocumentationPage() {
+  const { toast } = useToast()
   const [copiedEndpoint, setCopiedEndpoint] = useState(null)
 
-  const copyToClipboard = (text, id) => {
+  const copyToClipboard = useCallback((text, id) => {
     navigator.clipboard.writeText(text)
     setCopiedEndpoint(id)
     setTimeout(() => setCopiedEndpoint(null), 2000)
-  }
+    toast({
+      title: 'Copied!',
+      description: 'Endpoint copied to clipboard'
+    })
+  }, [toast])
 
   const endpoints = {
     keywords: [

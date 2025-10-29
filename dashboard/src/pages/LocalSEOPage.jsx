@@ -1,9 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
+import { useToast } from '@/hooks/use-toast'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+
+import { localSEOAPI } from '@/services/api'
+import { useAPIRequest, useAPIData } from '@/hooks/useAPIRequest'
+
 import {
   MapPin,
   Phone,
@@ -16,212 +22,202 @@ import {
   Star,
   Globe,
   FileCode,
-  RefreshCw
+  RefreshCw,
+  Loader2
 } from 'lucide-react'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { LoadingState } from '@/components/LoadingState'
-import { ErrorState } from '@/components/ErrorState'
 
-export function LocalSEOPage() {
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [running, setRunning] = useState(false)
-  const [localSEOData, setLocalSEOData] = useState({
-    clients: [],
-    summary: {
-      totalClients: 0,
-      avgScore: 0,
-      issuesFound: 0,
-      lastRun: null
+export default function LocalSEOPage() {
+  const { toast } = useToast()
+  const [running, setRunning] = useState(null)
+
+  // API Requests
+  const { data: localSEOData, loading, error, refetch } = useAPIData(
+    () => localSEOAPI.getScores(),
+    { autoFetch: true }
+  )
+
+  const { execute: runAudit } = useAPIRequest()
+  const { execute: runAutoFix } = useAPIRequest()
+
+  const clients = localSEOData?.clients || []
+
+  const summary = useMemo(() => {
+    const calculateAverageScore = (clients) => {
+      if (clients.length === 0) return 0
+      return Math.round(clients.reduce((sum, c) => sum + (c.score || 0), 0) / clients.length)
     }
-  })
 
-  useEffect(() => {
-    fetchLocalSEOData()
-  }, [])
+    const countTotalIssues = (clients) => {
+      return clients.reduce((sum, c) => sum + (c.issues?.length || 0), 0)
+    }
 
-  const fetchLocalSEOData = async () => {
-    setLoading(true)
-    setError(null)
+    return {
+      totalClients: clients.length,
+      avgScore: calculateAverageScore(clients),
+      issuesFound: countTotalIssues(clients),
+      lastRun: localSEOData?.lastRun || new Date().toISOString()
+    }
+  }, [clients, localSEOData])
 
-    try {
-      const response = await fetch('/api/local-seo/scores')
+  const handleRunAudit = useCallback(async (clientId) => {
+    setRunning(clientId)
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch local SEO data')
-      }
-
-      const data = await response.json()
-
-      setLocalSEOData({
-        clients: data.clients || [],
-        summary: {
-          totalClients: data.clients?.length || 0,
-          avgScore: calculateAverageScore(data.clients || []),
-          issuesFound: countTotalIssues(data.clients || []),
-          lastRun: data.lastRun || new Date().toISOString()
+    await runAudit(
+      () => localSEOAPI.runAudit(clientId),
+      {
+        showSuccessToast: true,
+        successMessage: 'Audit started successfully',
+        onSuccess: () => {
+          refetch()
         }
-      })
-    } catch (err) {
-      console.error('Error fetching local SEO data:', err)
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const calculateAverageScore = (clients) => {
-    if (clients.length === 0) return 0
-    const sum = clients.reduce((acc, client) => acc + (client.score || 0), 0)
-    return (sum / clients.length).toFixed(1)
-  }
-
-  const countTotalIssues = (clients) => {
-    return clients.reduce((acc, client) => {
-      return acc +
-        (client.napConsistency ? 0 : 1) +
-        (client.schemaMarkup ? 0 : 1) +
-        (client.citations || 0)
-    }, 0)
-  }
-
-  const handleRunAudit = async (clientId) => {
-    setRunning(true)
-    try {
-      const response = await fetch(`/api/local-seo/audit/${clientId}`, {
-        method: 'POST'
-      })
-
-      if (response.ok) {
-        await fetchLocalSEOData()
       }
-    } catch (err) {
-      console.error('Audit error:', err)
-    } finally {
-      setRunning(false)
-    }
-  }
+    )
 
-  const handleAutoFix = async (clientId) => {
-    setRunning(true)
-    try {
-      const response = await fetch(`/api/local-seo/auto-fix/${clientId}`, {
-        method: 'POST'
-      })
+    setRunning(null)
+  }, [runAudit, refetch])
 
-      if (response.ok) {
-        await fetchLocalSEOData()
+  const handleAutoFix = useCallback(async (clientId) => {
+    setRunning(`fix-${clientId}`)
+
+    await runAutoFix(
+      () => localSEOAPI.autoFix(clientId),
+      {
+        showSuccessToast: true,
+        successMessage: 'Auto-fix completed successfully',
+        onSuccess: () => {
+          refetch()
+        }
       }
-    } catch (err) {
-      console.error('Auto-fix error:', err)
-    } finally {
-      setRunning(false)
-    }
-  }
+    )
 
-  const getScoreColor = (score) => {
+    setRunning(null)
+  }, [runAutoFix, refetch])
+
+  const getScoreColor = useCallback((score) => {
     if (score >= 80) return 'text-green-600'
     if (score >= 60) return 'text-yellow-600'
     return 'text-red-600'
+  }, [])
+
+  const getScoreBadge = useCallback((score) => {
+    if (score >= 80) return 'default'
+    if (score >= 60) return 'secondary'
+    return 'destructive'
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading local SEO data...</span>
+      </div>
+    )
   }
 
-  const getScoreBadge = (score) => {
-    if (score >= 80) return { variant: 'default', label: 'Excellent' }
-    if (score >= 60) return { variant: 'secondary', label: 'Good' }
-    return { variant: 'destructive', label: 'Needs Work' }
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <MapPin className="h-8 w-8" />
+            Local SEO
+          </h1>
+        </div>
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Failed to Load</h3>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={refetch}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
-
-  if (loading) return <LoadingState message="Loading local SEO data..." />
-  if (error) return <ErrorState message={error} onRetry={fetchLocalSEOData} />
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Local SEO Dashboard</h1>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <MapPin className="h-8 w-8" />
+            Local SEO
+          </h1>
           <p className="text-muted-foreground">
-            Monitor and optimize local search presence
+            Optimize local search presence with NAP consistency
           </p>
         </div>
-        <Button onClick={() => fetchLocalSEOData()} disabled={running}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${running ? 'animate-spin' : ''}`} />
+        <Button onClick={refetch} variant="outline">
+          <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Stats */}
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
             <Building className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{localSEOData.summary.totalClients}</div>
-            <p className="text-xs text-muted-foreground">Tracked locations</p>
+            <div className="text-2xl font-bold">{summary.totalClients}</div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Score</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Avg Score</CardTitle>
+            <Star className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${getScoreColor(localSEOData.summary.avgScore)}`}>
-              {localSEOData.summary.avgScore}
+            <div className={`text-2xl font-bold ${getScoreColor(summary.avgScore)}`}>
+              {summary.avgScore}%
             </div>
-            <p className="text-xs text-muted-foreground">Out of 100</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Issues Found</CardTitle>
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{localSEOData.summary.issuesFound}</div>
-            <p className="text-xs text-muted-foreground">Requiring attention</p>
+            <div className="text-2xl font-bold">{summary.issuesFound}</div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Last Updated</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Last Run</CardTitle>
             <RefreshCw className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-sm font-bold">
-              {new Date(localSEOData.summary.lastRun).toLocaleDateString()}
+            <div className="text-sm">
+              {new Date(summary.lastRun).toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">
-              {new Date(localSEOData.summary.lastRun).toLocaleTimeString()}
-            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Client List with Scores */}
+      {/* Clients Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Client Local SEO Scores</CardTitle>
-          <CardDescription>
-            Overall local SEO health for each client
-          </CardDescription>
+          <CardTitle>Local SEO Scores</CardTitle>
+          <CardDescription>NAP consistency and local optimization status</CardDescription>
         </CardHeader>
         <CardContent>
-          {localSEOData.clients.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No local SEO data available. Run an audit to get started.
+          {clients.length === 0 ? (
+            <div className="text-center py-12">
+              <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Data Available</h3>
+              <p className="text-muted-foreground">
+                Run an audit to see local SEO scores
+              </p>
             </div>
           ) : (
             <Table>
@@ -229,104 +225,32 @@ export function LocalSEOPage() {
                 <TableRow>
                   <TableHead>Client</TableHead>
                   <TableHead>Score</TableHead>
-                  <TableHead>Rating</TableHead>
-                  <TableHead>NAP</TableHead>
+                  <TableHead>NAP Status</TableHead>
+                  <TableHead>GMB Status</TableHead>
                   <TableHead>Schema</TableHead>
-                  <TableHead>Citations</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead>Issues</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {localSEOData.clients.map((client) => {
-                  const badge = getScoreBadge(client.score || 0)
-                  return (
-                    <TableRow key={client.id}>
-                      <TableCell className="font-medium">{client.name}</TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className={`text-xl font-bold ${getScoreColor(client.score || 0)}`}>
-                            {client.score || 0}
-                          </div>
-                          <Progress value={client.score || 0} className="h-2" />
+                {clients.map(client => (
+                  <TableRow key={client.id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{client.name}</p>
+                        <p className="text-sm text-muted-foreground">{client.domain}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className={`text-2xl font-bold ${getScoreColor(client.score || 0)}`}>
+                          {client.score || 0}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={badge.variant}>{badge.label}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {client.napConsistency ? (
-                          <CheckCircle2 className="h-5 w-5 text-green-600" />
-                        ) : (
-                          <XCircle className="h-5 w-5 text-red-600" />
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {client.schemaMarkup ? (
-                          <CheckCircle2 className="h-5 w-5 text-green-600" />
-                        ) : (
-                          <XCircle className="h-5 w-5 text-red-600" />
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{client.citations || 0} found</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleRunAudit(client.id)}
-                            disabled={running}
-                          >
-                            Audit
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => handleAutoFix(client.id)}
-                            disabled={running}
-                          >
-                            <Wrench className="h-3 w-3 mr-1" />
-                            Fix
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Tabs for detailed views */}
-      <Tabs defaultValue="nap" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="nap">NAP Consistency</TabsTrigger>
-          <TabsTrigger value="schema">Schema Markup</TabsTrigger>
-          <TabsTrigger value="citations">Citations</TabsTrigger>
-          <TabsTrigger value="reviews">Reviews</TabsTrigger>
-        </TabsList>
-
-        {/* NAP Tab */}
-        <TabsContent value="nap" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                NAP Consistency Check
-              </CardTitle>
-              <CardDescription>
-                Name, Address, Phone number consistency across your website
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {localSEOData.clients.map((client) => (
-                  <div key={client.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold">{client.name}</h4>
-                      {client.napConsistency ? (
+                        <Progress value={client.score || 0} className="w-20 h-2" />
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {client.nap?.consistent ? (
                         <Badge variant="default">
                           <CheckCircle2 className="h-3 w-3 mr-1" />
                           Consistent
@@ -334,147 +258,83 @@ export function LocalSEOPage() {
                       ) : (
                         <Badge variant="destructive">
                           <XCircle className="h-3 w-3 mr-1" />
-                          Inconsistent
+                          Issues
                         </Badge>
                       )}
-                    </div>
-                    <div className="grid gap-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <Building className="h-4 w-4 text-muted-foreground" />
-                        <span>{client.businessName || 'Not set'}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span>{client.address || 'Not set'}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <span>{client.phone || 'Not set'}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Schema Tab */}
-        <TabsContent value="schema" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileCode className="h-5 w-5" />
-                Schema Markup Status
-              </CardTitle>
-              <CardDescription>
-                Structured data implementation for local business
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {localSEOData.clients.map((client) => (
-                  <div key={client.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold">{client.name}</h4>
-                      {client.schemaMarkup ? (
+                    </TableCell>
+                    <TableCell>
+                      {client.gmb?.verified ? (
+                        <Badge variant="default">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Verified
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Not Verified
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {client.schema?.implemented ? (
                         <Badge variant="default">
                           <CheckCircle2 className="h-3 w-3 mr-1" />
                           Implemented
                         </Badge>
                       ) : (
-                        <Badge variant="destructive">
+                        <Badge variant="secondary">
                           <XCircle className="h-3 w-3 mr-1" />
                           Missing
                         </Badge>
                       )}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {client.schemaMarkup
-                        ? 'LocalBusiness schema is properly implemented'
-                        : 'Schema markup needs to be added for better local visibility'}
-                    </div>
-                    {!client.schemaMarkup && (
-                      <Button
-                        size="sm"
-                        className="mt-3"
-                        onClick={() => handleAutoFix(client.id)}
-                      >
-                        <Wrench className="h-3 w-3 mr-1" />
-                        Inject Schema
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Citations Tab */}
-        <TabsContent value="citations" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Globe className="h-5 w-5" />
-                Citation Tracking
-              </CardTitle>
-              <CardDescription>
-                Business listings and directory submissions
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {localSEOData.clients.map((client) => (
-                  <div key={client.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold">{client.name}</h4>
-                      <Badge variant="outline">{client.citations || 0} Citations</Badge>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Found in {client.citations || 0} business directories
-                    </div>
-                    <Progress value={(client.citations || 0) * 2} className="h-2 mt-2" />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Reviews Tab */}
-        <TabsContent value="reviews" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Star className="h-5 w-5" />
-                Review Monitoring
-              </CardTitle>
-              <CardDescription>
-                Track and manage online reviews
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {localSEOData.clients.map((client) => (
-                  <div key={client.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold">{client.name}</h4>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                        <span className="font-medium">{client.avgRating || 'N/A'}</span>
+                    </TableCell>
+                    <TableCell>
+                      {client.issues?.length > 0 ? (
+                        <Badge variant="destructive">
+                          {client.issues.length} Issues
+                        </Badge>
+                      ) : (
+                        <Badge variant="default">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          No Issues
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRunAudit(client.id)}
+                          disabled={running === client.id}
+                        >
+                          {running === client.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleAutoFix(client.id)}
+                          disabled={running === `fix-${client.id}` || !client.issues?.length}
+                        >
+                          {running === `fix-${client.id}` ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Wrench className="h-4 w-4" />
+                          )}
+                        </Button>
                       </div>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {client.reviewCount || 0} reviews tracked
-                    </div>
-                  </div>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

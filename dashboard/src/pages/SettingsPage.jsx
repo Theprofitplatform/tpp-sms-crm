@@ -1,289 +1,577 @@
+import { useState, useEffect, useCallback } from 'react'
+import { useToast } from '@/hooks/use-toast'
+import { settingsAPI } from '@/services/api'
+import { useAPIRequest } from '@/hooks/useAPIRequest'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
+import { VALIDATION_PATTERNS } from '@/constants'
+
+// UI Components
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Settings, Bell, Mail, Key, Database, Palette } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
-export function SettingsPage() {
+// Icons
+import {
+  Settings,
+  Bell,
+  Link2,
+  Key,
+  Palette,
+  Save,
+  X,
+  AlertCircle,
+  Loader2,
+  Eye,
+  EyeOff,
+  Copy,
+  RefreshCw
+} from 'lucide-react'
+
+export default function SettingsPage() {
+  // Form state
+  const [settings, setSettings] = useState({
+    general: {
+      platformName: '',
+      adminEmail: '',
+      language: 'en',
+      timezone: 'UTC'
+    },
+    notifications: {
+      rankChanges: true,
+      auditCompletion: true,
+      optimizationResults: true,
+      systemErrors: true,
+      weeklyReports: true
+    },
+    integrations: [],
+    api: {
+      apiKey: '',
+      webhookUrl: ''
+    },
+    appearance: {
+      theme: 'system',
+      primaryColor: 'blue',
+      sidebarPosition: 'left'
+    }
+  })
+
+  const [initialSettings, setInitialSettings] = useState(null)
+  const [isDirty, setIsDirty] = useState(false)
+  const [errors, setErrors] = useState({})
+  const [showApiKey, setShowApiKey] = useState(false)
+  const [activeTab, setActiveTab] = useLocalStorage('settings-active-tab', 'general')
+
+  const { loading, execute } = useAPIRequest()
+  const { toast } = useToast()
+
+  // Load settings on mount
+  useEffect(() => {
+    loadSettings()
+  }, [])
+
+  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isDirty) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [isDirty])
+
+  const loadSettings = async () => {
+    await execute(
+      () => settingsAPI.getAll(),
+      {
+        showErrorToast: true,
+        onSuccess: (data) => {
+          setSettings(data)
+          setInitialSettings(JSON.parse(JSON.stringify(data)))
+        },
+        onError: () => {
+          // Set default values if API fails
+          const defaultSettings = { ...settings }
+          setSettings(defaultSettings)
+          setInitialSettings(JSON.parse(JSON.stringify(defaultSettings)))
+        }
+      }
+    )
+  }
+
+  const handleChange = useCallback((category, field, value) => {
+    setSettings(prev => ({
+      ...prev,
+      [category]: {
+        ...prev[category],
+        [field]: value
+      }
+    }))
+    setIsDirty(true)
+
+    // Clear error for this field
+    setErrors(prev => {
+      const newErrors = { ...prev }
+      delete newErrors[`${category}.${field}`]
+      return newErrors
+    })
+  }, [])
+
+  const validateSettings = () => {
+    const newErrors = {}
+
+    // Validate email
+    if (!VALIDATION_PATTERNS.EMAIL.test(settings.general.adminEmail)) {
+      newErrors['general.adminEmail'] = 'Invalid email format'
+    }
+
+    // Validate webhook URL if provided
+    if (settings.api.webhookUrl && !VALIDATION_PATTERNS.URL.test(settings.api.webhookUrl)) {
+      newErrors['api.webhookUrl'] = 'Invalid URL format'
+    }
+
+    // Validate platform name
+    if (!settings.general.platformName || settings.general.platformName.trim().length === 0) {
+      newErrors['general.platformName'] = 'Platform name is required'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleSave = async () => {
+    // Validate before saving
+    if (!validateSettings()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please fix the errors before saving',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    await execute(
+      () => settingsAPI.update('all', settings),
+      {
+        showSuccessToast: true,
+        successMessage: 'Settings saved successfully',
+        onSuccess: () => {
+          setInitialSettings(JSON.parse(JSON.stringify(settings)))
+          setIsDirty(false)
+        }
+      }
+    )
+  }
+
+  const handleDiscard = () => {
+    setSettings(JSON.parse(JSON.stringify(initialSettings)))
+    setIsDirty(false)
+    setErrors({})
+    toast({ title: 'Changes discarded' })
+  }
+
+  const handleRegenerateApiKey = async () => {
+    if (!confirm('This will invalidate your current API key. Continue?')) {
+      return
+    }
+
+    await execute(
+      () => settingsAPI.generateAPIKey('Default Key'),
+      {
+        showSuccessToast: true,
+        successMessage: 'API key regenerated successfully',
+        onSuccess: (data) => {
+          handleChange('api', 'apiKey', data.apiKey)
+        }
+      }
+    )
+  }
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text)
+    toast({ title: 'Copied to clipboard' })
+  }
+
+  if (loading && !initialSettings) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-          <p className="text-muted-foreground">
-            Manage your platform configuration and preferences
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Settings className="h-8 w-8" />
+            Settings
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Manage your application configuration
           </p>
         </div>
+
+        {isDirty && (
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleDiscard}
+              disabled={loading}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Discard Changes
+            </Button>
+            <Button onClick={handleSave} disabled={loading}>
+              {loading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Save Changes
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Settings Tabs */}
-      <Tabs defaultValue="general" className="space-y-4">
+      {/* Unsaved changes alert */}
+      {isDirty && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            You have unsaved changes. Don't forget to save before leaving this page.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="general">
-            <Settings className="h-4 w-4 mr-2" />
-            General
-          </TabsTrigger>
-          <TabsTrigger value="notifications">
-            <Bell className="h-4 w-4 mr-2" />
-            Notifications
-          </TabsTrigger>
-          <TabsTrigger value="integrations">
-            <Database className="h-4 w-4 mr-2" />
-            Integrations
-          </TabsTrigger>
-          <TabsTrigger value="api">
-            <Key className="h-4 w-4 mr-2" />
-            API
-          </TabsTrigger>
-          <TabsTrigger value="appearance">
-            <Palette className="h-4 w-4 mr-2" />
-            Appearance
-          </TabsTrigger>
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="integrations">Integrations</TabsTrigger>
+          <TabsTrigger value="api">API</TabsTrigger>
+          <TabsTrigger value="appearance">Appearance</TabsTrigger>
         </TabsList>
 
-        {/* General Settings */}
+        {/* General Settings Tab */}
         <TabsContent value="general" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Platform Configuration</CardTitle>
+              <CardTitle>General Settings</CardTitle>
               <CardDescription>
-                Manage your SEO automation platform settings
+                Basic application configuration
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Platform Name */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Platform Name</label>
-                <Input defaultValue="SEO Automation Platform" />
+                <Label htmlFor="platform-name">
+                  Platform Name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="platform-name"
+                  value={settings.general.platformName}
+                  onChange={(e) => handleChange('general', 'platformName', e.target.value)}
+                  placeholder="My SEO Platform"
+                  aria-invalid={!!errors['general.platformName']}
+                  aria-describedby={errors['general.platformName'] ? 'platform-name-error' : undefined}
+                />
+                {errors['general.platformName'] && (
+                  <p id="platform-name-error" className="text-sm text-red-500">
+                    {errors['general.platformName']}
+                  </p>
+                )}
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Admin Email</label>
-                <Input type="email" defaultValue="admin@example.com" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Default Language</label>
-                <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm">
-                  <option>English</option>
-                  <option>Spanish</option>
-                  <option>French</option>
-                  <option>German</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Timezone</label>
-                <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm">
-                  <option>UTC</option>
-                  <option>America/New_York</option>
-                  <option>America/Los_Angeles</option>
-                  <option>Europe/London</option>
-                </select>
-              </div>
-              <Button>Save Changes</Button>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Automation Settings</CardTitle>
-              <CardDescription>
-                Configure automation behavior
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Auto-run Audits</p>
-                  <p className="text-sm text-muted-foreground">
-                    Automatically run SEO audits weekly
+              {/* Admin Email */}
+              <div className="space-y-2">
+                <Label htmlFor="admin-email">
+                  Admin Email <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="admin-email"
+                  type="email"
+                  value={settings.general.adminEmail}
+                  onChange={(e) => handleChange('general', 'adminEmail', e.target.value)}
+                  placeholder="admin@example.com"
+                  aria-invalid={!!errors['general.adminEmail']}
+                  aria-describedby={errors['general.adminEmail'] ? 'admin-email-error' : undefined}
+                />
+                {errors['general.adminEmail'] && (
+                  <p id="admin-email-error" className="text-sm text-red-500">
+                    {errors['general.adminEmail']}
                   </p>
-                </div>
-                <Button variant="outline" size="sm">Configure</Button>
+                )}
               </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Rank Tracking</p>
-                  <p className="text-sm text-muted-foreground">
-                    Check rankings daily for all clients
-                  </p>
-                </div>
-                <Button variant="outline" size="sm">Configure</Button>
+
+              {/* Language */}
+              <div className="space-y-2">
+                <Label htmlFor="language">Language</Label>
+                <Select
+                  value={settings.general.language}
+                  onValueChange={(value) => handleChange('general', 'language', value)}
+                >
+                  <SelectTrigger id="language">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="es">Spanish</SelectItem>
+                    <SelectItem value="fr">French</SelectItem>
+                    <SelectItem value="de">German</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Auto-fix Issues</p>
-                  <p className="text-sm text-muted-foreground">
-                    Automatically fix common SEO issues
-                  </p>
-                </div>
-                <Button variant="outline" size="sm">Configure</Button>
+
+              {/* Timezone */}
+              <div className="space-y-2">
+                <Label htmlFor="timezone">Timezone</Label>
+                <Select
+                  value={settings.general.timezone}
+                  onValueChange={(value) => handleChange('general', 'timezone', value)}
+                >
+                  <SelectTrigger id="timezone">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="UTC">UTC</SelectItem>
+                    <SelectItem value="America/New_York">Eastern Time</SelectItem>
+                    <SelectItem value="America/Chicago">Central Time</SelectItem>
+                    <SelectItem value="America/Denver">Mountain Time</SelectItem>
+                    <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
+                    <SelectItem value="Europe/London">London</SelectItem>
+                    <SelectItem value="Europe/Paris">Paris</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Notifications */}
+        {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Email Notifications</CardTitle>
+              <CardTitle>Notification Preferences</CardTitle>
               <CardDescription>
-                Choose which emails you want to receive
+                Choose which notifications you want to receive
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {[
-                { title: 'Audit Completed', description: 'When an SEO audit finishes' },
-                { title: 'Ranking Changes', description: 'When keyword rankings change significantly' },
-                { title: 'New Issues Found', description: 'When new SEO issues are detected' },
-                { title: 'Campaign Updates', description: 'Weekly campaign performance reports' },
-                { title: 'System Alerts', description: 'Important system notifications' },
-              ].map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between py-2">
-                  <div>
-                    <p className="font-medium">{item.title}</p>
-                    <p className="text-sm text-muted-foreground">{item.description}</p>
-                  </div>
-                  <input type="checkbox" defaultChecked className="h-4 w-4" />
-                </div>
-              ))}
-              <Button>Save Preferences</Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Integrations */}
-        <TabsContent value="integrations" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Connected Services</CardTitle>
-              <CardDescription>
-                Manage your third-party integrations
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {[
-                { name: 'Google Search Console', status: 'Connected', icon: '🔍' },
-                { name: 'Google Analytics', status: 'Connected', icon: '📊' },
-                { name: 'Ahrefs API', status: 'Not Connected', icon: '🔗' },
-                { name: 'SEMrush', status: 'Not Connected', icon: '📈' },
-                { name: 'Slack', status: 'Connected', icon: '💬' },
-              ].map((service, idx) => (
-                <div key={idx} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{service.icon}</span>
-                    <div>
-                      <p className="font-medium">{service.name}</p>
-                      <Badge variant={service.status === 'Connected' ? 'success' : 'secondary'}>
-                        {service.status}
-                      </Badge>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    {service.status === 'Connected' ? 'Configure' : 'Connect'}
-                  </Button>
+              {Object.entries({
+                rankChanges: 'Rank Changes',
+                auditCompletion: 'Audit Completion',
+                optimizationResults: 'Optimization Results',
+                systemErrors: 'System Errors',
+                weeklyReports: 'Weekly Reports'
+              }).map(([key, label]) => (
+                <div key={key} className="flex items-center justify-between">
+                  <Label htmlFor={`notif-${key}`} className="cursor-pointer">
+                    {label}
+                  </Label>
+                  <Switch
+                    id={`notif-${key}`}
+                    checked={settings.notifications[key]}
+                    onCheckedChange={(checked) => handleChange('notifications', key, checked)}
+                  />
                 </div>
               ))}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* API Settings */}
+        {/* API Tab */}
         <TabsContent value="api" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>API Keys</CardTitle>
+              <CardTitle>API Configuration</CardTitle>
               <CardDescription>
-                Manage your API access keys
+                Manage your API keys and webhooks
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* API Key */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">API Key</label>
+                <Label htmlFor="api-key">API Key</Label>
                 <div className="flex gap-2">
-                  <Input type="password" value="sk_live_xxxxxxxxxxxxxxxx" readOnly />
-                  <Button variant="outline">Copy</Button>
+                  <div className="relative flex-1">
+                    <Input
+                      id="api-key"
+                      type={showApiKey ? 'text' : 'password'}
+                      value={settings.api.apiKey}
+                      readOnly
+                      className="pr-20"
+                    />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+                      >
+                        {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => copyToClipboard(settings.api.apiKey)}
+                        aria-label="Copy API key"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={handleRegenerateApiKey}
+                    disabled={loading}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Regenerate
+                  </Button>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Webhook URL</label>
-                <Input defaultValue="https://api.example.com/webhooks" />
-              </div>
-              <div className="flex gap-2">
-                <Button>Regenerate Key</Button>
-                <Button variant="outline">View Documentation</Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Rate Limits</CardTitle>
-              <CardDescription>
-                Current API usage and limits
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Requests this month</span>
-                  <span className="font-medium">1,247 / 10,000</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-primary w-[12%]"></div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between pt-2">
                 <p className="text-sm text-muted-foreground">
-                  Need higher limits?
+                  Keep your API key secure. Never share it publicly.
                 </p>
-                <Button variant="outline" size="sm">Upgrade Plan</Button>
+              </div>
+
+              {/* Webhook URL */}
+              <div className="space-y-2">
+                <Label htmlFor="webhook-url">Webhook URL (Optional)</Label>
+                <Input
+                  id="webhook-url"
+                  type="url"
+                  value={settings.api.webhookUrl}
+                  onChange={(e) => handleChange('api', 'webhookUrl', e.target.value)}
+                  placeholder="https://your-domain.com/webhook"
+                  aria-invalid={!!errors['api.webhookUrl']}
+                  aria-describedby={errors['api.webhookUrl'] ? 'webhook-url-error' : undefined}
+                />
+                {errors['api.webhookUrl'] && (
+                  <p id="webhook-url-error" className="text-sm text-red-500">
+                    {errors['api.webhookUrl']}
+                  </p>
+                )}
+                <p className="text-sm text-muted-foreground">
+                  Receive real-time notifications at this URL
+                </p>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Appearance */}
+        {/* Appearance Tab */}
         <TabsContent value="appearance" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Theme Preferences</CardTitle>
+              <CardTitle>Appearance</CardTitle>
               <CardDescription>
                 Customize the look and feel of your dashboard
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Theme */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Theme Mode</label>
+                <Label>Theme</Label>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm">Light</Button>
-                  <Button variant="outline" size="sm">Dark</Button>
-                  <Button variant="default" size="sm">System</Button>
+                  {['light', 'dark', 'system'].map((theme) => (
+                    <Button
+                      key={theme}
+                      variant={settings.appearance.theme === theme ? 'default' : 'outline'}
+                      onClick={() => handleChange('appearance', 'theme', theme)}
+                      className="flex-1"
+                    >
+                      {theme.charAt(0).toUpperCase() + theme.slice(1)}
+                    </Button>
+                  ))}
                 </div>
               </div>
+
+              {/* Primary Color */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Primary Color</label>
-                <div className="flex gap-2">
-                  {['bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-orange-500', 'bg-red-500'].map((color, idx) => (
+                <Label>Primary Color</Label>
+                <div className="grid grid-cols-5 gap-2">
+                  {['blue', 'green', 'purple', 'red', 'orange'].map((color) => (
                     <button
-                      key={idx}
-                      className={`h-10 w-10 rounded-md ${color} border-2 ${idx === 0 ? 'border-foreground' : 'border-transparent'}`}
+                      key={color}
+                      className={`h-10 rounded-md border-2 ${
+                        settings.appearance.primaryColor === color
+                          ? 'border-primary ring-2 ring-offset-2'
+                          : 'border-transparent'
+                      }`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => handleChange('appearance', 'primaryColor', color)}
+                      aria-label={`Select ${color} as primary color`}
                     />
                   ))}
                 </div>
               </div>
+
+              {/* Sidebar Position */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Sidebar Position</label>
-                <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm">
-                  <option>Left</option>
-                  <option>Right</option>
-                </select>
+                <Label htmlFor="sidebar-position">Sidebar Position</Label>
+                <Select
+                  value={settings.appearance.sidebarPosition}
+                  onValueChange={(value) => handleChange('appearance', 'sidebarPosition', value)}
+                >
+                  <SelectTrigger id="sidebar-position">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="left">Left</SelectItem>
+                    <SelectItem value="right">Right</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <Button>Save Preferences</Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Integrations Tab - Placeholder */}
+        <TabsContent value="integrations" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Integrations</CardTitle>
+              <CardDescription>
+                Connect third-party services
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                No integrations configured yet.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Save reminder - Fixed position */}
+      {isDirty && (
+        <div className="fixed bottom-4 right-4 bg-background border rounded-lg shadow-lg p-4 flex items-center gap-4">
+          <AlertCircle className="h-5 w-5 text-yellow-500" />
+          <div>
+            <p className="font-medium">You have unsaved changes</p>
+            <p className="text-sm text-muted-foreground">Don't forget to save</p>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={handleDiscard}>
+              Discard
+            </Button>
+            <Button size="sm" onClick={handleSave} disabled={loading}>
+              Save
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

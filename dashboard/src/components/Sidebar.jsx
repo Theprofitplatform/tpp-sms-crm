@@ -22,7 +22,8 @@ import {
   Zap,
   Download,
   Bell,
-  Code
+  Code,
+  TrendingUp
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -40,6 +41,7 @@ const navGroups = [
     items: [
       { icon: Rocket, label: 'Control Center', href: '#automation' },
       { icon: Bot, label: 'Auto-Fix Engines', href: '#autofix' },
+      { icon: Activity, label: 'Activity Log', href: '#activity-log' },
       { icon: Sparkles, label: 'AI Optimizer', href: '#ai-optimizer' },
       { icon: Clock, label: 'Scheduler', href: '#scheduler' },
       { icon: Zap, label: 'Bulk Operations', href: '#bulk-operations' },
@@ -48,6 +50,9 @@ const navGroups = [
   {
     title: 'SEO Tools',
     items: [
+      { icon: Globe, label: 'Domains', href: '#domains' },
+      { icon: Target, label: 'Keywords Tracking', href: '#keywords' },
+      { icon: TrendingUp, label: 'Position Analysis', href: '#position-tracking' },
       { icon: Globe, label: 'Google Console', href: '#google-console' },
       { icon: MapPin, label: 'Local SEO', href: '#local-seo' },
       { icon: FileCode, label: 'WordPress', href: '#wordpress' },

@@ -1,9 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Progress } from '@/components/ui/progress'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useToast } from '@/hooks/use-toast'
+
+import { clientAPI, batchAPI } from '@/services/api'
+import { useAPIRequest, useAPIData } from '@/hooks/useAPIRequest'
+
 import {
   Zap,
   CheckCircle2,
@@ -12,83 +18,99 @@ import {
   Mail,
   Play,
   Square,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from 'lucide-react'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { LoadingState } from '@/components/LoadingState'
 
-export function BulkOperationsPage() {
-  const [loading, setLoading] = useState(true)
-  const [running, setRunning] = useState(false)
+export default function BulkOperationsPage() {
+  const { toast } = useToast()
   const [selectedClients, setSelectedClients] = useState([])
   const [progress, setProgress] = useState(0)
-  const [clients, setClients] = useState([])
+  const [running, setRunning] = useState(false)
 
-  useEffect(() => {
-    fetchClients()
-  }, [])
+  // API Requests
+  const { data: clientsData, loading, refetch } = useAPIData(
+    () => clientAPI.getAll(),
+    { autoFetch: true }
+  )
 
-  const fetchClients = async () => {
-    setLoading(true)
-    try {
-      const response = await fetch('/api/dashboard')
-      if (response.ok) {
-        const data = await response.json()
-        setClients(data.clients || [])
-      }
-    } catch (err) {
-      console.error('Error fetching clients:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { execute: runBulkOperation } = useAPIRequest()
 
-  const handleSelectAll = () => {
+  const clients = clientsData?.clients || []
+
+  const handleSelectAll = useCallback(() => {
     if (selectedClients.length === clients.length) {
       setSelectedClients([])
     } else {
       setSelectedClients(clients.map(c => c.id))
     }
-  }
+  }, [clients, selectedClients])
 
-  const handleToggleClient = (clientId) => {
+  const handleToggleClient = useCallback((clientId) => {
     setSelectedClients(prev =>
       prev.includes(clientId)
         ? prev.filter(id => id !== clientId)
         : [...prev, clientId]
     )
-  }
+  }, [])
 
-  const handleBulkOperation = async (operation) => {
-    if (selectedClients.length === 0) return
+  const handleBulkOperation = useCallback(async (operation) => {
+    if (selectedClients.length === 0) {
+      toast({
+        title: 'No Clients Selected',
+        description: 'Please select at least one client',
+        variant: 'destructive'
+      })
+      return
+    }
 
     setRunning(true)
     setProgress(0)
 
     try {
       for (let i = 0; i < selectedClients.length; i++) {
-        await fetch(`/api/${operation}/${selectedClients[i]}`, { method: 'POST' })
+        const clientId = selectedClients[i]
+        
+        if (operation === 'audit') {
+          await clientAPI.runAudit(clientId)
+        } else if (operation === 'optimize') {
+          await clientAPI.runOptimization(clientId)
+        }
+        
         setProgress(((i + 1) / selectedClients.length) * 100)
       }
+
+      toast({
+        title: 'Operation Complete',
+        description: `Successfully processed ${selectedClients.length} clients`
+      })
+      
+      refetch()
     } catch (err) {
-      console.error('Bulk operation error:', err)
+      toast({
+        title: 'Operation Failed',
+        description: err.message || 'Some operations failed',
+        variant: 'destructive'
+      })
     } finally {
       setRunning(false)
       setProgress(0)
+      setSelectedClients([])
     }
-  }
+  }, [selectedClients, refetch, toast])
 
-  if (loading) return <LoadingState message="Loading clients..." />
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading clients...</span>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
           <Zap className="h-8 w-8 text-primary" />
@@ -98,6 +120,21 @@ export function BulkOperationsPage() {
           Perform actions on multiple clients at once
         </p>
       </div>
+
+      {/* Progress Bar */}
+      {running && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Processing...</span>
+                <span className="text-sm text-muted-foreground">{Math.round(progress)}%</span>
+              </div>
+              <Progress value={progress} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Operation Cards */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -112,7 +149,7 @@ export function BulkOperationsPage() {
               onClick={() => handleBulkOperation('audit')}
               disabled={selectedClients.length === 0 || running}
             >
-              <FileText className="h-4 w-4 mr-2" />
+              {running ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
               Run Audits
             </Button>
           </CardContent>
@@ -129,7 +166,7 @@ export function BulkOperationsPage() {
               onClick={() => handleBulkOperation('optimize')}
               disabled={selectedClients.length === 0 || running}
             >
-              <Zap className="h-4 w-4 mr-2" />
+              {running ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Zap className="h-4 w-4 mr-2" />}
               Optimize All
             </Button>
           </CardContent>
@@ -146,52 +183,31 @@ export function BulkOperationsPage() {
               onClick={() => handleBulkOperation('send-report')}
               disabled={selectedClients.length === 0 || running}
             >
-              <Mail className="h-4 w-4 mr-2" />
+              {running ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
               Send Reports
             </Button>
           </CardContent>
         </Card>
       </div>
 
-      {/* Progress */}
-      {running && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Operation in Progress...</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Progress value={progress} />
-            <p className="text-sm text-muted-foreground">
-              Processing {Math.round(progress)}% complete
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Client Selection */}
       <Card>
         <CardHeader>
-          <CardTitle>Select Clients</CardTitle>
-          <CardDescription>
-            Choose which clients to include in bulk operations
-          </CardDescription>
-          <div className="flex items-center gap-2 pt-2">
-            <Button variant="outline" size="sm" onClick={handleSelectAll}>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Select Clients</CardTitle>
+              <CardDescription>Choose which clients to perform operations on</CardDescription>
+            </div>
+            <Button variant="outline" onClick={handleSelectAll}>
               {selectedClients.length === clients.length ? 'Deselect All' : 'Select All'}
             </Button>
-            <Badge variant="secondary">{selectedClients.length} selected</Badge>
           </div>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-12">
-                  <Checkbox
-                    checked={selectedClients.length === clients.length}
-                    onCheckedChange={handleSelectAll}
-                  />
-                </TableHead>
+                <TableHead className="w-[50px]">Select</TableHead>
                 <TableHead>Client</TableHead>
                 <TableHead>Domain</TableHead>
                 <TableHead>Status</TableHead>
@@ -199,7 +215,7 @@ export function BulkOperationsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clients.map((client) => (
+              {clients.map(client => (
                 <TableRow key={client.id}>
                   <TableCell>
                     <Checkbox
@@ -207,14 +223,14 @@ export function BulkOperationsPage() {
                       onCheckedChange={() => handleToggleClient(client.id)}
                     />
                   </TableCell>
-                  <TableCell className="font-medium">{client.name}</TableCell>
-                  <TableCell>{client.domain}</TableCell>
+                  <TableCell className="font-medium">{client.name || client.id}</TableCell>
+                  <TableCell>{client.domain || client.url}</TableCell>
                   <TableCell>
-                    <Badge variant={client.status === 'active' ? 'default' : 'secondary'}>
-                      {client.status}
+                    <Badge variant={client.envConfigured ? 'default' : 'secondary'}>
+                      {client.envConfigured ? 'Active' : 'Pending'}
                     </Badge>
                   </TableCell>
-                  <TableCell>{client.keywords || 0}</TableCell>
+                  <TableCell>{client.totalKeywords || 0}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -222,18 +238,18 @@ export function BulkOperationsPage() {
         </CardContent>
       </Card>
 
+      {/* Stats */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5" />
-            Bulk Operation Guidelines
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>• Bulk operations run sequentially to avoid API rate limits</p>
-          <p>• Progress is updated in real-time as each client is processed</p>
-          <p>• Failed operations for individual clients won't stop the batch</p>
-          <p>• All operations are logged for audit purposes</p>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-muted-foreground" />
+              <span className="font-medium">{selectedClients.length} clients selected</span>
+            </div>
+            {selectedClients.length > 0 && (
+              <Badge variant="secondary">Ready for bulk operations</Badge>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
