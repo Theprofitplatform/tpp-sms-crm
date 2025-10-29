@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 import { wordpressAPI } from '@/services/api'
 import { useAPIRequest, useAPIData } from '@/hooks/useAPIRequest'
+import AddSiteDialog from '@/components/wordpress/AddSiteDialog'
 
 import {
   Globe,
@@ -28,17 +29,20 @@ export default function WordPressManagerPage() {
   const { toast } = useToast()
   const [testing, setTesting] = useState(null)
   const [syncing, setSyncing] = useState(null)
+  const [showAddDialog, setShowAddDialog] = useState(false)
 
   // API Requests
   const { data: wpData, loading, error, refetch } = useAPIData(
     () => wordpressAPI.getSites(),
-    { autoFetch: true }
+    { autoFetch: true, initialData: { sites: [] } }
   )
 
   const { execute: testConnection } = useAPIRequest()
   const { execute: syncSite } = useAPIRequest()
 
-  const sites = wpData?.sites || []
+  // Ensure sites is always an array
+  const sites = Array.isArray(wpData?.sites) ? wpData.sites : 
+                Array.isArray(wpData) ? wpData : []
 
   // Calculate summary stats
   const summary = useMemo(() => {
@@ -86,6 +90,10 @@ export default function WordPressManagerPage() {
     
     setSyncing(null)
   }, [syncSite, refetch])
+
+  const handleSiteAdded = useCallback(() => {
+    refetch()
+  }, [refetch])
 
   const getStatusColor = useCallback((status) => {
     switch (status) {
@@ -151,11 +159,24 @@ export default function WordPressManagerPage() {
             Manage WordPress site integrations
           </p>
         </div>
-        <Button onClick={refetch} variant="outline">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setShowAddDialog(true)}>
+            <Plug className="h-4 w-4 mr-2" />
+            Connect Site
+          </Button>
+          <Button onClick={refetch} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
+      
+      {/* Add Site Dialog */}
+      <AddSiteDialog 
+        open={showAddDialog} 
+        onOpenChange={setShowAddDialog}
+        onSiteAdded={handleSiteAdded}
+      />
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -214,7 +235,7 @@ export default function WordPressManagerPage() {
               <p className="text-muted-foreground mb-4">
                 Connect your first WordPress site to start managing content
               </p>
-              <Button>
+              <Button onClick={() => setShowAddDialog(true)}>
                 <Plug className="h-4 w-4 mr-2" />
                 Connect Site
               </Button>

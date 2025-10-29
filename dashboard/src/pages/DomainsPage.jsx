@@ -38,10 +38,19 @@ export default function DomainsPage() {
   const [errors, setErrors] = useState({})
 
   // API Requests
-  const { data: domains, loading, refetch } = useAPIData(
+  const { data: response, loading, refetch } = useAPIData(
     () => domainsAPI.getAll(),
-    { autoFetch: true, initialData: [] }
+    { autoFetch: true, initialData: { domains: [] } }
   )
+  
+  // Debug: Log the response
+  console.log('Domains API Response:', response)
+  
+  // Ensure domains is always an array
+  const domains = Array.isArray(response?.domains) ? response.domains : 
+                  Array.isArray(response) ? response : []
+  
+  console.log('Domains array:', domains, 'isArray:', Array.isArray(domains))
 
   const { execute: createDomain, loading: creating } = useAPIRequest()
   const { execute: updateDomain, loading: updating } = useAPIRequest()

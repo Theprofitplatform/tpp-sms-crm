@@ -104,6 +104,30 @@ export const analyticsAPI = {
   async getClientMetrics() {
     const response = await fetch(`${API_BASE}/analytics/clients/metrics`)
     return response.json()
+  },
+
+  // Get GSC summary data
+  async getGSCSummary() {
+    try {
+      const response = await fetch(`${API_BASE}/gsc/summary`)
+      if (!response.ok) {
+        console.warn('GSC data not available')
+        return { topQueries: [], totalClicks: 0, totalImpressions: 0, avgPosition: 0 }
+      }
+      return response.json()
+    } catch (error) {
+      console.warn('GSC service error:', error)
+      return { topQueries: [], totalClicks: 0, totalImpressions: 0, avgPosition: 0 }
+    }
+  },
+
+  // Sync GSC data
+  async syncGSC() {
+    const response = await fetch(`${API_BASE}/gsc/sync`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Failed to sync GSC data')
+    return response.json()
   }
 }
 

@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Calendar, TrendingUp, TrendingDown, Download, Filter, Loader2 } from 'lucide-react'
+import { Calendar, TrendingUp, TrendingDown, Download, Filter, Loader2, RefreshCw } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 import { analyticsAPI, clientAPI } from '@/services/api'

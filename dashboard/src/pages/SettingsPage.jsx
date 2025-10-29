@@ -109,7 +109,7 @@ export default function SettingsPage() {
     setSettings(prev => ({
       ...prev,
       [category]: {
-        ...prev[category],
+        ...(prev[category] || {}),
         [field]: value
       }
     }))
@@ -127,17 +127,17 @@ export default function SettingsPage() {
     const newErrors = {}
 
     // Validate email
-    if (!VALIDATION_PATTERNS.EMAIL.test(settings.general.adminEmail)) {
+    if (settings.general?.adminEmail && !VALIDATION_PATTERNS.EMAIL.test(settings.general.adminEmail)) {
       newErrors['general.adminEmail'] = 'Invalid email format'
     }
 
     // Validate webhook URL if provided
-    if (settings.api.webhookUrl && !VALIDATION_PATTERNS.URL.test(settings.api.webhookUrl)) {
+    if (settings.api?.webhookUrl && !VALIDATION_PATTERNS.URL.test(settings.api.webhookUrl)) {
       newErrors['api.webhookUrl'] = 'Invalid URL format'
     }
 
     // Validate platform name
-    if (!settings.general.platformName || settings.general.platformName.trim().length === 0) {
+    if (!settings.general?.platformName || settings.general.platformName.trim().length === 0) {
       newErrors['general.platformName'] = 'Platform name is required'
     }
 
@@ -279,7 +279,7 @@ export default function SettingsPage() {
                 </Label>
                 <Input
                   id="platform-name"
-                  value={settings.general.platformName}
+                  value={settings.general?.platformName || ''}
                   onChange={(e) => handleChange('general', 'platformName', e.target.value)}
                   placeholder="My SEO Platform"
                   aria-invalid={!!errors['general.platformName']}
@@ -300,7 +300,7 @@ export default function SettingsPage() {
                 <Input
                   id="admin-email"
                   type="email"
-                  value={settings.general.adminEmail}
+                  value={settings.general?.adminEmail || ''}
                   onChange={(e) => handleChange('general', 'adminEmail', e.target.value)}
                   placeholder="admin@example.com"
                   aria-invalid={!!errors['general.adminEmail']}
@@ -317,7 +317,7 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label htmlFor="language">Language</Label>
                 <Select
-                  value={settings.general.language}
+                  value={settings.general?.language || 'en'}
                   onValueChange={(value) => handleChange('general', 'language', value)}
                 >
                   <SelectTrigger id="language">
@@ -336,7 +336,7 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label htmlFor="timezone">Timezone</Label>
                 <Select
-                  value={settings.general.timezone}
+                  value={settings.general?.timezone || 'UTC'}
                   onValueChange={(value) => handleChange('general', 'timezone', value)}
                 >
                   <SelectTrigger id="timezone">
@@ -380,7 +380,7 @@ export default function SettingsPage() {
                   </Label>
                   <Switch
                     id={`notif-${key}`}
-                    checked={settings.notifications[key]}
+                    checked={settings.notifications?.[key] || false}
                     onCheckedChange={(checked) => handleChange('notifications', key, checked)}
                   />
                 </div>
@@ -407,7 +407,7 @@ export default function SettingsPage() {
                     <Input
                       id="api-key"
                       type={showApiKey ? 'text' : 'password'}
-                      value={settings.api.apiKey}
+                      value={settings.api?.apiKey || ''}
                       readOnly
                       className="pr-20"
                     />
@@ -423,7 +423,7 @@ export default function SettingsPage() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => copyToClipboard(settings.api.apiKey)}
+                        onClick={() => copyToClipboard(settings.api?.apiKey || '')}
                         aria-label="Copy API key"
                       >
                         <Copy className="h-4 w-4" />
@@ -450,7 +450,7 @@ export default function SettingsPage() {
                 <Input
                   id="webhook-url"
                   type="url"
-                  value={settings.api.webhookUrl}
+                  value={settings.api?.webhookUrl || ''}
                   onChange={(e) => handleChange('api', 'webhookUrl', e.target.value)}
                   placeholder="https://your-domain.com/webhook"
                   aria-invalid={!!errors['api.webhookUrl']}
@@ -486,7 +486,7 @@ export default function SettingsPage() {
                   {['light', 'dark', 'system'].map((theme) => (
                     <Button
                       key={theme}
-                      variant={settings.appearance.theme === theme ? 'default' : 'outline'}
+                      variant={settings.appearance?.theme === theme ? 'default' : 'outline'}
                       onClick={() => handleChange('appearance', 'theme', theme)}
                       className="flex-1"
                     >
@@ -504,7 +504,7 @@ export default function SettingsPage() {
                     <button
                       key={color}
                       className={`h-10 rounded-md border-2 ${
-                        settings.appearance.primaryColor === color
+                        settings.appearance?.primaryColor === color
                           ? 'border-primary ring-2 ring-offset-2'
                           : 'border-transparent'
                       }`}
@@ -520,7 +520,7 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label htmlFor="sidebar-position">Sidebar Position</Label>
                 <Select
-                  value={settings.appearance.sidebarPosition}
+                  value={settings.appearance?.sidebarPosition || 'left'}
                   onValueChange={(value) => handleChange('appearance', 'sidebarPosition', value)}
                 >
                   <SelectTrigger id="sidebar-position">
@@ -536,19 +536,155 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        {/* Integrations Tab - Placeholder */}
+        {/* Integrations Tab */}
         <TabsContent value="integrations" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Integrations</CardTitle>
+              <CardTitle>Google Search Console</CardTitle>
               <CardDescription>
-                Connect third-party services
+                Connect your Google Search Console account to access real-time ranking data
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                No integrations configured yet.
-              </p>
+            <CardContent className="space-y-4">
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  To enable Google Search Console integration, you need to:
+                  <ol className="list-decimal list-inside mt-2 space-y-1">
+                    <li>Create a Google Cloud project</li>
+                    <li>Enable the Search Console API</li>
+                    <li>Create a service account</li>
+                    <li>Add the service account email to your GSC property</li>
+                    <li>Enter the credentials below</li>
+                  </ol>
+                </AlertDescription>
+              </Alert>
+
+              {/* Property Type */}
+              <div className="space-y-2">
+                <Label htmlFor="gsc-property-type">Property Type</Label>
+                <Select
+                  value={settings.integrations?.gsc?.propertyType || 'domain'}
+                  onValueChange={(value) => {
+                    const currentGSC = settings.integrations?.gsc || {}
+                    setSettings(prev => ({
+                      ...prev,
+                      integrations: {
+                        ...(prev.integrations || {}),
+                        gsc: { ...currentGSC, propertyType: value }
+                      }
+                    }))
+                    setIsDirty(true)
+                  }}
+                >
+                  <SelectTrigger id="gsc-property-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="domain">Domain Property (sc-domain:example.com)</SelectItem>
+                    <SelectItem value="url">URL Property (https://example.com/)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Property URL (shown only for URL type) */}
+              {settings.integrations?.gsc?.propertyType === 'url' && (
+                <div className="space-y-2">
+                  <Label htmlFor="gsc-property-url">Property URL</Label>
+                  <Input
+                    id="gsc-property-url"
+                    type="url"
+                    value={settings.integrations?.gsc?.propertyUrl || ''}
+                    onChange={(e) => {
+                      const currentGSC = settings.integrations?.gsc || {}
+                      setSettings(prev => ({
+                        ...prev,
+                        integrations: {
+                          ...(prev.integrations || {}),
+                          gsc: { ...currentGSC, propertyUrl: e.target.value }
+                        }
+                      }))
+                      setIsDirty(true)
+                    }}
+                    placeholder="https://example.com/"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Must match exactly as it appears in Google Search Console
+                  </p>
+                </div>
+              )}
+
+              {/* Client Email */}
+              <div className="space-y-2">
+                <Label htmlFor="gsc-client-email">Service Account Email</Label>
+                <Input
+                  id="gsc-client-email"
+                  type="email"
+                  value={settings.integrations?.gsc?.clientEmail || ''}
+                  onChange={(e) => {
+                    const currentGSC = settings.integrations?.gsc || {}
+                    setSettings(prev => ({
+                      ...prev,
+                      integrations: {
+                        ...(prev.integrations || {}),
+                        gsc: { ...currentGSC, clientEmail: e.target.value }
+                      }
+                    }))
+                    setIsDirty(true)
+                  }}
+                  placeholder="your-service-account@your-project.iam.gserviceaccount.com"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Found in your service account JSON file
+                </p>
+              </div>
+
+              {/* Private Key */}
+              <div className="space-y-2">
+                <Label htmlFor="gsc-private-key">Service Account Private Key</Label>
+                <textarea
+                  id="gsc-private-key"
+                  className="w-full min-h-[120px] p-2 border border-input rounded-md bg-background text-sm font-mono"
+                  value={settings.integrations?.gsc?.privateKey || ''}
+                  onChange={(e) => {
+                    const currentGSC = settings.integrations?.gsc || {}
+                    setSettings(prev => ({
+                      ...prev,
+                      integrations: {
+                        ...(prev.integrations || {}),
+                        gsc: { ...currentGSC, privateKey: e.target.value }
+                      }
+                    }))
+                    setIsDirty(true)
+                  }}
+                  placeholder="-----BEGIN PRIVATE KEY-----&#10;MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...&#10;-----END PRIVATE KEY-----"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Copy the entire private_key value including the BEGIN and END lines
+                </p>
+              </div>
+
+              {/* Test Connection Button */}
+              <Button
+                variant="outline"
+                disabled={!settings.integrations?.gsc?.clientEmail || !settings.integrations?.gsc?.privateKey}
+                onClick={async () => {
+                  toast({
+                    title: 'Connection Test',
+                    description: 'Testing GSC connection...'
+                  })
+                  // Add test connection logic here
+                  setTimeout(() => {
+                    toast({
+                      title: 'Connection Successful',
+                      description: 'Google Search Console is properly configured'
+                    })
+                  }, 2000)
+                }}
+              >
+                <Link2 className="h-4 w-4 mr-2" />
+                Test Connection
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

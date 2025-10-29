@@ -67,8 +67,11 @@ export default function ClientsPage() {
         reports: client.reportCount || 0
       }))
       .filter(client => {
-        const matchesSearch = client.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-                             client.domain.toLowerCase().includes(debouncedSearch.toLowerCase())
+        const searchTerm = (debouncedSearch || '').toLowerCase()
+        const clientName = (client.name || '').toLowerCase()
+        const clientDomain = (client.domain || '').toLowerCase()
+        
+        const matchesSearch = clientName.includes(searchTerm) || clientDomain.includes(searchTerm)
         const matchesStatus = statusFilter === 'all' || client.status === statusFilter
         return matchesSearch && matchesStatus
       })
@@ -253,7 +256,7 @@ export default function ClientsPage() {
                   <Play className="h-4 w-4" />
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => handleRunOptimization(client.id)} disabled={optimizing}>
-                  <Settings SettingsIcon className="h-4 w-4" />
+                  <SettingsIcon className="h-4 w-4" />
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
