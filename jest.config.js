@@ -59,7 +59,7 @@ export default {
         '^.+\\.(js|jsx)$': 'babel-jest'
       },
       transformIgnorePatterns: [
-        'node_modules/(?!(lucide-react)/)'
+        'node_modules/(?!(lucide-react|clsx|tailwind-merge|class-variance-authority)/)'
       ]
     }
   ],

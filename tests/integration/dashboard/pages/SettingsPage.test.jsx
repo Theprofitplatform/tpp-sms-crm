@@ -11,7 +11,7 @@ import * as api from '../../../../dashboard/src/services/api.js'
 
 // Mock API
 jest.mock('../../../../dashboard/src/services/api.js')
-jest.mock('../../../../dashboard/src/components/ui/use-toast')
+jest.mock('../../../../dashboard/src/hooks/use-toast')
 
 // Mock window.confirm and window.addEventListener
 global.confirm = jest.fn(() => true)
