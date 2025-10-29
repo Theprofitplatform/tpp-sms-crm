@@ -1,3 +1,21 @@
+# AUTOMATIC DEPLOYMENT WORKFLOW
+#
+# This workflow automatically deploys to production when code is merged to main.
+#
+# Workflow: dev → PR → main (auto-deploy to production)
+#
+# Triggers:
+#   - Push to main branch (typically via PR merge)
+#   - Manual trigger via workflow_dispatch
+#
+# Safety:
+#   - Tests must pass before deployment
+#   - Health checks after deployment
+#   - Automatic rollback on health check failure
+#   - Manual rollback available via workflow_dispatch
+#
+# Target: Docker VPS (31.97.222.218)
+#
 name: Deploy to Production VPS
 
 on:

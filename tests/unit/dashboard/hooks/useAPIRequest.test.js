@@ -10,7 +10,7 @@ import * as errorHandler from '../../../../dashboard/src/utils/errorHandler.js'
 
 // Mock toast
 const mockToast = jest.fn()
-jest.mock('../../../../dashboard/src/components/ui/use-toast', () => ({
+jest.mock('../../../../dashboard/src/hooks/use-toast', () => ({
   useToast: () => ({ toast: mockToast })
 }))
 

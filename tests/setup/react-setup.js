@@ -6,6 +6,10 @@
 import '@testing-library/jest-dom'
 import { configure } from '@testing-library/react'
 import { jest } from '@jest/globals'
+import React from 'react'
+
+// Ensure React is globally available for hooks
+global.React = React
 
 // Configure React Testing Library
 configure({
