@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 import { autoFixAPI } from '@/services/api'
 import { useAPIRequest, useAPIData } from '@/hooks/useAPIRequest'
+import AutoFixChangeHistory from '@/components/AutoFixChangeHistory'
 
 import {
   Wrench,
@@ -44,89 +45,8 @@ export default function AutoFixPage() {
   const { execute: toggleEngine } = useAPIRequest()
   const { execute: runEngine } = useAPIRequest()
 
-  // Use fallback data if backend not available
-  const mockEngines = [
-    {
-      id: 1,
-      name: 'Content Optimizer',
-      description: 'Analyzes and optimizes content quality, keyword density, headings, and internal linking',
-      category: 'on-page',
-      impact: 'high',
-      enabled: true,
-      fixesApplied: 247,
-      successRate: 94,
-      lastRun: new Date().toISOString()
-    },
-    {
-      id: 2,
-      name: 'NAP Consistency Fixer',
-      description: 'Ensures Name, Address, Phone data is consistent across all pages',
-      category: 'local-seo',
-      impact: 'high',
-      enabled: true,
-      fixesApplied: 183,
-      successRate: 98,
-      lastRun: new Date().toISOString()
-    },
-    {
-      id: 3,
-      name: 'Schema Markup Injector',
-      description: 'Generates and injects LocalBusiness schema markup for better search visibility',
-      category: 'technical',
-      impact: 'high',
-      enabled: true,
-      fixesApplied: 45,
-      successRate: 100,
-      lastRun: new Date().toISOString()
-    },
-    {
-      id: 4,
-      name: 'Title/Meta Optimizer',
-      description: 'Optimizes page titles and meta descriptions for better click-through rates',
-      category: 'on-page',
-      impact: 'medium',
-      enabled: false,
-      fixesApplied: 312,
-      successRate: 89,
-      lastRun: new Date(Date.now() - 86400000).toISOString()
-    }
-  ]
-
-  const mockHistory = [
-    {
-      id: 1,
-      engineId: 1,
-      engineName: 'Content Optimizer',
-      clientId: 'instantautotraders',
-      fixesApplied: 23,
-      status: 'success',
-      timestamp: new Date(Date.now() - 3600000).toISOString(),
-      duration: '2m 34s'
-    },
-    {
-      id: 2,
-      engineId: 2,
-      engineName: 'NAP Consistency Fixer',
-      clientId: 'theprofitplatform',
-      fixesApplied: 15,
-      status: 'success',
-      timestamp: new Date(Date.now() - 7200000).toISOString(),
-      duration: '1m 12s'
-    },
-    {
-      id: 3,
-      engineId: 3,
-      engineName: 'Schema Markup Injector',
-      clientId: 'instantautotraders',
-      fixesApplied: 1,
-      status: 'success',
-      timestamp: new Date(Date.now() - 10800000).toISOString(),
-      duration: '45s'
-    }
-  ]
-
-  const engines = (enginesData && enginesData.length > 0) ? enginesData : mockEngines
-  const history = (historyData && historyData.length > 0) ? historyData : mockHistory
+  const engines = enginesData || []
+  const history = historyData || []
 
   const stats = useMemo(() => {
     return {
@@ -349,50 +269,14 @@ export default function AutoFixPage() {
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Fix History</CardTitle>
-              <CardDescription>Recent auto-fix operations</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {history.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No history yet
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Engine</TableHead>
-                      <TableHead>Client</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Fixes</TableHead>
-                      <TableHead>Date</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {history.map((item, idx) => (
-                      <TableRow key={item.id || idx}>
-                        <TableCell className="font-medium">{item.engineName}</TableCell>
-                        <TableCell>{item.clientName || 'All'}</TableCell>
-                        <TableCell>
-                          <Badge variant={item.status === 'success' ? 'default' : 'destructive'}>
-                            {item.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{item.fixesApplied || 0}</TableCell>
-                        <TableCell>
-                          {item.createdAt
-                            ? new Date(item.createdAt).toLocaleString()
-                            : 'N/A'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+          <div>
+            <h2 className="text-2xl font-bold mb-2">Change History</h2>
+            <p className="text-muted-foreground mb-6">
+              View all auto-fix optimizations with detailed before/after comparisons
+            </p>
+          </div>
+          
+          <AutoFixChangeHistory limit={20} />
         </TabsContent>
       </Tabs>
     </div>

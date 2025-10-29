@@ -234,7 +234,7 @@ export default function KeywordsPage() {
                 <div className="space-y-2">
                   <Label htmlFor="domain">Domain *</Label>
                   <Select
-                    value={newKeyword.domain_id}
+                    value={newKeyword.domain_id || undefined}
                     onValueChange={(value) => setNewKeyword({ ...newKeyword, domain_id: value })}
                   >
                     <SelectTrigger>
@@ -320,14 +320,14 @@ export default function KeywordsPage() {
               Filter by Domain:
             </Label>
             <Select
-              value={selectedDomain?.toString() || ''}
-              onValueChange={(value) => handleDomainChange(value ? parseInt(value) : null)}
+              value={selectedDomain?.toString() || 'all'}
+              onValueChange={(value) => handleDomainChange(value === 'all' ? null : parseInt(value))}
             >
               <SelectTrigger className="w-[300px]">
                 <SelectValue placeholder="All domains" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Domains</SelectItem>
+                <SelectItem value="all">All Domains</SelectItem>
                 {domains.map((domain) => (
                   <SelectItem key={domain.id} value={domain.id.toString()}>
                     {domain.display_name || domain.domain} ({domain.keyword_count} keywords)

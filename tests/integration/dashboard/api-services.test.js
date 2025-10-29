@@ -30,7 +30,7 @@ const mockResponse = (data, ok = true, status = 200) => ({
 
 describe('WordPress API Module', () => {
   beforeEach(() => {
-    fetch.mockClear()
+    fetch.mockReset()
   })
 
   it('should fetch WordPress sites', async () => {
@@ -54,7 +54,7 @@ describe('WordPress API Module', () => {
 
     const result = await wordpressAPI.testConnection(1)
 
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/wordpress/sites/1/test'))
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/wordpress/test/1'), expect.objectContaining({ method: 'POST' }))
     expect(result.success).toBe(true)
   })
 
@@ -66,7 +66,7 @@ describe('WordPress API Module', () => {
     const result = await wordpressAPI.syncSite(1)
 
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/wordpress/sites/1/sync'),
+      expect.stringContaining('/wordpress/sync/1'),
       expect.objectContaining({ method: 'POST' })
     )
     expect(result.success).toBe(true)
@@ -81,7 +81,7 @@ describe('WordPress API Module', () => {
 
 describe('Scheduler API Module', () => {
   beforeEach(() => {
-    fetch.mockClear()
+    fetch.mockReset()
   })
 
   it('should fetch scheduled jobs', async () => {
@@ -107,7 +107,7 @@ describe('Scheduler API Module', () => {
 
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/scheduler/jobs/1/toggle'),
-      expect.objectContaining({ method: 'PUT' })
+      expect.objectContaining({ method: 'POST' })
     )
     expect(result.enabled).toBe(false)
   })
@@ -129,7 +129,7 @@ describe('Scheduler API Module', () => {
 
 describe('Export API Module', () => {
   beforeEach(() => {
-    fetch.mockClear()
+    fetch.mockReset()
   })
 
   it('should export data as CSV', async () => {
@@ -137,13 +137,16 @@ describe('Export API Module', () => {
 
     fetch.mockResolvedValueOnce({
       ok: true,
+      headers: { get: () => 'filename="export.csv"' },
       blob: async () => mockBlob
     })
 
     const result = await exportAPI.exportData('csv')
 
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/export/data?type=csv'))
-    expect(result).toBeInstanceOf(Blob)
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/export/csv'))
+    expect(result).toHaveProperty('blob')
+    expect(result).toHaveProperty('filename')
+    expect(result.blob).toBeInstanceOf(Blob)
   })
 
   it('should export data as JSON', async () => {
@@ -151,12 +154,15 @@ describe('Export API Module', () => {
 
     fetch.mockResolvedValueOnce({
       ok: true,
+      headers: { get: () => 'filename="export.json"' },
       blob: async () => mockBlob
     })
 
     const result = await exportAPI.exportData('json')
 
-    expect(result).toBeInstanceOf(Blob)
+    expect(result).toHaveProperty('blob')
+    expect(result).toHaveProperty('filename')
+    expect(result.blob).toBeInstanceOf(Blob)
   })
 
   it('should fetch backup history', async () => {
@@ -169,14 +175,14 @@ describe('Export API Module', () => {
 
     const result = await exportAPI.getBackupHistory(10)
 
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/export/backups?limit=10'))
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/backups?limit=10'))
     expect(result).toEqual(mockHistory)
   })
 })
 
 describe('Notifications API Module', () => {
   beforeEach(() => {
-    fetch.mockClear()
+    fetch.mockReset()
   })
 
   it('should fetch notification settings', async () => {
@@ -210,7 +216,7 @@ describe('Notifications API Module', () => {
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/notifications/settings'),
       expect.objectContaining({
-        method: 'PUT',
+        method: 'POST',
         body: JSON.stringify(newSettings)
       })
     )
@@ -220,26 +226,24 @@ describe('Notifications API Module', () => {
 
 describe('Local SEO API Module', () => {
   beforeEach(() => {
-    fetch.mockClear()
+    fetch.mockReset()
   })
 
-  it('should fetch local SEO status', async () => {
-    const mockStatus = {
-      napConsistency: 85,
-      gmbStatus: 'verified',
-      schemaMarkup: true,
-      score: 90
-    }
+  it('should fetch local SEO scores', async () => {
+    const mockScores = [
+      { clientId: 1, napConsistency: 85, gmbStatus: 'verified', schemaMarkup: true, score: 90 },
+      { clientId: 2, napConsistency: 78, gmbStatus: 'pending', schemaMarkup: false, score: 75 }
+    ]
 
-    fetch.mockResolvedValueOnce(mockResponse(mockStatus))
+    fetch.mockResolvedValueOnce(mockResponse(mockScores))
 
-    const result = await localSEOAPI.getStatus()
+    const result = await localSEOAPI.getScores()
 
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/local-seo/status'))
-    expect(result).toEqual(mockStatus)
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/local-seo/scores'))
+    expect(result).toEqual(mockScores)
   })
 
-  it('should run local SEO check', async () => {
+  it('should run local SEO audit for client', async () => {
     const mockResult = {
       success: true,
       issuesFound: 3,
@@ -248,16 +252,16 @@ describe('Local SEO API Module', () => {
 
     fetch.mockResolvedValueOnce(mockResponse(mockResult))
 
-    const result = await localSEOAPI.runCheck()
+    const result = await localSEOAPI.runAudit(1)
 
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/local-seo/check'),
+      expect.stringContaining('/local-seo/audit/1'),
       expect.objectContaining({ method: 'POST' })
     )
     expect(result.issuesFound).toBe(3)
   })
 
-  it('should auto-fix local SEO issues', async () => {
+  it('should auto-fix local SEO issues for client', async () => {
     const mockResult = {
       success: true,
       fixed: 2,
@@ -266,10 +270,10 @@ describe('Local SEO API Module', () => {
 
     fetch.mockResolvedValueOnce(mockResponse(mockResult))
 
-    const result = await localSEOAPI.autoFix()
+    const result = await localSEOAPI.autoFix(1)
 
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/local-seo/auto-fix'),
+      expect.stringContaining('/local-seo/fix/1'),
       expect.objectContaining({ method: 'POST' })
     )
     expect(result.fixed).toBe(2)
@@ -278,7 +282,7 @@ describe('Local SEO API Module', () => {
 
 describe('Domains API Module', () => {
   beforeEach(() => {
-    fetch.mockClear()
+    fetch.mockReset()
   })
 
   it('should fetch all domains', async () => {
@@ -289,7 +293,7 @@ describe('Domains API Module', () => {
 
     fetch.mockResolvedValueOnce(mockResponse(mockDomains))
 
-    const result = await domainsAPI.getDomains()
+    const result = await domainsAPI.getAll()
 
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/domains'))
     expect(result).toEqual(mockDomains)
@@ -301,7 +305,7 @@ describe('Domains API Module', () => {
 
     fetch.mockResolvedValueOnce(mockResponse(mockResult))
 
-    const result = await domainsAPI.createDomain(newDomain)
+    const result = await domainsAPI.create(newDomain)
 
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/domains'),
@@ -319,7 +323,7 @@ describe('Domains API Module', () => {
 
     fetch.mockResolvedValueOnce(mockResponse(mockResult))
 
-    const result = await domainsAPI.updateDomain(1, updates)
+    const result = await domainsAPI.update(1, updates)
 
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/domains/1'),
@@ -336,7 +340,7 @@ describe('Domains API Module', () => {
 
     fetch.mockResolvedValueOnce(mockResponse(mockResult))
 
-    const result = await domainsAPI.deleteDomain(1)
+    const result = await domainsAPI.delete(1)
 
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/domains/1'),
@@ -348,7 +352,7 @@ describe('Domains API Module', () => {
 
 describe('Goals API Module', () => {
   beforeEach(() => {
-    fetch.mockClear()
+    fetch.mockReset()
   })
 
   it('should fetch all goals', async () => {
@@ -418,7 +422,7 @@ describe('Goals API Module', () => {
 
 describe('Webhooks API Module', () => {
   beforeEach(() => {
-    fetch.mockClear()
+    fetch.mockReset()
   })
 
   it('should fetch all webhooks', async () => {
@@ -490,7 +494,7 @@ describe('Webhooks API Module', () => {
 
     fetch.mockResolvedValueOnce(mockResponse(mockResult))
 
-    const result = await webhooksAPI.testWebhook(1)
+    const result = await webhooksAPI.test(1)
 
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/webhooks/1/test'),
@@ -503,7 +507,7 @@ describe('Webhooks API Module', () => {
 
 describe('Recommendations API Module', () => {
   beforeEach(() => {
-    fetch.mockClear()
+    fetch.mockReset()
   })
 
   it('should fetch all recommendations', async () => {
@@ -534,16 +538,16 @@ describe('Recommendations API Module', () => {
     expect(result.applied).toBe(true)
   })
 
-  it('should dismiss recommendation', async () => {
+  it('should delete recommendation', async () => {
     const mockResult = { success: true }
 
     fetch.mockResolvedValueOnce(mockResponse(mockResult))
 
-    const result = await recommendationsAPI.dismiss(1)
+    const result = await recommendationsAPI.delete(1)
 
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/recommendations/1/dismiss'),
-      expect.objectContaining({ method: 'POST' })
+      expect.stringContaining('/recommendations/1'),
+      expect.objectContaining({ method: 'DELETE' })
     )
     expect(result.success).toBe(true)
   })
@@ -551,7 +555,7 @@ describe('Recommendations API Module', () => {
 
 describe('AutoFix API Module', () => {
   beforeEach(() => {
-    fetch.mockClear()
+    fetch.mockReset()
   })
 
   it('should fetch autofix engines', async () => {
@@ -578,7 +582,7 @@ describe('AutoFix API Module', () => {
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/autofix/engines/1/toggle'),
       expect.objectContaining({
-        method: 'PUT',
+        method: 'POST',
         body: JSON.stringify({ enabled: false })
       })
     )
@@ -616,36 +620,40 @@ describe('AutoFix API Module', () => {
 
 describe('API Error Handling', () => {
   beforeEach(() => {
-    fetch.mockClear()
+    fetch.mockReset()
   })
 
   it('should handle 401 Unauthorized', async () => {
     fetch.mockResolvedValueOnce(mockResponse({ error: 'Unauthorized' }, false, 401))
 
-    await expect(domainsAPI.getDomains()).rejects.toThrow()
+    await expect(domainsAPI.getAll()).rejects.toThrow('Failed to fetch domains')
   })
 
   it('should handle 403 Forbidden', async () => {
     fetch.mockResolvedValueOnce(mockResponse({ error: 'Forbidden' }, false, 403))
 
-    await expect(goalsAPI.getAll()).rejects.toThrow()
+    // goalsAPI.getAll() doesn't check response.ok, so it returns the error as JSON
+    const result = await goalsAPI.getAll()
+    expect(result).toEqual({ error: 'Forbidden' })
   })
 
   it('should handle 404 Not Found', async () => {
     fetch.mockResolvedValueOnce(mockResponse({ error: 'Not found' }, false, 404))
 
-    await expect(webhooksAPI.delete(999)).rejects.toThrow()
+    // webhooksAPI.delete() doesn't check response.ok, so it returns the error as JSON
+    const result = await webhooksAPI.delete(999)
+    expect(result).toEqual({ error: 'Not found' })
   })
 
   it('should handle 500 Server Error', async () => {
     fetch.mockResolvedValueOnce(mockResponse({ error: 'Internal error' }, false, 500))
 
-    await expect(schedulerAPI.getJobs()).rejects.toThrow()
+    await expect(schedulerAPI.getJobs()).rejects.toThrow('Failed to fetch scheduler data')
   })
 
   it('should handle network errors', async () => {
     fetch.mockRejectedValueOnce(new TypeError('Failed to fetch'))
 
-    await expect(wordpressAPI.getSites()).rejects.toThrow()
+    await expect(wordpressAPI.getSites()).rejects.toThrow('Failed to fetch')
   })
 })

@@ -2769,6 +2769,86 @@ app.get('/api/autofix/stats', (req, res) => {
   }
 });
 
+// ============================================
+// AUTO-FIX HISTORY API (New)
+// ============================================
+
+import autoFixHistory from './src/services/auto-fix-history.js';
+
+// Get auto-fix history
+app.get('/api/auto-fix-history', async (req, res) => {
+  try {
+    const { clientId, limit = 10, engineType } = req.query;
+    
+    const reports = await autoFixHistory.getAutoFixReports(
+      clientId,
+      parseInt(limit),
+      engineType
+    );
+    
+    res.json({
+      success: true,
+      reports,
+      total: reports.length
+    });
+  } catch (error) {
+    console.error('Error fetching auto-fix history:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get specific auto-fix report
+app.get('/api/auto-fix-history/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await autoFixHistory.getAutoFixReportById(id);
+    
+    if (!result.success) {
+      return res.status(404).json(result);
+    }
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching auto-fix report:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Revert auto-fix changes
+app.post('/api/auto-fix/revert', async (req, res) => {
+  try {
+    const { clientId, backupId, postIds } = req.body;
+    
+    if (!clientId || !backupId || !Array.isArray(postIds)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: clientId, backupId, postIds'
+      });
+    }
+    
+    const result = await autoFixHistory.revertAutoFixChanges(
+      clientId,
+      backupId,
+      postIds
+    );
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error reverting auto-fix changes:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Catchall route for React Router (must be last!)
 // Note: Using app.use instead of app.get to handle all HTTP methods and avoid path-to-regexp errors
 app.use((req, res, next) => {

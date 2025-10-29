@@ -307,6 +307,37 @@ export const autoFixAPI = {
       body: JSON.stringify(settings)
     })
     return response.json()
+  },
+
+  // Get auto-fix change history (NEW)
+  async getChangeHistory(params = {}) {
+    const queryString = new URLSearchParams(params).toString()
+    const response = await fetch(`${API_BASE}/auto-fix-history?${queryString}`)
+    if (!response.ok) {
+      console.warn('Auto-fix history not available')
+      return { success: false, reports: [] }
+    }
+    return response.json()
+  },
+
+  // Get specific auto-fix report (NEW)
+  async getReport(reportId) {
+    const response = await fetch(`${API_BASE}/auto-fix-history/${reportId}`)
+    if (!response.ok) {
+      console.warn('Auto-fix report not found')
+      return { success: false, error: 'Report not found' }
+    }
+    return response.json()
+  },
+
+  // Revert auto-fix changes (NEW)
+  async revertChanges(clientId, backupId, postIds) {
+    const response = await fetch(`${API_BASE}/auto-fix/revert`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, backupId, postIds })
+    })
+    return response.json()
   }
 }
 

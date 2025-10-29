@@ -55,7 +55,9 @@ export default {
         '/_archive/',
         '/files/'
       ],
-      transform: {},
+      transform: {
+        '^.+\\.(js|jsx)$': 'babel-jest'
+      },
       transformIgnorePatterns: [
         'node_modules/(?!(lucide-react)/)'
       ]
