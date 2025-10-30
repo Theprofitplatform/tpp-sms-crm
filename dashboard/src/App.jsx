@@ -2,13 +2,16 @@ import { useState, useEffect } from 'react'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Sidebar } from './components/Sidebar'
 import DashboardPage from './pages/DashboardPage'
+import DashboardPageUpgraded from './pages/DashboardPageUpgraded'
 import ClientsPage from './pages/ClientsPage'
 import ReportsPage from './pages/ReportsPage'
 import ControlCenterPage from './pages/ControlCenterPage'
 import PositionTrackingPage from './pages/PositionTrackingPage'
 import DomainsPage from './pages/DomainsPage'
-import KeywordsPage from './pages/KeywordsPage'
+import KeywordsPage from './pages/KeywordsPageEnhanced'
 import AutoFixPage from './pages/AutoFixPage'
+import AutoFixReviewPage from './pages/AutoFixReviewPage'
+import AutoFixSettingsPage from './pages/AutoFixSettingsPage'
 import RecommendationsPage from './pages/RecommendationsPage'
 import KeywordResearchPage from './pages/KeywordResearchPage'
 import UnifiedKeywordsPage from './pages/UnifiedKeywordsPage'
@@ -19,7 +22,7 @@ import WhiteLabelPage from './pages/WhiteLabelPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import SettingsPage from './pages/SettingsPage'
 import ClientDetailPage from './pages/ClientDetailPage'
-import GoogleSearchConsolePage from './pages/GoogleSearchConsolePage'
+import GoogleSearchConsolePageEnhanced from './pages/GoogleSearchConsolePageEnhanced'
 import LocalSEOPage from './pages/LocalSEOPage'
 import AIOptimizerPage from './pages/AIOptimizerPage'
 import WordPressManagerPage from './pages/WordPressManagerPage'
@@ -47,6 +50,8 @@ function App() {
   const [currentSection, setCurrentSection] = useState('dashboard')
   const [selectedClient, setSelectedClient] = useState(null)
   const [isDark, setIsDark] = useState(false)
+  const [notifications, setNotifications] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
   const [dashboardData, setDashboardData] = useState({
     stats: {
       totalClients: 0,
@@ -68,6 +73,27 @@ function App() {
       document.documentElement.classList.remove('dark')
     }
   }, [isDark])
+
+  useEffect(() => {
+    // Fetch notifications
+    const fetchNotifications = async () => {
+      try {
+        const response = await fetch('/api/notifications?limit=5')
+        if (response.ok) {
+          const data = await response.json()
+          setNotifications(data.notifications || [])
+          setUnreadCount(data.meta?.unread || 0)
+        }
+      } catch (error) {
+        console.error('Failed to fetch notifications:', error)
+      }
+    }
+
+    fetchNotifications()
+    // Refresh notifications every 30 seconds
+    const notifInterval = setInterval(fetchNotifications, 30000)
+    return () => clearInterval(notifInterval)
+  }, [])
 
   useEffect(() => {
     // Fetch dashboard data from API
@@ -236,30 +262,61 @@ function App() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="relative">
                     <Bell className="h-5 w-5" />
-                    <Badge
-                      variant="destructive"
-                      className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
-                    >
-                      3
-                    </Badge>
+                    {unreadCount > 0 && (
+                      <Badge
+                        variant="destructive"
+                        className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                      >
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </Badge>
+                    )}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-80">
                   <div className="p-2">
-                    <h4 className="font-semibold mb-2">Notifications</h4>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold">Notifications</h4>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-auto p-1 text-xs"
+                        onClick={() => handleNavigate('notifications')}
+                      >
+                        View All
+                      </Button>
+                    </div>
                     <div className="space-y-2">
-                      <div className="p-2 hover:bg-muted rounded-md text-sm">
-                        <p className="font-medium">New ranking update</p>
-                        <p className="text-muted-foreground text-xs">Acme Corp improved by 3 positions</p>
-                      </div>
-                      <div className="p-2 hover:bg-muted rounded-md text-sm">
-                        <p className="font-medium">Audit completed</p>
-                        <p className="text-muted-foreground text-xs">TechStart Inc - 15 issues found</p>
-                      </div>
-                      <div className="p-2 hover:bg-muted rounded-md text-sm">
-                        <p className="font-medium">Configuration needed</p>
-                        <p className="text-muted-foreground text-xs">Global Solutions requires setup</p>
-                      </div>
+                      {notifications.length === 0 ? (
+                        <div className="p-4 text-center text-sm text-muted-foreground">
+                          No new notifications
+                        </div>
+                      ) : (
+                        notifications.map(notif => (
+                          <div 
+                            key={notif.id} 
+                            className="p-2 hover:bg-muted rounded-md text-sm cursor-pointer"
+                            onClick={() => {
+                              if (notif.link) {
+                                const section = notif.link.replace('/', '')
+                                handleNavigate(section || 'notifications')
+                              }
+                            }}
+                          >
+                            <div className="flex items-start gap-2">
+                              <div className={`h-2 w-2 rounded-full mt-1.5 flex-shrink-0 ${
+                                notif.type === 'error' ? 'bg-red-500' :
+                                notif.type === 'warning' ? 'bg-yellow-500' :
+                                notif.type === 'success' ? 'bg-green-500' :
+                                'bg-blue-500'
+                              }`} />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium truncate">{notif.title}</p>
+                                <p className="text-muted-foreground text-xs truncate">{notif.message}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 </DropdownMenuContent>
@@ -271,12 +328,14 @@ function App() {
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto p-6">
           {currentSection === 'dashboard' && (
-            <DashboardPage data={dashboardData} onClientClick={handleClientSelect} />
+            <DashboardPageUpgraded data={dashboardData} onClientClick={handleClientSelect} />
           )}
           {currentSection === 'clients' && <ClientsPage />}
           {currentSection === 'reports' && <ReportsPage />}
           {currentSection === 'automation' && <ControlCenterPage />}
-          {currentSection === 'autofix' && <AutoFixPage />}
+          {currentSection === 'autofix' && <AutoFixPage onNavigate={handleNavigate} />}
+          {currentSection === 'autofix-review' && <AutoFixReviewPage onNavigate={handleNavigate} />}
+          {currentSection === 'autofix-settings' && <AutoFixSettingsPage onNavigate={handleNavigate} />}
           {currentSection === 'activity-log' && <ActivityLogPage />}
           {currentSection === 'ai-optimizer' && <AIOptimizerPage />}
           {currentSection === 'scheduler' && <SchedulerPage />}
@@ -284,7 +343,7 @@ function App() {
           {currentSection === 'position-tracking' && <PositionTrackingPage />}
           {currentSection === 'domains' && <DomainsPage />}
           {currentSection === 'keywords' && <KeywordsPage />}
-          {currentSection === 'google-console' && <GoogleSearchConsolePage />}
+          {currentSection === 'google-console' && <GoogleSearchConsolePageEnhanced />}
           {currentSection === 'local-seo' && <LocalSEOPage />}
           {currentSection === 'wordpress' && <WordPressManagerPage />}
           {currentSection === 'recommendations' && <RecommendationsPage />}
@@ -302,7 +361,7 @@ function App() {
           {currentSection === 'client-detail' && (
             <ClientDetailPage clientId={selectedClient} onBack={handleBackToDashboard} />
           )}
-          {!['dashboard', 'clients', 'reports', 'automation', 'autofix', 'activity-log', 'ai-optimizer', 'scheduler',
+          {!['dashboard', 'clients', 'reports', 'automation', 'autofix', 'autofix-review', 'autofix-settings', 'activity-log', 'ai-optimizer', 'scheduler',
               'bulk-operations', 'position-tracking', 'domains', 'keywords', 'google-console', 'local-seo', 'wordpress', 'recommendations',
               'keyword-research', 'unified-keywords', 'goals', 'emails', 'notifications', 'webhooks',
               'api-docs', 'export-backup', 'whitelabel', 'analytics', 'settings', 'client-detail'].includes(currentSection) && (

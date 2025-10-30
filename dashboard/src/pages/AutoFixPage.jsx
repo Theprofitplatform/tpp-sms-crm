@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
-import { autoFixAPI } from '@/services/api'
+import { autoFixAPI, autofixReviewAPI } from '@/services/api'
 import { useAPIRequest, useAPIData } from '@/hooks/useAPIRequest'
 import AutoFixChangeHistory from '@/components/AutoFixChangeHistory'
 
@@ -24,12 +24,15 @@ import {
   AlertTriangle,
   Info,
   Loader2,
-  MapPin
+  MapPin,
+  Eye,
+  Clipboard
 } from 'lucide-react'
 
-export default function AutoFixPage() {
+export default function AutoFixPage({ onNavigate }) {
   const { toast } = useToast()
   const [runningEngine, setRunningEngine] = useState(null)
+  const [reviewMode, setReviewMode] = useState(true) // Default to review mode
 
   // API Requests
   const { data: enginesData, loading: loadingEngines, refetch: refetchEngines } = useAPIData(
@@ -75,20 +78,58 @@ export default function AutoFixPage() {
   const handleRunEngine = useCallback(async (engineId) => {
     setRunningEngine(engineId)
 
-    await runEngine(
-      () => autoFixAPI.runEngine(engineId),
-      {
-        showSuccessToast: true,
-        successMessage: 'Engine started successfully',
-        onSuccess: () => {
-          refetchEngines()
-          refetchHistory()
+    if (reviewMode) {
+      // Run detection only (Phase 1)
+      await runEngine(
+        () => autofixReviewAPI.runDetection(engineId, null),
+        {
+          showSuccessToast: false,
+          onSuccess: (data) => {
+            if (data.success && data.result.proposals > 0) {
+              toast({
+                title: 'Detection Complete',
+                description: (
+                  <div className="space-y-2">
+                    <p>Found {data.result.detected} issues</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onNavigate && onNavigate('autofix-review')}
+                      className="mt-2"
+                    >
+                      <Eye className="mr-2 h-4 w-4" />
+                      Review Proposals
+                    </Button>
+                  </div>
+                )
+              })
+              refetchEngines()
+            } else {
+              toast({
+                title: 'No Issues Found',
+                description: 'No issues were detected by this engine',
+              })
+            }
+          }
         }
-      }
-    )
+      )
+    } else {
+      // Run immediately (legacy mode)
+      await runEngine(
+        () => autoFixAPI.runEngine(engineId),
+        {
+          showSuccessToast: true,
+          successMessage: 'Engine completed successfully',
+          onSuccess: () => {
+            refetchEngines()
+            refetchHistory()
+          }
+        }
+      )
+    }
 
     setRunningEngine(null)
-  }, [runEngine, refetchEngines, refetchHistory])
+  }, [reviewMode, runEngine, refetchEngines, refetchHistory, toast, onNavigate])
 
   const getImpactColor = useCallback((impact) => {
     switch (impact) {
@@ -122,14 +163,39 @@ export default function AutoFixPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Wrench className="h-8 w-8" />
-          Auto-Fix Engines
-        </h1>
-        <p className="text-muted-foreground">
-          Automated SEO issue resolution
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Wrench className="h-8 w-8" />
+            Auto-Fix Engines
+          </h1>
+          <p className="text-muted-foreground">
+            Automated SEO issue resolution
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">Review Mode</label>
+            <Switch
+              checked={reviewMode}
+              onCheckedChange={setReviewMode}
+            />
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => onNavigate && onNavigate('autofix-settings')}
+          >
+            <Settings className="mr-2 h-4 w-4" />
+            Configure
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => onNavigate && onNavigate('autofix-review')}
+          >
+            <Clipboard className="mr-2 h-4 w-4" />
+            View Proposals
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -252,12 +318,21 @@ export default function AutoFixPage() {
                       {runningEngine === engine.id ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Running...
+                          {reviewMode ? 'Detecting...' : 'Running...'}
                         </>
                       ) : (
                         <>
-                          <Play className="h-4 w-4 mr-2" />
-                          Run Now
+                          {reviewMode ? (
+                            <>
+                              <Eye className="h-4 w-4 mr-2" />
+                              Detect Issues
+                            </>
+                          ) : (
+                            <>
+                              <Play className="h-4 w-4 mr-2" />
+                              Run Now
+                            </>
+                          )}
                         </>
                       )}
                     </Button>
