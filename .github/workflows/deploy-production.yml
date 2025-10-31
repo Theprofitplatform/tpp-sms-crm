@@ -149,10 +149,13 @@ jobs:
             echo "🛑 Stopping existing containers..."
             docker compose -f docker-compose.prod.yml down || true
 
+            # Install dependencies from root
+            echo "📦 Installing dependencies..."
+            npm ci --silent
+
             # Build React dashboard
             echo "🎨 Building React dashboard..."
             cd dashboard
-            npm ci --silent
             npm run build --silent
             cd ..
 
