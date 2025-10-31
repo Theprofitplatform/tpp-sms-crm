@@ -72,6 +72,9 @@ import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 import authRoutes from './src/routes/auth-routes.js';
 import { authMiddleware } from './src/auth/auth-middleware.js';
+import { executeAudit, executeOptimization, executeAutoFix, executeNodeScript } from './src/utils/safe-exec.js';
+import { protectClientEndpoint, protectAdminEndpoint, auditLog, validateClientId } from './src/middleware/route-protection.js';
+import { sanitizeClientId } from './src/utils/input-validator.js';
 
 const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
@@ -601,48 +604,52 @@ app.post('/api/test-auth/:clientId', async (req, res) => {
   }
 });
 
-// Run audit for a client
-app.post('/api/audit/:clientId', async (req, res) => {
-  const { clientId } = req.params;
+// Run audit for a client - SECURED with input validation and authentication
+app.post('/api/audit/:clientId',
+  validateClientId,
+  auditLog,
+  async (req, res) => {
+    const { clientId } = req.params;
 
-  try {
-    const startTime = Date.now();
-    const { stdout } = await execAsync(`node client-manager.js audit ${clientId}`);
-    const duration = Date.now() - startTime;
+    try {
+      // Use safe execution wrapper instead of direct execAsync
+      const result = await executeAudit(clientId);
+      const duration = result.duration;
 
-    // Store audit in history
-    historyDB.addAuditRecord(clientId, {
-      type: 'audit',
-      success: true,
-      duration,
-      output: stdout.substring(0, 500) // Store first 500 chars
-    });
+      // Store audit in history
+      historyDB.addAuditRecord(clientId, {
+        type: 'audit',
+        success: true,
+        duration,
+        output: result.stdout.substring(0, 500) // Store first 500 chars
+      });
 
-    // Update client metrics
-    const metrics = historyDB.getClientMetrics(clientId) || {};
-    historyDB.updateClientMetrics(clientId, {
-      ...metrics,
-      totalAudits: (metrics.totalAudits || 0) + 1
-    });
+      // Update client metrics
+      const metrics = historyDB.getClientMetrics(clientId) || {};
+      historyDB.updateClientMetrics(clientId, {
+        ...metrics,
+        totalAudits: (metrics.totalAudits || 0) + 1
+      });
 
-    // Broadcast real-time update
-    broadcastUpdate('audit-completed', {
-      clientId,
-      success: true,
-      timestamp: new Date().toISOString()
-    });
+      // Broadcast real-time update
+      broadcastUpdate('audit-completed', {
+        clientId,
+        success: true,
+        timestamp: new Date().toISOString()
+      });
 
-    res.json({
-      success: true,
-      output: stdout
-    });
-  } catch (error) {
-    // Store failed audit
-    historyDB.addAuditRecord(clientId, {
-      type: 'audit',
-      success: false,
-      error: error.message
-    });
+      res.json({
+        success: true,
+        output: result.stdout,
+        duration
+      });
+    } catch (error) {
+      // Store failed audit
+      historyDB.addAuditRecord(clientId, {
+        type: 'audit',
+        success: false,
+        error: error.message
+      });
 
     broadcastUpdate('audit-failed', {
       clientId,
@@ -658,48 +665,52 @@ app.post('/api/audit/:clientId', async (req, res) => {
   }
 });
 
-// Run optimization for a client
-app.post('/api/optimize/:clientId', async (req, res) => {
-  const { clientId } = req.params;
+// Run optimization for a client - SECURED with input validation and authentication
+app.post('/api/optimize/:clientId',
+  validateClientId,
+  auditLog,
+  async (req, res) => {
+    const { clientId } = req.params;
 
-  try {
-    const startTime = Date.now();
-    const { stdout } = await execAsync(`node client-manager.js optimize ${clientId}`);
-    const duration = Date.now() - startTime;
+    try {
+      // Use safe execution wrapper instead of direct execAsync
+      const result = await executeOptimization(clientId);
+      const duration = result.duration;
 
-    // Store optimization in history
-    historyDB.addAuditRecord(clientId, {
-      type: 'optimization',
-      success: true,
-      duration,
-      output: stdout.substring(0, 500)
-    });
+      // Store optimization in history
+      historyDB.addAuditRecord(clientId, {
+        type: 'optimization',
+        success: true,
+        duration,
+        output: result.stdout.substring(0, 500)
+      });
 
-    // Update client metrics
-    const metrics = historyDB.getClientMetrics(clientId) || {};
-    historyDB.updateClientMetrics(clientId, {
-      ...metrics,
-      totalOptimizations: (metrics.totalOptimizations || 0) + 1
-    });
+      // Update client metrics
+      const metrics = historyDB.getClientMetrics(clientId) || {};
+      historyDB.updateClientMetrics(clientId, {
+        ...metrics,
+        totalOptimizations: (metrics.totalOptimizations || 0) + 1
+      });
 
-    // Broadcast real-time update
-    broadcastUpdate('optimization-completed', {
-      clientId,
-      success: true,
-      timestamp: new Date().toISOString()
-    });
+      // Broadcast real-time update
+      broadcastUpdate('optimization-completed', {
+        clientId,
+        success: true,
+        timestamp: new Date().toISOString()
+      });
 
-    res.json({
-      success: true,
-      output: stdout
-    });
-  } catch (error) {
-    // Store failed optimization
-    historyDB.addAuditRecord(clientId, {
-      type: 'optimization',
-      success: false,
-      error: error.message
-    });
+      res.json({
+        success: true,
+        output: result.stdout,
+        duration
+      });
+    } catch (error) {
+      // Store failed optimization
+      historyDB.addAuditRecord(clientId, {
+        type: 'optimization',
+        success: false,
+        error: error.message
+      });
 
     broadcastUpdate('optimization-failed', {
       clientId,
@@ -1263,14 +1274,14 @@ app.post('/api/control/auto-fix/content/:clientId', async (req, res) => {
     // Broadcast job started
     broadcastUpdate('job-started', job);
 
-    // Execute content optimizer in background
-    execAsync(`node auto-fix-all.js ${clientId}`)
-      .then(({ stdout }) => {
+    // Execute content optimizer in background - SECURED
+    executeAutoFix('all', clientId)
+      .then((result) => {
         job.status = 'completed';
         job.progress = 100;
         job.endTime = Date.now();
         activeJobs.delete(jobId);
-        jobHistory.push({ ...job, output: stdout.substring(0, 200) });
+        jobHistory.push({ ...job, output: result.stdout.substring(0, 200) });
         broadcastUpdate('job-completed', job);
       })
       .catch((error) => {
@@ -1377,41 +1388,46 @@ app.post('/api/control/auto-fix/schema/:clientId', async (req, res) => {
   }
 });
 
-// Title/Meta Optimizer
-app.post('/api/control/auto-fix/titles/:clientId', async (req, res) => {
-  try {
-    const { clientId } = req.params;
-    const jobId = `job-${jobIdCounter++}`;
+// Title/Meta Optimizer - SECURED with admin protection
+app.post('/api/control/auto-fix/titles/:clientId',
+  protectAdminEndpoint,
+  validateClientId,
+  auditLog,
+  async (req, res) => {
+    try {
+      const { clientId } = req.params;
+      const jobId = `job-${jobIdCounter++}`;
 
-    const job = {
-      id: jobId,
-      type: 'title-meta-optimization',
-      clientId,
-      clientName: clientId,
-      status: 'running',
-      progress: 0,
-      startTime: Date.now()
-    };
-    activeJobs.set(jobId, job);
-    broadcastUpdate('job-started', job);
+      const job = {
+        id: jobId,
+        type: 'title-meta-optimization',
+        clientId,
+        clientName: clientId,
+        status: 'running',
+        progress: 0,
+        startTime: Date.now()
+      };
+      activeJobs.set(jobId, job);
+      broadcastUpdate('job-started', job);
 
-    execAsync(`node auto-fix-titles.js ${clientId}`)
-      .then(({ stdout }) => {
-        job.status = 'completed';
-        job.progress = 100;
-        job.endTime = Date.now();
-        activeJobs.delete(jobId);
-        jobHistory.push({ ...job, output: stdout.substring(0, 200) });
-        broadcastUpdate('job-completed', job);
-      })
-      .catch((error) => {
-        job.status = 'failed';
-        job.error = error.message;
-        job.endTime = Date.now();
-        activeJobs.delete(jobId);
-        jobHistory.push(job);
-        broadcastUpdate('job-failed', job);
-      });
+      // Use safe execution wrapper - SECURED
+      executeAutoFix('titles', clientId)
+        .then((result) => {
+          job.status = 'completed';
+          job.progress = 100;
+          job.endTime = Date.now();
+          activeJobs.delete(jobId);
+          jobHistory.push({ ...job, output: result.stdout.substring(0, 200) });
+          broadcastUpdate('job-completed', job);
+        })
+        .catch((error) => {
+          job.status = 'failed';
+          job.error = error.message;
+          job.endTime = Date.now();
+          activeJobs.delete(jobId);
+          jobHistory.push(job);
+          broadcastUpdate('job-failed', job);
+        });
 
     res.json({
       success: true,
