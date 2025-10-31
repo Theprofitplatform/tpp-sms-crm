@@ -1,4 +1,4 @@
-name: Deploy to TPP VPS (PM2)
+name: Deploy to Production (PM2)
 
 on:
   push:
@@ -6,11 +6,15 @@ on:
       - main
   workflow_dispatch:  # Allow manual triggering
 
+# This is the PRIMARY production deployment workflow
+# Deploys to TPP VPS using PM2 process manager
+# Target: https://seodashboard.theprofitplatform.com.au
+
 jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-    continue-on-error: true  # Allow deployment even if some tests fail
+    # Tests must pass for deployment to proceed
 
     steps:
       - name: Checkout code
@@ -26,12 +30,14 @@ jobs:
         run: npm ci
 
       - name: Run linting
-        run: npm run lint || echo "Linting completed with warnings"
+        run: npm run lint
+        continue-on-error: true  # Allow warnings but log them
 
       - name: Run tests
-        run: npm test || echo "Tests completed with some failures"
+        run: npm test
         env:
           CI: true
+        # Tests must pass - deployment will be blocked if tests fail
 
   deploy:
     name: Deploy to TPP VPS
@@ -146,7 +152,7 @@ jobs:
 
             echo "✨ Deployment completed successfully!"
             echo "📍 Service running at: http://localhost:3000"
-            echo "🌐 Public URL: https://seo-expert.theprofitplatform.com.au"
+            echo "🌐 Public URL: https://seodashboard.theprofitplatform.com.au"
           ENDSSH
 
       - name: Verify Cloudflare Tunnel
@@ -176,7 +182,7 @@ jobs:
             echo ""
             echo "🌐 Endpoints:"
             echo "  • Internal: http://localhost:3000"
-            echo "  • External: https://seo-expert.theprofitplatform.com.au"
+            echo "  • External: https://seodashboard.theprofitplatform.com.au"
             echo ""
             echo "🔗 Integration Status:"
             echo "  • SerpBear: http://localhost:3006"

@@ -27,7 +27,15 @@
     "vps:connect": "ssh tpp-vps",
     "vps:monitor": "ssh tpp-vps 'pm2 monit'",
     "vps:backup": "ssh tpp-vps 'cd ~/projects/seo-expert && tar -czf ~/backups/seo-expert/manual-backup-$(date +%Y%m%d-%H%M%S).tar.gz --exclude=node_modules --exclude=.git .'",
-    "actions:status": "echo 'Check: https://github.com/YOUR_USERNAME/seo-expert/actions'",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop all",
+    "pm2:restart": "pm2 restart all",
+    "pm2:reload": "pm2 reload all",
+    "pm2:logs": "pm2 logs",
+    "pm2:monit": "pm2 monit",
+    "pm2:status": "pm2 status",
+    "pm2:save": "pm2 save",
+    "actions:status": "echo 'Check: https://github.com/Theprofitplatform/seoexpert/actions'",
     "actions:logs": "gh run list --limit 5 || echo 'Install gh CLI: https://cli.github.com/'"
   },
   "keywords": [
@@ -53,6 +61,7 @@
     "cheerio": "^1.0.0-rc.12",
     "cookie-parser": "^1.4.7",
     "cron-parser": "^5.4.0",
+    "date-fns": "^4.1.0",
     "dotenv": "^16.3.1",
     "express": "^5.1.0",
     "googleapis": "^164.1.0",
@@ -65,6 +74,7 @@
     "nodemailer": "^7.0.10",
     "openai": "^6.6.0",
     "pdfkit": "^0.17.2",
+    "react-day-picker": "^9.11.1",
     "socket.io": "^4.7.5",
     "winston": "^3.14.2",
     "xlsx": "^0.18.5"

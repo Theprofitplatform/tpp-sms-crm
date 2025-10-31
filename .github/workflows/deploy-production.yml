@@ -1,28 +1,25 @@
-# AUTOMATIC DEPLOYMENT WORKFLOW
+# DOCKER DEPLOYMENT WORKFLOW - DISABLED
 #
-# This workflow automatically deploys to production when code is merged to main.
+# ⚠️ This workflow is DISABLED in favor of PM2 deployment
+# Docker deployment caused persistent issues with:
+#   - SQLite volume mounting
+#   - Container networking complexity
+#   - Sync service crashes
+#   - Slow build times
 #
-# Workflow: dev → PR → main (auto-deploy to production)
+# Active deployment: .github/workflows/deploy-tpp-vps.yml (PM2)
 #
-# Triggers:
-#   - Push to main branch (typically via PR merge)
-#   - Manual trigger via workflow_dispatch
-#
-# Safety:
-#   - Tests must pass before deployment
-#   - Health checks after deployment
-#   - Automatic rollback on health check failure
-#   - Manual rollback available via workflow_dispatch
+# This workflow is kept for reference only and emergency manual use
 #
 # Target: Docker VPS (31.97.222.218)
 #
-name: Deploy to Production VPS
+name: Deploy to Production VPS (Docker - DISABLED)
 
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:  # Allow manual triggering
+  # push:  # DISABLED - Using PM2 deployment instead
+  #   branches:
+  #     - main
+  workflow_dispatch:  # Manual only for emergency Docker deployment
 
 env:
   DOCKER_BUILDKIT: 1
