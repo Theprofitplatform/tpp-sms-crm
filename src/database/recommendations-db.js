@@ -1,12 +1,27 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { mkdirSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const dbPath = path.join(__dirname, '../../database/recommendations.db');
-const db = new Database(dbPath);
+
+// Ensure database directory exists and initialize database
+let db;
+try {
+  mkdirSync(path.dirname(dbPath), { recursive: true });
+  db = new Database(dbPath);
+} catch (err) {
+  console.warn('⚠️  Could not initialize recommendations database. Feature disabled.');
+  console.warn('Error:', err.message);
+  // Create a mock database object that does nothing
+  db = {
+    prepare: () => ({ run: () => {}, get: () => null, all: () => [] }),
+    exec: () => {}
+  };
+}
 
 // Initialize database
 db.exec(`

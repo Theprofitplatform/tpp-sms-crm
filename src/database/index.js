@@ -447,6 +447,22 @@ CREATE TABLE IF NOT EXISTS white_label_config (
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_white_label_active ON white_label_config(is_active);
+
+-- Scraper settings table
+CREATE TABLE IF NOT EXISTS scraper_settings (
+  scraper_name TEXT PRIMARY KEY,
+  enabled INTEGER DEFAULT 0,
+  api_key TEXT,
+  priority INTEGER DEFAULT 10,
+  config TEXT,
+  last_used_at DATETIME,
+  success_rate REAL DEFAULT 1.0,
+  error_count INTEGER DEFAULT 0,
+  last_error TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_scraper_enabled ON scraper_settings(enabled, priority);
 `;
 
 /**

@@ -1,12 +1,26 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { mkdirSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const dbPath = path.join(__dirname, '../../database/goals.db');
-const db = new Database(dbPath);
+
+// Ensure database directory exists
+let db;
+try {
+  mkdirSync(path.dirname(dbPath), { recursive: true });
+  db = new Database(dbPath);
+} catch (err) {
+  console.warn('⚠️  Could not initialize goals database. Feature disabled.');
+  console.warn('Error:', err.message);
+  db = {
+    prepare: () => ({ run: () => {}, get: () => null, all: () => [] }),
+    exec: () => {}
+  };
+}
 
 // Initialize database
 db.exec(`
