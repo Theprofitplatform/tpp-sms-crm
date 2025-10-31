@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Calendar as CalendarComponent } from '@/components/ui/calendar'
+// Calendar component temporarily disabled for deployment
+// import { Calendar as CalendarComponent } from '@/components/ui/calendar'
 import { autoFixAPI } from '@/services/api'
 import { useToast } from '@/hooks/use-toast'
 import { 
@@ -352,12 +353,16 @@ export function AutoFixChangeHistory({ limit = 10 }) {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
-                    <CalendarComponent
+                    {/* Calendar component temporarily disabled for deployment */}
+                    {/* <CalendarComponent
                       mode="single"
                       selected={filters.dateFrom}
                       onSelect={(date) => setFilters(prev => ({ ...prev, dateFrom: date }))}
                       initialFocus
-                    />
+                    /> */}
+                    <div className="p-4 text-sm text-muted-foreground">
+                      Calendar temporarily unavailable
+                    </div>
                   </PopoverContent>
                 </Popover>
               </div>
@@ -372,12 +377,16 @@ export function AutoFixChangeHistory({ limit = 10 }) {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
-                    <CalendarComponent
+                    {/* Calendar component temporarily disabled for deployment */}
+                    {/* <CalendarComponent
                       mode="single"
                       selected={filters.dateTo}
                       onSelect={(date) => setFilters(prev => ({ ...prev, dateTo: date }))}
                       initialFocus
-                    />
+                    /> */}
+                    <div className="p-4 text-sm text-muted-foreground">
+                      Calendar temporarily unavailable
+                    </div>
                   </PopoverContent>
                 </Popover>
               </div>

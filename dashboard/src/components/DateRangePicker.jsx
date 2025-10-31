@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Calendar } from '@/components/ui/calendar'
+// Calendar component temporarily disabled for deployment
+// import { Calendar } from '@/components/ui/calendar'
 import {
   Popover,
   PopoverContent,
@@ -80,14 +81,15 @@ export function DateRangePicker({ value, onChange, className }) {
                 </Button>
               ))}
             </div>
-            <Calendar
+            {/* Calendar component temporarily disabled for deployment */}
+            {/* <Calendar
               initialFocus
               mode="range"
               defaultMonth={date?.from}
               selected={date}
               onSelect={handleDateSelect}
               numberOfMonths={2}
-            />
+            /> */}
           </div>
         </PopoverContent>
       </Popover>
