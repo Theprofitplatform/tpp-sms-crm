@@ -3,8 +3,9 @@
  * Tests bidirectional sync between systems
  */
 
-const request = require('supertest');
-const { expect } = require('chai');
+import { describe, it, before, after } from '@jest/globals';
+import request from 'supertest';
+import { expect } from 'chai';
 
 const BASE_URL = process.env.TEST_API_URL || 'http://localhost:9000';
 const API_PREFIX = '/api/v2';
