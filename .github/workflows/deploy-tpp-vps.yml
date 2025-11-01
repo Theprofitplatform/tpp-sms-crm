@@ -101,6 +101,13 @@ jobs:
             echo "📦 Installing dependencies..."
             npm ci --omit=dev --ignore-scripts
 
+            # Build React dashboard
+            echo "🎨 Building React dashboard..."
+            cd dashboard
+            npm ci
+            npm run build
+            cd ..
+
             # Backup database if exists
             if [ -f "database/seo-expert.db" ]; then
               echo "💾 Backing up database..."
