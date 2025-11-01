@@ -11,6 +11,7 @@ import express from 'express';
 import keywordsRouter from './keywords.js';
 import researchRouter from './research.js';
 import syncRouter from './sync.js';
+import ottoFeaturesRouter from './otto-features.js';
 import { corsMiddleware, optionalAuthenticate } from './middleware/auth.js';
 
 const router = express.Router();
@@ -58,6 +59,21 @@ router.get('/', (req, res) => {
           base: '/api/v2/sync',
           description: 'Synchronization management endpoints',
           methods: ['GET', 'POST']
+        },
+        pixel: {
+          base: '/api/v2/pixel',
+          description: 'Otto SEO - Pixel deployment and tracking',
+          methods: ['GET', 'POST', 'DELETE']
+        },
+        schema: {
+          base: '/api/v2/schema',
+          description: 'Otto SEO - Schema markup automation',
+          methods: ['GET', 'POST', 'DELETE']
+        },
+        ssr: {
+          base: '/api/v2/ssr',
+          description: 'Otto SEO - Server-side rendering optimizations',
+          methods: ['GET', 'POST']
         }
       },
       authentication: {
@@ -83,6 +99,9 @@ router.get('/', (req, res) => {
 router.use('/keywords', keywordsRouter);
 router.use('/research', researchRouter);
 router.use('/sync', syncRouter);
+
+// Otto SEO Features
+router.use('/', ottoFeaturesRouter);
 
 // 404 handler for v2 routes
 router.use((req, res) => {
