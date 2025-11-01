@@ -23,7 +23,9 @@ import {
   Download,
   Bell,
   Code,
-  TrendingUp
+  TrendingUp,
+  Server,
+  Boxes
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -45,6 +47,14 @@ const navGroups = [
       { icon: Sparkles, label: 'AI Optimizer', href: '#ai-optimizer' },
       { icon: Clock, label: 'Scheduler', href: '#scheduler' },
       { icon: Zap, label: 'Bulk Operations', href: '#bulk-operations' },
+    ]
+  },
+  {
+    title: 'Otto Features',
+    items: [
+      { icon: Code, label: 'Pixel Management', href: '#pixel-management' },
+      { icon: Boxes, label: 'Schema Automation', href: '#schema-automation' },
+      { icon: Server, label: 'SSR Optimization', href: '#ssr-optimization' },
     ]
   },
   {

@@ -32,6 +32,9 @@ import ExportBackupPage from './pages/ExportBackupPage'
 import NotificationCenterPage from './pages/NotificationCenterPage'
 import APIDocumentationPage from './pages/APIDocumentationPage'
 import ActivityLogPage from './pages/ActivityLogPage'
+import PixelManagementPage from './pages/PixelManagementPage'
+import SchemaAutomationPage from './pages/SchemaAutomationPage'
+import SSROptimizationPage from './pages/SSROptimizationPage'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { Bell, Search, Moon, Sun } from 'lucide-react'
@@ -338,6 +341,9 @@ function App() {
           {currentSection === 'autofix-settings' && <AutoFixSettingsPage onNavigate={handleNavigate} />}
           {currentSection === 'activity-log' && <ActivityLogPage />}
           {currentSection === 'ai-optimizer' && <AIOptimizerPage />}
+          {currentSection === 'pixel-management' && <PixelManagementPage />}
+          {currentSection === 'schema-automation' && <SchemaAutomationPage />}
+          {currentSection === 'ssr-optimization' && <SSROptimizationPage />}
           {currentSection === 'scheduler' && <SchedulerPage />}
           {currentSection === 'bulk-operations' && <BulkOperationsPage />}
           {currentSection === 'position-tracking' && <PositionTrackingPage />}
