@@ -241,6 +241,8 @@ export class NAPAutoFixer extends AutoFixEngineBase {
             contentId: content.id,
             contentType: content.type,
             contentField: field,
+            contentTitle: content.title?.rendered || content.title,
+            contentUrl: content.link,
             found: foundPhone,
             correct: this.officialNAP.phone,
             severity: 'high'
@@ -263,6 +265,8 @@ export class NAPAutoFixer extends AutoFixEngineBase {
               contentId: content.id,
               contentType: content.type,
               contentField: field,
+              contentTitle: content.title?.rendered || content.title,
+              contentUrl: content.link,
               found: match,
               correct: this.officialNAP.name,
               severity: 'medium'
@@ -290,6 +294,8 @@ export class NAPAutoFixer extends AutoFixEngineBase {
               contentId: content.id,
               contentType: content.type,
               contentField: field,
+              contentTitle: content.title?.rendered || content.title,
+              contentUrl: content.link,
               found: foundEmail,
               correct: this.officialNAP.email,
               severity: 'medium'
@@ -399,36 +405,47 @@ export class NAPAutoFixer extends AutoFixEngineBase {
   }
 
   /**
-   * Apply a single fix
+   * REQUIRED: Apply a single fix from an approved proposal
+   * This is called by AutoFixEngineBase.runApplication()
    */
-  async applyFix(issue) {
-    const { contentId, contentType, contentField, found, correct } = issue;
+  async applyFix(proposal, options = {}) {
+    const { target_id, field_name, before_value, after_value, metadata } = proposal;
 
-    // Get current content
-    const content = await this.wpClient.getPost(contentId);
+    // Get current content from WordPress
+    const content = await this.wpClient.getPost(target_id);
 
     // Prepare update based on field
     let updatedContent = {};
 
-    if (contentField === 'title') {
-      updatedContent.title = content.title.rendered.replace(found, correct);
-    } else if (contentField === 'content') {
-      updatedContent.content = content.content.rendered.replace(new RegExp(this.escapeRegex(found), 'g'), correct);
-    } else if (contentField === 'excerpt') {
-      updatedContent.excerpt = (content.excerpt?.rendered || '').replace(new RegExp(this.escapeRegex(found), 'g'), correct);
+    if (field_name === 'title') {
+      updatedContent.title = content.title.rendered.replace(
+        before_value,
+        after_value
+      );
+    } else if (field_name === 'content') {
+      // Use global replace for content field
+      updatedContent.content = content.content.rendered.replace(
+        new RegExp(this.escapeRegex(before_value), 'g'),
+        after_value
+      );
+    } else if (field_name === 'excerpt') {
+      updatedContent.excerpt = (content.excerpt?.rendered || '').replace(
+        new RegExp(this.escapeRegex(before_value), 'g'),
+        after_value
+      );
     }
 
-    // Apply update via WordPress API
-    const updated = await this.wpClient.updatePost(contentId, updatedContent);
+    // Apply update via WordPress REST API
+    const updated = await this.wpClient.updatePost(target_id, updatedContent);
 
     return {
-      issue,
-      applied: true,
-      contentId,
-      field: contentField,
-      before: found,
-      after: correct,
-      timestamp: new Date().toISOString()
+      success: true,
+      contentId: target_id,
+      field: field_name,
+      before: before_value,
+      after: after_value,
+      timestamp: new Date().toISOString(),
+      url: updated.link
     };
   }
 
