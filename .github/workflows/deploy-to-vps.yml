@@ -1,0 +1,133 @@
+name: Deploy to VPS
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install SSH Key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.VPS_SSH_KEY }}
+          known_hosts: 'placeholder'
+
+      - name: Add Known Hosts
+        run: ssh-keyscan -H 31.97.222.218 >> ~/.ssh/known_hosts
+
+      - name: Deploy to VPS
+        env:
+          VPS_HOST: 31.97.222.218
+          VPS_USER: avi
+          DEPLOY_PATH: /var/www/seo-expert
+        run: |
+          echo "🚀 Starting deployment to VPS..."
+
+          # Create deployment directory if it doesn't exist
+          ssh $VPS_USER@$VPS_HOST "mkdir -p $DEPLOY_PATH"
+
+          # Sync files to VPS (excluding node_modules, .git, etc.)
+          echo "📦 Syncing files..."
+          rsync -avz --delete \
+            --exclude 'node_modules' \
+            --exclude '.git' \
+            --exclude 'backups' \
+            --exclude 'logs' \
+            --exclude '.env' \
+            --exclude 'data' \
+            ./ $VPS_USER@$VPS_HOST:$DEPLOY_PATH/
+
+          # Install dependencies and deploy
+          echo "📥 Installing dependencies..."
+          ssh $VPS_USER@$VPS_HOST "cd $DEPLOY_PATH && npm ci --omit=dev"
+
+          echo "🏗️ Building dashboard..."
+          ssh $VPS_USER@$VPS_HOST "cd $DEPLOY_PATH/dashboard && npm ci --omit=dev && npm run build"
+
+          # Create necessary directories
+          echo "📁 Creating directories..."
+          ssh $VPS_USER@$VPS_HOST "cd $DEPLOY_PATH && mkdir -p data logs backups/database"
+
+          # Restart PM2
+          echo "🔄 Restarting PM2..."
+          ssh $VPS_USER@$VPS_HOST "cd $DEPLOY_PATH && npx pm2 restart ecosystem.config.cjs --env ${{ inputs.environment }} || npx pm2 start ecosystem.config.cjs --env ${{ inputs.environment }}"
+
+          # Save PM2 configuration
+          ssh $VPS_USER@$VPS_HOST "npx pm2 save"
+
+          # Wait for service to start
+          echo "⏳ Waiting for service to start..."
+          sleep 5
+
+          # Health check
+          echo "🏥 Running health check..."
+          ssh $VPS_USER@$VPS_HOST "curl -f http://localhost:9000/api/v2/health || exit 1"
+
+          echo "✅ Deployment complete!"
+
+      - name: Verify Deployment
+        run: |
+          echo "🔍 Verifying deployment..."
+
+          # Wait for propagation
+          sleep 10
+
+          # Test public endpoint
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://seodashboard.theprofitplatform.com.au/api/v2/health)
+
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            echo "✅ Public endpoint is healthy (HTTP $HTTP_CODE)"
+          else
+            echo "⚠️ Public endpoint returned HTTP $HTTP_CODE"
+            echo "Note: If you see 502, you may need to update Cloudflare Tunnel configuration"
+          fi
+
+      - name: Setup Monitoring (First Deploy Only)
+        if: github.run_number == 1
+        env:
+          VPS_HOST: 31.97.222.218
+          VPS_USER: avi
+          DEPLOY_PATH: /var/www/seo-expert
+        run: |
+          echo "📊 Setting up monitoring..."
+          ssh $VPS_USER@$VPS_HOST "cd $DEPLOY_PATH && chmod +x scripts/setup-monitoring.sh && ./scripts/setup-monitoring.sh"
+
+          echo "💾 Setting up backups..."
+          ssh $VPS_USER@$VPS_HOST "cd $DEPLOY_PATH && chmod +x scripts/setup-backup-cron.sh && ./scripts/setup-backup-cron.sh"
+
+      - name: Post-Deployment Summary
+        run: |
+          echo "================================================"
+          echo "🎉 Deployment Summary"
+          echo "================================================"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "VPS: 31.97.222.218"
+          echo "Dashboard: https://seodashboard.theprofitplatform.com.au"
+          echo ""
+          echo "Next steps:"
+          echo "1. Verify dashboard is accessible"
+          echo "2. Run: ssh avi@31.97.222.218 'npx pm2 status'"
+          echo "3. Update Cloudflare Tunnel if needed (run update-cloudflare-tunnel workflow)"
+          echo "================================================"

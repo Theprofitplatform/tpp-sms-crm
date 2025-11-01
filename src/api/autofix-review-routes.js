@@ -538,8 +538,13 @@ router.get('/sessions', async (req, res) => {
 async function loadEngine(engineId, clientId) {
   // Map engine IDs to module paths (relative to project root)
   const engineMap = {
+    // Modern engines with review workflow (✅ RECOMMENDED)
     'nap-auto-fixer': './src/automation/auto-fixers/nap-fixer.js',
     'nap-fixer': './src/automation/auto-fixers/nap-fixer.js',
+    'content-optimizer-v2': './src/automation/auto-fixers/content-optimizer-v2.js',
+    'schema-injector-v2': './src/automation/auto-fixers/schema-injector-v2.js',
+
+    // Legacy engines (need refactoring for full review workflow)
     'content-optimizer': './src/automation/auto-fixers/content-optimizer.js',
     'title-meta-optimizer': './src/automation/auto-fixers/title-meta-optimizer.js',
     'meta-description-optimizer': './src/automation/auto-fixers/meta-description-optimizer.js',
