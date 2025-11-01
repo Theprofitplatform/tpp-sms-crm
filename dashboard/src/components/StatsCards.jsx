@@ -23,7 +23,7 @@ export function StatsCards({ stats = {} }) {
     {
       icon: TrendingUp,
       title: 'Avg. Ranking',
-      value: stats.avgRanking ? `#${stats.avgRanking.toFixed(1)}` : '--',
+      value: stats.avgRanking && isFinite(Number(stats.avgRanking)) ? `#${Number(stats.avgRanking).toFixed(1)}` : '--',
       badge: { text: '+2.3 positions', variant: 'success' },
       iconColor: 'text-purple-500',
       bgColor: 'bg-purple-50 dark:bg-purple-950'

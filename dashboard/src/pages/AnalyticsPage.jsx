@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Calendar, TrendingUp, TrendingDown, Download, Filter, Loader2, RefreshCw } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { ResponsiveContainer, LineChart, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, Area } from 'recharts'
 
 import { analyticsAPI, clientAPI } from '@/services/api'
 import { useAPIData } from '@/hooks/useAPIRequest'
