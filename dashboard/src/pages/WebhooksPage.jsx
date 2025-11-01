@@ -337,7 +337,9 @@ export default function WebhooksPage() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.avgSuccessRate.toFixed(1)}%</div>
+            <div className="text-2xl font-bold">
+              {isFinite(stats.avgSuccessRate) ? Number(stats.avgSuccessRate).toFixed(1) : '0.0'}%
+            </div>
           </CardContent>
         </Card>
       </div>

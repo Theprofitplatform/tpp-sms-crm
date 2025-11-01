@@ -48,6 +48,7 @@ import { createDomainsAPI } from './src/api/domains-api.js';
 import { createKeywordsAPI } from './src/api/keywords-api.js';
 import { ScraperService } from './src/services/scraper-service.js';
 import { initializePositionTrackingJobs } from './src/jobs/position-tracking-cron.js';
+import { initializePixelNotificationJobs } from './src/jobs/pixel-notification-cron.js';
 import { initializeSchedulerDB, schedulerOps } from './src/database/scheduler-db.js';
 import { schedulerManager } from './src/automation/scheduler-manager.js';
 import recommendationsDB from './src/database/recommendations-db.js';
@@ -5474,6 +5475,9 @@ app.use((req, res, next) => {
 
 // Initialize cron jobs for position tracking
 initializePositionTrackingJobs();
+
+// Initialize cron jobs for pixel notifications (Phase 4B)
+initializePixelNotificationJobs();
 
 // Setup Local SEO scheduler event listeners
 localSEOScheduler.on('auditStarted', (data) => {

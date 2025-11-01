@@ -685,7 +685,10 @@ export default function KeywordsPageEnhanced() {
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{stats.top3}</div>
             <p className="text-xs text-muted-foreground">
-              {stats.total > 0 ? ((stats.top3 / stats.total) * 100).toFixed(1) : 0}%
+              {(() => {
+                const val = stats.total > 0 ? ((stats.top3 / stats.total) * 100) : 0
+                return isFinite(val) ? val.toFixed(1) : '0.0'
+              })()}%
             </p>
           </CardContent>
         </Card>
@@ -697,7 +700,10 @@ export default function KeywordsPageEnhanced() {
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">{stats.top10}</div>
             <p className="text-xs text-muted-foreground">
-              {stats.total > 0 ? ((stats.top10 / stats.total) * 100).toFixed(1) : 0}%
+              {(() => {
+                const val = stats.total > 0 ? ((stats.top10 / stats.total) * 100) : 0
+                return isFinite(val) ? val.toFixed(1) : '0.0'
+              })()}%
             </p>
           </CardContent>
         </Card>
@@ -734,7 +740,9 @@ export default function KeywordsPageEnhanced() {
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.avgPosition.toFixed(1)}</div>
+            <div className="text-2xl font-bold">
+              {isFinite(stats.avgPosition) ? Number(stats.avgPosition).toFixed(1) : '0.0'}
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -743,7 +751,12 @@ export default function KeywordsPageEnhanced() {
             <Search className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{(stats.totalVolume / 1000).toFixed(1)}k</div>
+            <div className="text-2xl font-bold">
+              {(() => {
+                const val = stats.totalVolume / 1000
+                return isFinite(val) ? val.toFixed(1) : '0.0'
+              })()}k
+            </div>
           </CardContent>
         </Card>
       </div>

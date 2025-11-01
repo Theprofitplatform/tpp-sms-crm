@@ -9,6 +9,7 @@
 
 import express from 'express';
 import enhancedPixelService from '../../services/pixel-service-enhanced.js';
+import pixelRecommendationsSync from '../../services/pixel-recommendations-sync.js';
 
 const router = express.Router();
 
@@ -81,6 +82,9 @@ router.post('/pixel/issues/:issueId/resolve', async (req, res) => {
     const resolved = enhancedPixelService.resolveIssue(issueId);
 
     if (resolved) {
+      // Phase 4B: Sync resolution with recommendations
+      await pixelRecommendationsSync.syncIssueResolution(parseInt(issueId));
+
       res.json({
         success: true,
         message: 'Issue resolved successfully'

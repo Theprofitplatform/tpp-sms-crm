@@ -305,7 +305,9 @@ export default function GoalsPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.avgProgress.toFixed(0)}%</div>
+            <div className="text-2xl font-bold">
+              {isFinite(stats.avgProgress) ? Number(stats.avgProgress).toFixed(0) : '0'}%
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -377,7 +379,10 @@ export default function GoalsPage() {
                       </div>
                       <Progress value={calculateProgress(goal)} className="h-2" />
                       <p className="text-sm text-muted-foreground">
-                        {calculateProgress(goal).toFixed(0)}% complete
+                        {(() => {
+                          const progress = calculateProgress(goal)
+                          return isFinite(progress) ? progress.toFixed(0) : '0'
+                        })()}% complete
                       </p>
                     </div>
 

@@ -9,6 +9,8 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import issueDetector from './pixel-issue-detector.js';
+import pixelRecommendationsSync from './pixel-recommendations-sync.js';
+import pixelNotificationService from './pixel-notifications.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -84,9 +86,10 @@ class EnhancedPixelService {
     `);
 
     let issuesStored = 0;
+    let recommendationsCreated = 0;
     detectedIssues.forEach(issue => {
       try {
-        issueStmt.run(
+        const result = issueStmt.run(
           pixel.id,
           data.metadata.url,
           issue.id,
@@ -107,6 +110,25 @@ class EnhancedPixelService {
           'OPEN'
         );
         issuesStored++;
+
+        // Phase 4B: Auto-create recommendation for CRITICAL/HIGH issues
+        if (['CRITICAL', 'HIGH'].includes(issue.severity)) {
+          const issueWithId = {
+            ...issue,
+            id: result.lastInsertRowid,
+            pageUrl: data.metadata.url,
+            detectedAt: new Date().toISOString()
+          };
+          const recommendation = pixelRecommendationsSync.processIssue(issueWithId, pixel.client_id);
+          if (recommendation) {
+            recommendationsCreated++;
+          }
+
+          // Phase 4B: Send notification for CRITICAL issues
+          if (issue.severity === 'CRITICAL') {
+            pixelNotificationService.notifyCriticalIssue(issueWithId, pixel);
+          }
+        }
       } catch (err) {
         console.error(`Error storing issue ${issue.type}:`, err.message);
       }
@@ -133,6 +155,7 @@ class EnhancedPixelService {
       seoScore,
       issuesDetected: detectedIssues.length,
       issuesStored,
+      recommendationsCreated,
       issueSummary,
       topIssues: detectedIssues.slice(0, 5).map(i => ({
         type: i.type,
