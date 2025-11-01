@@ -984,6 +984,173 @@ export const domainsAPI = {
 }
 
 /**
+ * Pixel Management API (Otto SEO)
+ */
+export const pixelAPI = {
+  // Get all pixels for a client
+  async getClientPixels(clientId) {
+    const response = await fetch(`${API_BASE}/v2/pixel/status/${clientId}`)
+    if (!response.ok) throw new Error('Failed to fetch pixels')
+    return response.json()
+  },
+
+  // Get pixel issues with optional filters
+  async getIssues(pixelId, filters = {}) {
+    const params = new URLSearchParams(filters)
+    const response = await fetch(`${API_BASE}/v2/pixel/issues/${pixelId}?${params}`)
+    if (!response.ok) throw new Error('Failed to fetch issues')
+    return response.json()
+  },
+
+  // Get issue summary (counts by severity)
+  async getIssueSummary(pixelId) {
+    const response = await fetch(`${API_BASE}/v2/pixel/issues/${pixelId}/summary`)
+    if (!response.ok) throw new Error('Failed to fetch issue summary')
+    return response.json()
+  },
+
+  // Get analytics data
+  async getAnalytics(pixelId, days = 7) {
+    const response = await fetch(`${API_BASE}/v2/pixel/analytics/${pixelId}?days=${days}`)
+    if (!response.ok) throw new Error('Failed to fetch analytics')
+    return response.json()
+  },
+
+  // Get analytics trends
+  async getTrends(pixelId) {
+    const response = await fetch(`${API_BASE}/v2/pixel/analytics/${pixelId}/trends`)
+    if (!response.ok) throw new Error('Failed to fetch trends')
+    return response.json()
+  },
+
+  // Get health and uptime data
+  async getHealth(pixelId) {
+    const response = await fetch(`${API_BASE}/v2/pixel/uptime/${pixelId}`)
+    if (!response.ok) throw new Error('Failed to fetch health data')
+    return response.json()
+  },
+
+  // Get health history
+  async getHealthHistory(pixelId, hours = 24) {
+    const response = await fetch(`${API_BASE}/v2/pixel/health/${pixelId}?hours=${hours}`)
+    if (!response.ok) throw new Error('Failed to fetch health history')
+    return response.json()
+  },
+
+  // Resolve an issue
+  async resolveIssue(issueId) {
+    const response = await fetch(`${API_BASE}/v2/pixel/issues/${issueId}/resolve`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Failed to resolve issue')
+    return response.json()
+  },
+
+  // Ignore an issue
+  async ignoreIssue(issueId) {
+    const response = await fetch(`${API_BASE}/v2/pixel/issues/${issueId}/ignore`, {
+      method: 'DELETE'
+    })
+    if (!response.ok) throw new Error('Failed to ignore issue')
+    return response.json()
+  },
+
+  // Generate new pixel
+  async generate(clientId, config) {
+    const response = await fetch(`${API_BASE}/v2/pixel/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, ...config })
+    })
+    if (!response.ok) throw new Error('Failed to generate pixel')
+    return response.json()
+  },
+
+  // Deactivate pixel
+  async deactivate(clientId, pixelId) {
+    const response = await fetch(`${API_BASE}/v2/pixel/deactivate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, pixelId })
+    })
+    if (!response.ok) throw new Error('Failed to deactivate pixel')
+    return response.json()
+  },
+
+  // Delete pixel
+  async delete(clientId, pixelId) {
+    const response = await fetch(`${API_BASE}/v2/pixel/${clientId}/${pixelId}`, {
+      method: 'DELETE'
+    })
+    if (!response.ok) throw new Error('Failed to delete pixel')
+    return response.json()
+  },
+
+  // Export analytics data
+  async exportAnalytics(pixelId, days, format = 'json') {
+    const response = await fetch(`${API_BASE}/v2/pixel/analytics/${pixelId}/export`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ days, format })
+    })
+    if (!response.ok) throw new Error('Failed to export analytics')
+
+    if (format === 'csv') {
+      const blob = await response.blob()
+      return { blob, filename: `pixel-analytics-${pixelId}.csv` }
+    }
+    return response.json()
+  },
+
+  // Get tracked pages for a pixel
+  async getPages(clientId, pixelId = null) {
+    const url = pixelId
+      ? `${API_BASE}/v2/pixel/pages/${clientId}?pixelId=${pixelId}`
+      : `${API_BASE}/v2/pixel/pages/${clientId}`
+    const response = await fetch(url)
+    if (!response.ok) throw new Error('Failed to fetch pages')
+    return response.json()
+  },
+
+  // Get platform-wide pixel statistics
+  async getPlatformStats() {
+    try {
+      const response = await fetch(`${API_BASE}/clients`)
+      if (!response.ok) return { totalPixels: 0, activePixels: 0, totalIssues: 0 }
+
+      const data = await response.json()
+      const clients = data.clients || []
+
+      // Aggregate stats from all clients
+      const stats = {
+        totalPixels: 0,
+        activePixels: 0,
+        totalIssues: 0,
+        avgSEOScore: 0
+      }
+
+      for (const client of clients) {
+        try {
+          const pixelData = await this.getClientPixels(client.id)
+          if (pixelData.success) {
+            const pixels = pixelData.data || []
+            stats.totalPixels += pixels.length
+            stats.activePixels += pixels.filter(p => p.status === 'active').length
+          }
+        } catch (error) {
+          console.warn(`Failed to fetch pixels for client ${client.id}:`, error)
+        }
+      }
+
+      return stats
+    } catch (error) {
+      console.warn('Failed to fetch platform stats:', error)
+      return { totalPixels: 0, activePixels: 0, totalIssues: 0 }
+    }
+  }
+}
+
+/**
  * Tracking Keywords API (Position Tracking)
  */
 export const trackingKeywordsAPI = {
@@ -1152,6 +1319,7 @@ export default {
   notifications: notificationsAPI,
   localSEO: localSEOAPI,
   domains: domainsAPI,
+  pixel: pixelAPI,
   healthCheck,
   handleAPIError
 }

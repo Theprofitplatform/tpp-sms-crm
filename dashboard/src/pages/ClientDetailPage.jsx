@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast'
 
 import { clientAPI, analyticsAPI, keywordAPI } from '@/services/api'
 import { useAPIRequest, useAPIData } from '@/hooks/useAPIRequest'
+import PixelHealthSummary from '@/components/PixelHealthSummary'
 
 import {
   ArrowLeft,
@@ -261,6 +262,7 @@ export default function ClientDetailPage({ clientId, onBack }) {
         <TabsList>
           <TabsTrigger value="keywords">Keywords ({keywords.length})</TabsTrigger>
           <TabsTrigger value="audits">Audits ({audits.length})</TabsTrigger>
+          <TabsTrigger value="seo-health">SEO Health</TabsTrigger>
         </TabsList>
 
         <TabsContent value="keywords">
@@ -314,6 +316,10 @@ export default function ClientDetailPage({ clientId, onBack }) {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="seo-health">
+          <PixelHealthSummary clientId={clientId} />
         </TabsContent>
       </Tabs>
     </div>

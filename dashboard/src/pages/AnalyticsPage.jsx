@@ -8,7 +8,7 @@ import { Calendar, TrendingUp, TrendingDown, Download, Filter, Loader2, RefreshC
 import { useToast } from '@/hooks/use-toast'
 import { ResponsiveContainer, LineChart, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, Area } from 'recharts'
 
-import { analyticsAPI, clientAPI } from '@/services/api'
+import { analyticsAPI, clientAPI, pixelAPI } from '@/services/api'
 import { useAPIData } from '@/hooks/useAPIRequest'
 
 export default function AnalyticsPage() {
@@ -31,7 +31,12 @@ export default function AnalyticsPage() {
     { autoFetch: true }
   )
 
-  const loading = loadingSummary || loadingClients || loadingStats
+  const { data: pixelStatsData, loading: loadingPixelStats } = useAPIData(
+    () => pixelAPI.getPlatformStats(),
+    { autoFetch: true }
+  )
+
+  const loading = loadingSummary || loadingClients || loadingStats || loadingPixelStats
 
   // Memoized metrics calculation
   const metrics = useMemo(() => {
@@ -159,6 +164,62 @@ export default function AnalyticsPage() {
           </Card>
         ))}
       </div>
+
+      {/* SEO Health Metrics */}
+      {pixelStatsData && (pixelStatsData.totalPixels > 0 || pixelStatsData.activePixels > 0) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>SEO Health Metrics</CardTitle>
+            <CardDescription>Platform-wide pixel monitoring and issue detection</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">Total Pixels</span>
+                  <Badge variant="secondary">{pixelStatsData.totalPixels || 0}</Badge>
+                </div>
+                <div className="text-2xl font-bold">{pixelStatsData.totalPixels || 0}</div>
+                <p className="text-xs text-muted-foreground mt-1">Deployed across all clients</p>
+              </div>
+
+              <div className="border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">Active Pixels</span>
+                  <Badge className="bg-green-600">{pixelStatsData.activePixels || 0}</Badge>
+                </div>
+                <div className="text-2xl font-bold">{pixelStatsData.activePixels || 0}</div>
+                <p className="text-xs text-muted-foreground mt-1">Currently online</p>
+              </div>
+
+              <div className="border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">Avg SEO Score</span>
+                  {(pixelStatsData.avgSEOScore || 0) >= 70 ? (
+                    <TrendingUp className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4 text-red-600" />
+                  )}
+                </div>
+                <div className="text-2xl font-bold">
+                  {(pixelStatsData.avgSEOScore || 0).toFixed(0)}
+                  <span className="text-sm text-muted-foreground">/100</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Across all pixels</p>
+              </div>
+
+              <div className="border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">Total Issues</span>
+                  <Badge variant="destructive">{pixelStatsData.totalIssues || 0}</Badge>
+                </div>
+                <div className="text-2xl font-bold">{pixelStatsData.totalIssues || 0}</div>
+                <p className="text-xs text-muted-foreground mt-1">Detected issues</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Performance Overview */}
       <Card>
