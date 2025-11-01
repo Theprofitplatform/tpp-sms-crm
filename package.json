@@ -36,7 +36,11 @@
     "pm2:status": "pm2 status",
     "pm2:save": "pm2 save",
     "actions:status": "echo 'Check: https://github.com/Theprofitplatform/seoexpert/actions'",
-    "actions:logs": "gh run list --limit 5 || echo 'Install gh CLI: https://cli.github.com/'"
+    "actions:logs": "gh run list --limit 5 || echo 'Install gh CLI: https://cli.github.com/'",
+    "prod:check": "./check-production-apis.sh",
+    "prod:health": "curl -sf https://seodashboard.theprofitplatform.com.au/api/v2/health | jq '.' || echo 'Production health check failed'",
+    "prod:dashboard": "curl -sf https://seodashboard.theprofitplatform.com.au/api/dashboard | jq '.stats' || echo 'Dashboard API check failed'",
+    "prod:status": "curl -sf https://seodashboard.theprofitplatform.com.au/api/v2/health | jq -r '\"Status: \\(.success) | Version: \\(.version) | Uptime: \\(.uptime)s\"' || echo 'Production status check failed'"
   },
   "keywords": [
     "seo",
