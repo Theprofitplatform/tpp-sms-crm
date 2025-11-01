@@ -8,7 +8,7 @@ import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import request from 'supertest';
 import express from 'express';
 import { AuthService } from '../../src/auth/auth-service.js';
-import { requireAuth } from '../../src/middleware/auth.js';
+import { requireAuth } from '../../src/api/v2/middleware/auth.js';
 import { validate } from '../../src/middleware/validation.js';
 import { clientSchema } from '../../src/validation/schemas.js';
 import db from '../../src/database/index.js';

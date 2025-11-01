@@ -44,7 +44,9 @@ export default {
       ],
       moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/dashboard/src/$1',
-        '\\.(css|less|scss|sass)$': '<rootDir>/tests/mocks/styleMock.js'
+        '\\.(css|less|scss|sass)$': '<rootDir>/tests/mocks/styleMock.js',
+        '^@/lib/utils$': '<rootDir>/tests/mocks/utilsMock.js',
+        '^@/hooks/use-toast$': '<rootDir>/tests/mocks/toastMock.js'
       },
       testPathIgnorePatterns: [
         '/node_modules/',

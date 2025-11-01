@@ -58,7 +58,7 @@ export class AuthService {
     }
 
     // Check if client exists
-    const client = db.clientOps.get(clientId);
+    const client = db.clientOps.getById(clientId);
     if (!client) {
       throw new Error('Client not found');
     }

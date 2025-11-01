@@ -3,7 +3,7 @@
  * Tests bidirectional sync between systems
  */
 
-import { describe, it, before, after } from '@jest/globals';
+import { describe, it, beforeAll, afterAll } from '@jest/globals';
 import request from 'supertest';
 import { expect } from 'chai';
 

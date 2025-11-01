@@ -3,7 +3,7 @@
  * Tests the unified keyword management API
  */
 
-import { describe, it, before, after } from '@jest/globals';
+import { describe, it, beforeAll, afterAll } from '@jest/globals';
 import request from 'supertest';
 import { expect } from 'chai';
 
@@ -16,12 +16,12 @@ describe('API v2 - Keywords Integration Tests', () => {
   let testProjectId;
 
   // Setup: Create test data
-  before(async () => {
+  beforeAll(async () => {
     console.log('Setting up test environment...');
   });
 
   // Teardown: Clean up test data
-  after(async () => {
+  afterAll(async () => {
     console.log('Cleaning up test data...');
   });
 
