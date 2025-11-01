@@ -1,62 +1,63 @@
 /**
  * PM2 Ecosystem Configuration
- * Supports development and production deployments
+ * For production deployment of Manual Review System
  */
 
 module.exports = {
   apps: [
     {
-      name: 'seo-dashboard',
-      script: './dashboard-server.js',
-      instances: 1,
-      exec_mode: 'fork',
-      env: {
-        NODE_ENV: 'development',
-        PORT: 9000
-      },
+      // Main API Server
+      name: 'seo-expert-api',
+      script: 'src/index.js',
+      instances: 2,
+      exec_mode: 'cluster',
+
+      // Production environment
       env_production: {
         NODE_ENV: 'production',
-        PORT: 9000
+        PORT: 4000,
+        API_PORT: 4000,
+        LOG_LEVEL: 'info'
       },
-      error_file: './logs/pm2-error.log',
-      out_file: './logs/pm2-out.log',
-      log_file: './logs/pm2-combined.log',
-      time: true,
+
+      // Development environment
+      env_development: {
+        NODE_ENV: 'development',
+        PORT: 4000,
+        API_PORT: 4000,
+        LOG_LEVEL: 'debug'
+      },
+
+      // Auto-restart settings
+      watch: false,
+      max_memory_restart: '500M',
+
+      // Error handling
       autorestart: true,
       max_restarts: 10,
       min_uptime: '10s',
-      max_memory_restart: '500M',
-      watch: false,
-      ignore_watch: [
-        'node_modules',
-        'logs',
-        '.git',
-        'dashboard/dist',
-        'dashboard/node_modules'
-      ]
+
+      // Logs
+      error_file: 'logs/pm2-error.log',
+      out_file: 'logs/pm2-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+
+      // Advanced settings
+      kill_timeout: 5000,
+      listen_timeout: 10000,
+      shutdown_with_message: true
     }
   ],
 
   deploy: {
     production: {
       user: 'node',
-      host: 'tpp-vps',
+      host: 'production-server',
       ref: 'origin/main',
-      repo: 'git@github.com:Theprofitplatform/seoexpert.git',
+      repo: 'git@github.com:your-repo/seo-expert.git',
       path: '/var/www/seo-expert',
-      'pre-deploy-local': '',
-      'post-deploy': 'npm ci --omit=dev --ignore-scripts && cd dashboard && npm ci --omit=dev --ignore-scripts && npm run build && cd .. && pm2 reload ecosystem.config.js --env production',
-      'pre-setup': ''
-    },
-    dev: {
-      user: 'node',
-      host: 'localhost',
-      ref: 'origin/main',
-      repo: 'git@github.com:Theprofitplatform/seoexpert.git',
-      path: '/var/www/seo-expert-dev',
-      'pre-deploy-local': '',
-      'post-deploy': 'npm ci --ignore-scripts && cd dashboard && npm ci --ignore-scripts && npm run build && cd .. && pm2 reload ecosystem.config.js --env development',
-      'pre-setup': ''
+      'post-deploy': 'npm ci --omit=dev --ignore-scripts && pm2 reload ecosystem.config.js --env production'
     }
   }
 };

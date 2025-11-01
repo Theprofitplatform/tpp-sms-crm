@@ -17,6 +17,9 @@ import fs from 'fs';
 // Import routes
 import autofixReviewRoutes from './api/autofix-review-routes.js';
 
+// Import database initialization
+import { initializeDatabase } from './database/index.js';
+
 // Load environment variables
 dotenv.config();
 
@@ -154,6 +157,9 @@ process.on('SIGINT', () => {
     process.exit(0);
   });
 });
+
+// Initialize database
+initializeDatabase();
 
 // Start server
 const server = app.listen(PORT, () => {
