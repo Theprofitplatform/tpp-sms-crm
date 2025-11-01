@@ -2,23 +2,23 @@
  * NAP Auto-Fixer
  *
  * Automatically detects and fixes NAP (Name, Address, Phone) inconsistencies
- * across WordPress content.
+ * across WordPress content using the review workflow.
  *
  * Features:
  * - Detects all variations of NAP data
- * - Bulk find-and-replace across posts, pages, widgets
- * - Creates automatic backups before changes
- * - Logs all changes to database
- * - Supports one-click rollback
+ * - Creates proposals for manual review
+ * - Rich descriptions with verification instructions
+ * - Risk assessment for each fix
+ * - Two-phase workflow: Detect → Review → Apply
  */
 
+import { AutoFixEngineBase } from './engine-base.js';
 import { WordPressClient } from '../wordpress-client.js';
 import db from '../../database/index.js';
 
-export class NAPAutoFixer {
+export class NAPAutoFixer extends AutoFixEngineBase {
   constructor(config) {
-    this.config = config;
-    this.clientId = config.id;
+    super(config);
     this.wpClient = new WordPressClient(config.siteUrl, config.wpUser, config.wpPassword);
 
     // Official NAP data (source of truth)
@@ -34,89 +34,18 @@ export class NAPAutoFixer {
   }
 
   /**
-   * Main entry point: Detect and fix all NAP inconsistencies
+   * Get engine category
    */
-  async runAutoFix() {
-    console.log('\n🔧 NAP AUTO-FIXER: Starting...');
-    console.log(`Client: ${this.config.businessName}`);
-    console.log('-'.repeat(70));
-
-    const results = {
-      detectionResults: null,
-      backupId: null,
-      fixesApplied: [],
-      errors: [],
-      success: false
-    };
-
-    try {
-      // Step 1: Detect inconsistencies
-      console.log('\n1️⃣  Detecting NAP inconsistencies...');
-      results.detectionResults = await this.detectInconsistencies();
-
-      if (results.detectionResults.issues.length === 0) {
-        console.log('   ✅ No inconsistencies found!');
-        results.success = true;
-        return results;
-      }
-
-      console.log(`   Found ${results.detectionResults.issues.length} inconsistencies`);
-
-      // Step 2: Create backup
-      console.log('\n2️⃣  Creating backup...');
-      results.backupId = await this.createBackup(results.detectionResults);
-      console.log(`   ✅ Backup created (ID: ${results.backupId})`);
-
-      // Step 3: Apply fixes
-      console.log('\n3️⃣  Applying fixes...');
-      for (const issue of results.detectionResults.issues) {
-        try {
-          const fix = await this.applyFix(issue);
-          results.fixesApplied.push(fix);
-          console.log(`   ✅ Fixed: ${issue.field} in ${issue.location}`);
-        } catch (error) {
-          console.error(`   ❌ Failed: ${issue.field} in ${issue.location} - ${error.message}`);
-          results.errors.push({
-            issue,
-            error: error.message
-          });
-        }
-      }
-
-      // Step 4: Log to database
-      console.log('\n4️⃣  Logging changes to database...');
-      await this.logChanges(results);
-      console.log('   ✅ Changes logged');
-
-      // Step 5: Verify fixes
-      console.log('\n5️⃣  Verifying fixes...');
-      const verification = await this.verifyFixes(results.fixesApplied);
-      console.log(`   ✅ Verification: ${verification.verified}/${verification.total} fixes confirmed`);
-
-      results.success = results.errors.length === 0;
-
-      console.log('\n' + '='.repeat(70));
-      console.log(`✅ NAP AUTO-FIX COMPLETE`);
-      console.log(`   Fixes Applied: ${results.fixesApplied.length}`);
-      console.log(`   Errors: ${results.errors.length}`);
-      console.log(`   Backup ID: ${results.backupId}`);
-      console.log('='.repeat(70));
-
-      return results;
-
-    } catch (error) {
-      console.error('\n❌ NAP Auto-Fix Error:', error.message);
-      results.errors.push({ error: error.message });
-      return results;
-    }
+  getCategory() {
+    return 'local-seo';
   }
 
   /**
-   * Detect all NAP inconsistencies across the site
+   * REQUIRED: Detect NAP issues and return as proposal-compatible format
+   * This is called by AutoFixEngineBase.runDetection()
    */
-  async detectInconsistencies() {
+  async detectIssues(options = {}) {
     const issues = [];
-    const scannedLocations = [];
 
     // Get all posts and pages
     const [posts, pages] = await Promise.all([
@@ -140,24 +69,157 @@ export class NAPAutoFixer {
         const excerptIssues = this.findNAPVariations(content.excerpt.rendered, 'excerpt', content);
         issues.push(...excerptIssues);
       }
-
-      scannedLocations.push({
-        type: content.type,
-        id: content.id,
-        title: content.title.rendered,
-        url: content.link
-      });
     }
 
+    // Convert to proposal format with rich descriptions
+    return issues.map(issue => this.createProposalFromIssue(issue));
+  }
+
+  /**
+   * Convert NAP issue to proposal format with rich descriptions
+   */
+  createProposalFromIssue(issue) {
+    const fieldNames = {
+      phone: 'Phone Number',
+      businessName: 'Business Name',
+      email: 'Email Address',
+      address: 'Street Address'
+    };
+
+    const fieldName = fieldNames[issue.field] || issue.field;
+    const location = `${issue.contentField} on ${issue.contentType}`;
+
+    // Create detailed descriptions based on field type
+    let issueDescription, fixDescription, expectedBenefit, verificationSteps;
+
+    switch (issue.field) {
+      case 'phone':
+        issueDescription = `Inconsistent phone number format: "${issue.found}" does not match official format "${issue.correct}"`;
+        fixDescription = `Standardize phone number from "${issue.found}" to "${issue.correct}"`;
+        expectedBenefit = 'Consistent phone formatting improves local SEO and user trust. Google prefers uniform NAP data.';
+        verificationSteps = [
+          'Check the updated page to see the new phone format',
+          'Verify the number still dials correctly',
+          'Confirm it matches your Google Business Profile',
+          `Location: ${issue.contentField} field`
+        ];
+        break;
+
+      case 'businessName':
+        issueDescription = `Business name variation: Found "${issue.found}" instead of official "${issue.correct}"`;
+        fixDescription = `Standardize business name from "${issue.found}" to "${issue.correct}"`;
+        expectedBenefit = 'Consistent business name across all pages helps search engines and builds brand recognition.';
+        verificationSteps = [
+          'Read the updated content to verify natural flow',
+          'Check that capitalization is consistent',
+          'Confirm it matches your official branding',
+          'Verify on footer, contact page, and about page'
+        ];
+        break;
+
+      case 'email':
+        issueDescription = `Email address variation: Found "${issue.found}" instead of official "${issue.correct}"`;
+        fixDescription = `Standardize email from "${issue.found}" to "${issue.correct}"`;
+        expectedBenefit = 'Consistent email address prevents confusion and ensures customers contact the right address.';
+        verificationSteps = [
+          'Verify email address is correct and monitored',
+          'Check that links still work (mailto:)',
+          'Confirm it matches your preferred contact email'
+        ];
+        break;
+
+      case 'address':
+        issueDescription = `Address variation: Found "${issue.found}" instead of official "${issue.correct}"`;
+        fixDescription = `Standardize address from "${issue.found}" to "${issue.correct}"`;
+        expectedBenefit = 'Consistent address improves local SEO rankings and helps customers find your location.';
+        verificationSteps = [
+          'Verify address matches Google Business Profile',
+          'Check that it includes city, state, and zip',
+          'Confirm formatting is consistent'
+        ];
+        break;
+
+      default:
+        issueDescription = `Found "${issue.found}" instead of official "${issue.correct}"`;
+        fixDescription = `Update from "${issue.found}" to "${issue.correct}"`;
+        expectedBenefit = 'Maintaining consistent NAP data improves local SEO rankings.';
+        verificationSteps = ['Verify the change looks correct on the page'];
+    }
+
+    // Determine risk level
+    const riskLevel = this.calculateRiskLevel(issue);
+    const priority = this.calculatePriority(issue);
+
     return {
-      issues,
-      scannedLocations,
-      summary: {
-        totalScanned: allContent.length,
-        totalIssues: issues.length,
-        byField: this.groupIssuesByField(issues)
+      target_type: issue.contentType,
+      target_id: issue.contentId,
+      target_title: issue.contentTitle || `${issue.contentType} #${issue.contentId}`,
+      target_url: issue.contentUrl || null,
+      field_name: issue.contentField,
+
+      before_value: issue.found,
+      after_value: issue.correct,
+
+      issue_description: issueDescription,
+      fix_description: fixDescription,
+      expected_benefit: expectedBenefit,
+
+      severity: issue.severity,
+      risk_level: riskLevel,
+      category: 'nap-consistency',
+      impact_score: priority,
+      priority,
+
+      reversible: true,
+
+      metadata: {
+        napField: issue.field,
+        fieldLabel: fieldName,
+        location,
+        verificationSteps,
+        affectedElement: issue.location,
+        changeType: 'text-replacement'
       }
     };
+  }
+
+  /**
+   * Calculate risk level for NAP changes
+   */
+  calculateRiskLevel(issue) {
+    // Phone and email are low risk (non-visible text changes)
+    if (issue.field === 'phone' || issue.field === 'email') {
+      return 'low';
+    }
+
+    // Business name in content could affect readability
+    if (issue.field === 'businessName' && issue.contentField === 'content') {
+      return 'medium';
+    }
+
+    // Everything else is low risk
+    return 'low';
+  }
+
+  /**
+   * Calculate priority score
+   */
+  calculatePriority(issue) {
+    let score = 50; // Base score
+
+    // High priority for phone numbers (most important for local SEO)
+    if (issue.field === 'phone') score += 30;
+
+    // Higher priority for contact pages
+    if (issue.contentField === 'title' || issue.contentField === 'excerpt') {
+      score += 10;
+    }
+
+    // Higher priority for high severity
+    if (issue.severity === 'high') score += 20;
+    if (issue.severity === 'medium') score += 10;
+
+    return Math.min(score, 100);
   }
 
   /**

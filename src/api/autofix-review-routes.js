@@ -215,6 +215,174 @@ router.post('/proposals/auto-approve', async (req, res) => {
 });
 
 /**
+ * POST /api/autofix/proposals/accept-all
+ * Accept all proposals in a group (with safety checks)
+ */
+router.post('/proposals/accept-all', async (req, res) => {
+  try {
+    const { groupId, confirmRisky = false, reviewedBy = 'user' } = req.body;
+
+    if (!groupId) {
+      return res.status(400).json({
+        success: false,
+        error: 'groupId is required'
+      });
+    }
+
+    // Get all proposals in the group
+    const proposals = proposalService.getProposals({
+      groupId,
+      status: 'pending'
+    });
+
+    if (proposals.length === 0) {
+      return res.json({
+        success: true,
+        approved: 0,
+        message: 'No pending proposals found'
+      });
+    }
+
+    // Check for high-risk proposals
+    const highRiskProposals = proposals.filter(p =>
+      p.risk_level === 'high' || p.severity === 'critical'
+    );
+
+    if (highRiskProposals.length > 0 && !confirmRisky) {
+      return res.json({
+        success: false,
+        requiresConfirmation: true,
+        highRiskCount: highRiskProposals.length,
+        totalCount: proposals.length,
+        message: `Found ${highRiskProposals.length} high-risk proposals. Set confirmRisky=true to proceed.`,
+        highRiskProposals: highRiskProposals.map(p => ({
+          id: p.id,
+          description: p.fix_description,
+          target: p.target_title,
+          riskLevel: p.risk_level
+        }))
+      });
+    }
+
+    // Approve all proposals
+    const proposalIds = proposals.map(p => p.id);
+    const result = proposalService.bulkReview(proposalIds, {
+      action: 'approve',
+      notes: 'Bulk approved via Accept All',
+      reviewedBy
+    });
+
+    res.json({
+      success: true,
+      approved: result.approved,
+      highRisk: highRiskProposals.length,
+      total: proposals.length,
+      message: `Approved ${result.approved} proposals (${highRiskProposals.length} high-risk)`
+    });
+
+  } catch (error) {
+    console.error('Error accepting all proposals:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/autofix/proposals/accept-low-risk
+ * Accept only low-risk proposals in a group
+ */
+router.post('/proposals/accept-low-risk', async (req, res) => {
+  try {
+    const { groupId, maxRiskLevel = 'low', reviewedBy = 'user' } = req.body;
+
+    if (!groupId) {
+      return res.status(400).json({
+        success: false,
+        error: 'groupId is required'
+      });
+    }
+
+    // Get all pending proposals in the group
+    const allProposals = proposalService.getProposals({
+      groupId,
+      status: 'pending'
+    });
+
+    if (allProposals.length === 0) {
+      return res.json({
+        success: true,
+        approved: 0,
+        skipped: 0,
+        message: 'No pending proposals found'
+      });
+    }
+
+    // Define risk level hierarchy
+    const riskLevels = ['low', 'medium', 'high', 'critical'];
+    const maxRiskIndex = riskLevels.indexOf(maxRiskLevel);
+
+    if (maxRiskIndex === -1) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid maxRiskLevel. Must be: low, medium, high, or critical'
+      });
+    }
+
+    // Filter proposals by risk level
+    const lowRiskProposals = allProposals.filter(p => {
+      const proposalRiskIndex = riskLevels.indexOf(p.risk_level || 'low');
+      return proposalRiskIndex <= maxRiskIndex;
+    });
+
+    const skippedProposals = allProposals.filter(p => {
+      const proposalRiskIndex = riskLevels.indexOf(p.risk_level || 'low');
+      return proposalRiskIndex > maxRiskIndex;
+    });
+
+    if (lowRiskProposals.length === 0) {
+      return res.json({
+        success: true,
+        approved: 0,
+        skipped: skippedProposals.length,
+        message: `No proposals found with risk level <= ${maxRiskLevel}. ${skippedProposals.length} proposals skipped.`
+      });
+    }
+
+    // Approve low-risk proposals
+    const proposalIds = lowRiskProposals.map(p => p.id);
+    const result = proposalService.bulkReview(proposalIds, {
+      action: 'approve',
+      notes: `Bulk approved via Accept Low Risk (max: ${maxRiskLevel})`,
+      reviewedBy
+    });
+
+    res.json({
+      success: true,
+      approved: result.approved,
+      skipped: skippedProposals.length,
+      total: allProposals.length,
+      maxRiskLevel,
+      message: `Approved ${result.approved} low-risk proposals. Skipped ${skippedProposals.length} higher-risk proposals.`,
+      skippedDetails: skippedProposals.map(p => ({
+        id: p.id,
+        description: p.fix_description,
+        riskLevel: p.risk_level,
+        severity: p.severity
+      }))
+    });
+
+  } catch (error) {
+    console.error('Error accepting low-risk proposals:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
  * POST /api/autofix/detect
  * Run auto-fix in detect mode only
  */

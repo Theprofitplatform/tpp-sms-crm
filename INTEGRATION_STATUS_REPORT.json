@@ -1,0 +1,348 @@
+{
+  "database": {
+    "tableCount": 47,
+    "tables": [
+      "analytics_cache",
+      "auth_activity_log",
+      "auto_fix_actions",
+      "autofix_approval_templates",
+      "autofix_proposals",
+      "autofix_review_sessions",
+      "autofix_review_settings",
+      "client_goals",
+      "clients",
+      "competitor_alerts",
+      "competitor_rankings",
+      "domains",
+      "email_campaigns",
+      "email_queue",
+      "email_sequences",
+      "email_tracking",
+      "email_unsubscribes",
+      "gsc_metrics",
+      "integrations",
+      "keyword_performance",
+      "keywords",
+      "lead_events",
+      "leads",
+      "local_seo_scores",
+      "notification_queue",
+      "optimization_history",
+      "page_performance",
+      "password_reset_tokens",
+      "pixel_deployments",
+      "pixel_page_data",
+      "portal_access_logs",
+      "recommendations",
+      "report_templates",
+      "reports_generated",
+      "response_performance",
+      "schema_markup",
+      "schema_opportunities",
+      "scraper_settings",
+      "serp_results",
+      "sqlite_sequence",
+      "ssr_cache",
+      "ssr_optimizations",
+      "system_logs",
+      "users",
+      "webhook_logs",
+      "webhooks",
+      "white_label_config"
+    ],
+    "tablesWithData": [
+      {
+        "name": "auth_activity_log",
+        "rows": 12
+      },
+      {
+        "name": "autofix_review_settings",
+        "rows": 2
+      },
+      {
+        "name": "clients",
+        "rows": 9
+      },
+      {
+        "name": "domains",
+        "rows": 2
+      },
+      {
+        "name": "email_campaigns",
+        "rows": 9
+      },
+      {
+        "name": "email_queue",
+        "rows": 1
+      },
+      {
+        "name": "keywords",
+        "rows": 93
+      },
+      {
+        "name": "lead_events",
+        "rows": 1
+      },
+      {
+        "name": "leads",
+        "rows": 1
+      },
+      {
+        "name": "schema_markup",
+        "rows": 1
+      },
+      {
+        "name": "scraper_settings",
+        "rows": 10
+      },
+      {
+        "name": "serp_results",
+        "rows": 10
+      },
+      {
+        "name": "sqlite_sequence",
+        "rows": 19
+      },
+      {
+        "name": "ssr_optimizations",
+        "rows": 3
+      },
+      {
+        "name": "system_logs",
+        "rows": 6
+      },
+      {
+        "name": "users",
+        "rows": 8
+      },
+      {
+        "name": "white_label_config",
+        "rows": 1
+      }
+    ]
+  },
+  "features": {
+    "claimed": 12,
+    "verified": 7,
+    "unverified": 5
+  },
+  "apis": {},
+  "modules": {
+    "total": 9,
+    "verified": 4,
+    "details": [
+      {
+        "name": "Historical Tracker",
+        "status": "verified",
+        "lines": 517
+      },
+      {
+        "name": "Local Keyword Tracker",
+        "status": "verified",
+        "lines": 408
+      },
+      {
+        "name": "Social Media Auditor",
+        "status": "verified",
+        "lines": 490
+      },
+      {
+        "name": "GMB Optimizer",
+        "status": "verified",
+        "lines": 515
+      },
+      {
+        "name": "Citation Monitor",
+        "status": "size-mismatch",
+        "lines": 396
+      },
+      {
+        "name": "Competitor Analyzer",
+        "status": "size-mismatch",
+        "lines": 338
+      },
+      {
+        "name": "Review Monitor",
+        "status": "size-mismatch",
+        "lines": 419
+      },
+      {
+        "name": "Email Automation",
+        "status": "size-mismatch",
+        "lines": 693
+      },
+      {
+        "name": "Email Templates",
+        "status": "size-mismatch",
+        "lines": 534
+      }
+    ]
+  },
+  "issues": [
+    "Too many documentation files: 119 (recommend <15)"
+  ],
+  "files": {
+    "critical": [
+      {
+        "file": "dashboard-server.js",
+        "size": 143999,
+        "exists": true
+      },
+      {
+        "file": "package.json",
+        "size": 3965,
+        "exists": true
+      },
+      {
+        "file": ".env.example",
+        "size": 3858,
+        "exists": true
+      },
+      {
+        "file": "src/database/index.js",
+        "size": 71537,
+        "exists": true
+      },
+      {
+        "file": "src/auth/auth-service.js",
+        "size": 9303,
+        "exists": true
+      },
+      {
+        "file": "src/routes/auth-routes.js",
+        "size": 5184,
+        "exists": true
+      }
+    ],
+    "missing": []
+  },
+  "documentation": {
+    "totalFiles": 119,
+    "files": [
+      ".claude.md",
+      "00_READ_ME_FIRST.md",
+      "00_START_HERE_FIXES_APPLIED.md",
+      "24-7-MONITORING.md",
+      "ACTIVITY_LOG_FAQ.md",
+      "AGENT_ASSIGNMENTS_QUICK_REF.md",
+      "AI_OPTIMIZER_CODE_REVIEW.md",
+      "AI_OPTIMIZER_INTEGRATION_PLAN.md",
+      "ANALYTICS_PAGE_FIX.md",
+      "AUTOFIX_ADVANCED_FEATURES.md",
+      "AUTOFIX_BEFORE_AFTER_COMPARISON.md",
+      "AUTOFIX_MANUAL_REVIEW_INTEGRATION_PLAN.md",
+      "AUTOFIX_QUICK_REFERENCE.md",
+      "AUTO_FIXER_RUN_RESULTS_OCT_29.md",
+      "CHANGELOG.md",
+      "CLAUDE_CODE_SETUP_FINAL.md",
+      "CLIENTS_PAGE_FIX_VERIFICATION.md",
+      "COMPONENT_INTERACTION_DIAGRAM.md",
+      "COMPREHENSIVE_KEYWORD_INTEGRATION_PLAN.md",
+      "COMPREHENSIVE_TEST_SUITE_DOCUMENTATION.md",
+      "CONTRIBUTING.md",
+      "DASHBOARD_ARCHITECTURE_OVERVIEW.md",
+      "DASHBOARD_AUTO_FIXER_CHANGES_PLAN.md",
+      "DASHBOARD_COMMANDS.md",
+      "DASHBOARD_COMPLETION_PLAN.md",
+      "DASHBOARD_ENHANCEMENTS.md",
+      "DASHBOARD_REFACTORING_PLAN.md",
+      "DASHBOARD_REFACTORING_PROGRESS.md",
+      "DASHBOARD_ROADMAP.md",
+      "DASHBOARD_RUNNING.md",
+      "DASHBOARD_UPDATE.md",
+      "DEPLOYMENT.md",
+      "DEV_TO_PRODUCTION_WORKFLOW.md",
+      "DISCORD_NOTIFICATIONS_QUICK_SETUP.md",
+      "DOCKER_SETUP.md",
+      "DOCKER_TO_PM2_MIGRATION.md",
+      "DOCKER_VS_PM2_FEATURE_ANALYSIS.md",
+      "DOCUMENTATION_INDEX.md",
+      "EMAIL-NOTIFICATIONS-ACTIVATED.md",
+      "FEATURES_ADDED_FROM_DOCKER.md",
+      "FEATURE_ENHANCEMENT_PLAN.md",
+      "FILES_CREATED_INDEX.md",
+      "FINAL-FIX-DNS.md",
+      "FIXES_COMPLETE_REPORT.md",
+      "FIX_WORDPRESS_CONNECTION_TEST.md",
+      "GITHUB-ACTIONS-DOCKER-REFERENCE.md",
+      "GITHUB-ACTIONS-QUICK-REFERENCE.md",
+      "GITHUB-ACTIONS-SETUP.md",
+      "GITHUB-SECRETS-SETUP.md",
+      "GSC_PERSISTENCE_FIX.md",
+      "GSC_QUICK_REFERENCE.md",
+      "GSC_README.md",
+      "GSC_TEST_RESULTS.md",
+      "HOW-IT-WORKS-DETAILED.md",
+      "HOW-IT-WORKS-SIMPLE.md",
+      "HOW_TO_VIEW_CHANGES.md",
+      "IMPROVEMENT_PLAN.md",
+      "IMPROVEMENT_RECOMMENDATIONS.md",
+      "INTEGRATION_ARCHITECTURE_DIAGRAM.md",
+      "INTEGRATION_REFERENCE_CARD.md",
+      "KEYWORDS_TRACKING_VERIFICATION.md",
+      "LOCAL_SEO_TEST_RESULTS.md",
+      "LOCAL_SEO_V3_FEATURES.md",
+      "MASTER_FIX_PLAN.md",
+      "MULTI_AGENT_TESTING_PLAN.md",
+      "NAP_CONFIG_EXPLAINED.md",
+      "NEW_SKILLS_SUMMARY.md",
+      "OPERATIONAL_CHECKLIST.md",
+      "PAGE_INVENTORY_REFERENCE.md",
+      "PARALLEL_SAFE_COMPLETION.md",
+      "PLAYWRIGHT_TEST_RESULTS.md",
+      "PM2_QUICK_REFERENCE.md",
+      "PRODUCTION_DEPLOYMENT_PLAN.md",
+      "PRODUCTION_DEPLOYMENT_REPORT.md",
+      "PROGRESS_TRACKER.md",
+      "QUICK_ACTION_PLAN.md",
+      "REACT_DASHBOARD_DOCUMENTATION.md",
+      "README.md",
+      "README_DASHBOARD_INTEGRATION.md",
+      "README_IMPROVEMENTS_OCT_29.md",
+      "README_INTEGRATION.md",
+      "README_OLD.md",
+      "README_WORDPRESS_CONNECTION.md",
+      "READY_TO_DEPLOY.md",
+      "REFACTORING_PROGRESS_UPDATE.md",
+      "RELEASE-NOTES.md",
+      "ROADMAP_NEXT_STEPS.md",
+      "SECURITY_FIXES_IMPLEMENTATION_GUIDE.md",
+      "SECURITY_UPDATES_APPLIED.md",
+      "SERPBEAR_INTEGRATION_PLAN.md",
+      "SETUP_BRANCH_PROTECTION_NOW.md",
+      "SETUP_GITHUB_ACTIONS.md",
+      "SIMPLIFIED_WORKFLOW.md",
+      "SSH_KEY_FIX.md",
+      "START-HERE-GITHUB-ACTIONS.md",
+      "START_HERE.md",
+      "START_HERE_AI_OPTIMIZER_V2.md",
+      "START_HERE_MANUAL_REVIEW.md",
+      "START_HERE_TESTING_PLAN.md",
+      "START_HERE_WORDPRESS.md",
+      "START_POSITION_TRACKING.md",
+      "START_POSITION_TRACKING_NOW.md",
+      "SYSTEM_ARCHITECTURE_VISUAL.md",
+      "SYSTEM_REVIEW_MANUAL_REVIEW.md",
+      "TEST_GSC_PERSISTENCE.md",
+      "TROUBLESHOOTING_AUTO_FIX_HISTORY.md",
+      "TROUBLESHOOT_502_ERROR.md",
+      "UNIFIED_DASHBOARD_PROGRESS.md",
+      "UNIFIED_INTERFACE_PLAN.md",
+      "V3.3_FINAL_ENHANCEMENTS.md",
+      "WHATS_NEXT.md",
+      "WHATS_NEXT_ROADMAP.md",
+      "WORKFLOW_TEST.md",
+      "npm-scripts-guide.md",
+      "⚡_ACTION_PLAN.md",
+      "✅_FINAL_RESULTS.md",
+      "🎉_ALL_FIXES_COMPLETE.md",
+      "🚀_RUN_THIS_NOW.md",
+      "🚀_START_HERE_FIRST.md"
+    ]
+  },
+  "dependencies": {
+    "production": 29,
+    "development": 20,
+    "total": 49
+  }
+}

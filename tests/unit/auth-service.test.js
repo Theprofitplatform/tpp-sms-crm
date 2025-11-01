@@ -47,10 +47,9 @@ describe('AuthService', () => {
   afterEach(() => {
     // Clean up test users
     try {
-      const user = db.authOps.getUserByEmail(testUser.email);
-      if (user) {
-        // Note: Add delete method if needed
-      }
+      db.authOps.deleteUserByEmail(testUser.email);
+      db.authOps.deleteUserByEmail('updated@example.com');
+      db.authOps.deleteUserByEmail('another@example.com');
     } catch (error) {
       // Ignore cleanup errors
     }

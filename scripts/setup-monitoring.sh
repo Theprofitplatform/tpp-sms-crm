@@ -1,123 +1,84 @@
 #!/bin/bash
 
-###############################################################################
-# Setup Monitoring & Cron Jobs
-#
-# Configures automated tasks for:
-# - Database backups
-# - Health checks
-# - Email reports
-# - Rank tracking
-#
-# Usage:
-#   ./scripts/setup-monitoring.sh
-###############################################################################
+# SEO Expert Platform - Monitoring Setup
+# Sets up basic monitoring for production environment
 
-set -euo pipefail
+echo "🔍 SEO Expert Platform - Monitoring Setup"
+echo "=========================================="
+echo ""
 
+# Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
-echo -e "${BLUE}"
-echo "=============================================="
-echo "  Monitoring & Automation Setup"
-echo "=============================================="
-echo -e "${NC}"
-
-# Get the absolute path to the project
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
-echo -e "${YELLOW}Project directory: $PROJECT_DIR${NC}\n"
-
-# Check if running on Windows (WSL)
-if grep -qi microsoft /proc/version 2>/dev/null; then
-    echo -e "${YELLOW}⚠️  Running on WSL (Windows Subsystem for Linux)${NC}"
-    echo "Cron might not work in WSL by default."
-    echo "Consider using Windows Task Scheduler instead."
-    echo ""
-    read -p "Continue with cron setup anyway? (y/n): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "Setup cancelled."
-        exit 0
-    fi
+# Check if PM2 is running
+echo "1. Checking PM2 status..."
+if npx pm2 list | grep -q "seo-dashboard"; then
+  echo -e "${GREEN}✅ PM2 is running${NC}"
+else
+  echo -e "${RED}❌ PM2 is not running or seo-dashboard not found${NC}"
+  echo "   Start it with: npx pm2 start ecosystem.config.cjs"
+  exit 1
 fi
 
-# Create cron jobs
-echo -e "${GREEN}Setting up cron jobs...${NC}\n"
-
-# Backup current crontab
-crontab -l > /tmp/crontab.backup 2>/dev/null || echo "# New crontab" > /tmp/crontab.backup
-
-# Remove old SEO automation jobs if they exist
-grep -v "# SEO Automation" /tmp/crontab.backup > /tmp/crontab.new || true
-
-# Add header
-echo "" >> /tmp/crontab.new
-echo "# =============================================" >> /tmp/crontab.new
-echo "# SEO Automation Platform - Automated Tasks" >> /tmp/crontab.new
-echo "# =============================================" >> /tmp/crontab.new
-echo "" >> /tmp/crontab.new
-
-# Daily database backup (2 AM)
-echo "# Database backup - Daily at 2:00 AM" >> /tmp/crontab.new
-echo "0 2 * * * cd $PROJECT_DIR && ./scripts/backup-database.sh >> logs/backup-cron.log 2>&1 # SEO Automation" >> /tmp/crontab.new
-echo "" >> /tmp/crontab.new
-
-# Health check every 15 minutes
-echo "# Health check - Every 15 minutes" >> /tmp/crontab.new
-echo "*/15 * * * * cd $PROJECT_DIR && curl -sf http://localhost:9000/api/v2/health > /dev/null || echo \"\$(date): Health check failed\" >> logs/health-cron.log # SEO Automation" >> /tmp/crontab.new
-echo "" >> /tmp/crontab.new
-
-# Weekly report (Sunday at 8 AM)
-echo "# Weekly report - Every Sunday at 8:00 AM" >> /tmp/crontab.new
-echo "0 8 * * 0 cd $PROJECT_DIR && node scripts/send-weekly-reports.js >> logs/reports-cron.log 2>&1 # SEO Automation" >> /tmp/crontab.new
-echo "" >> /tmp/crontab.new
-
-# Install new crontab
-crontab /tmp/crontab.new
-
-echo -e "${GREEN}✅ Cron jobs configured:${NC}"
-echo ""
-echo "1. Database Backup: Daily at 2:00 AM"
-echo "2. Health Check: Every 15 minutes"
-echo "3. Weekly Reports: Sundays at 8:00 AM"
 echo ""
 
-# Create log directory
-mkdir -p "$PROJECT_DIR/logs"
-touch "$PROJECT_DIR/logs/backup-cron.log"
-touch "$PROJECT_DIR/logs/health-cron.log"
-touch "$PROJECT_DIR/logs/reports-cron.log"
+# Install PM2 log rotation
+echo "2. Setting up PM2 log rotation..."
+if npx pm2 list | grep -q "pm2-logrotate"; then
+  echo -e "${YELLOW}⚠️  pm2-logrotate already installed${NC}"
+else
+  npx pm2 install pm2-logrotate
+  echo -e "${GREEN}✅ Installed pm2-logrotate${NC}"
+fi
 
-echo -e "${GREEN}✅ Log files created in logs/directory${NC}\n"
+# Configure log rotation
+echo ""
+echo "3. Configuring log rotation..."
+npx pm2 set pm2-logrotate:max_size 10M
+npx pm2 set pm2-logrotate:retain 30
+npx pm2 set pm2-logrotate:compress true
+npx pm2 set pm2-logrotate:rotateInterval '0 0 * * *'
+echo -e "${GREEN}✅ Log rotation configured (10MB max, 30 files, daily)${NC}"
 
-# Display current crontab
-echo -e "${BLUE}Current cron jobs:${NC}"
-crontab -l | grep "SEO Automation" | grep -v "^#"
+echo ""
+echo "4. Testing health endpoint..."
+HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9000/api/v2/health)
+if [ "$HEALTH_RESPONSE" -eq 200 ]; then
+  echo -e "${GREEN}✅ Health endpoint responding (HTTP $HEALTH_RESPONSE)${NC}"
+else
+  echo -e "${RED}❌ Health endpoint not responding properly (HTTP $HEALTH_RESPONSE)${NC}"
+fi
 
 echo ""
-echo -e "${GREEN}======================================"
-echo "  Monitoring Setup Complete!"
-echo "======================================${NC}"
+echo "5. Current PM2 Status:"
+npx pm2 status
+
 echo ""
-echo "📊 Monitoring Features:"
-echo "  - Automated daily backups"
-echo "  - Health checks every 15 min"
-echo "  - Weekly email reports"
+echo "=========================================="
+echo "✅ Monitoring setup complete!"
 echo ""
-echo "📝 View cron jobs: crontab -l"
-echo "📝 Edit cron jobs: crontab -e"
-echo "📝 View logs: tail -f logs/*.log"
+echo "📊 Monitoring Options:"
 echo ""
-echo "🔗 External Monitoring (Recommended):"
-echo "  1. UptimeRobot: https://uptimerobot.com"
-echo "     - Monitor: http://31.97.222.218:9000/api/v2/health"
-echo "     - Check every 5 minutes"
+echo "1. PM2 Web Dashboard:"
+echo "   npx pm2 web"
+echo "   Access at: http://localhost:9615"
 echo ""
-echo "  2. Healthchecks.io: https://healthchecks.io"
-echo "     - Add cron monitoring URLs"
-echo "     - Get alerts if jobs fail"
+echo "2. PM2 Monitoring (Optional - Requires PM2 Plus account):"
+echo "   npx pm2 link <secret> <public>"
+echo "   Sign up at: https://pm2.io"
+echo ""
+echo "3. External Uptime Monitoring (Recommended):"
+echo "   UptimeRobot: https://uptimerobot.com"
+echo "   Pingdom: https://www.pingdom.com"
+echo "   Monitor: https://seodashboard.theprofitplatform.com.au/api/v2/health"
+echo ""
+echo "4. View Logs:"
+echo "   npx pm2 logs seo-dashboard"
+echo "   npx pm2 logs seo-dashboard --lines 100"
+echo ""
+echo "5. Monitor Resources:"
+echo "   npx pm2 monit"
 echo ""

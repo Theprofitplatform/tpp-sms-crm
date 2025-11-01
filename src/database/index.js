@@ -1748,6 +1748,22 @@ export const authOps = {
   getAllUsers() {
     const stmt = db.prepare('SELECT id, client_id, email, first_name, last_name, role, status, last_login, created_at FROM users');
     return stmt.all();
+  },
+
+  /**
+   * Delete user (for testing purposes)
+   */
+  deleteUser(userId) {
+    const stmt = db.prepare('DELETE FROM users WHERE id = ?');
+    return stmt.run(userId);
+  },
+
+  /**
+   * Delete user by email (for testing purposes)
+   */
+  deleteUserByEmail(email) {
+    const stmt = db.prepare('DELETE FROM users WHERE email = ?');
+    return stmt.run(email);
   }
 };
 

@@ -4,11 +4,12 @@
  * Tests authentication endpoints with real HTTP requests
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
 import request from 'supertest';
 import express from 'express';
 import authRoutes from '../../src/routes/auth-routes.js';
 import { AuthService } from '../../src/auth/auth-service.js';
+import db from '../../src/database/index.js';
 
 // Create test app
 const app = express();
@@ -25,6 +26,15 @@ describe('Authentication API', () => {
   };
 
   let authToken;
+
+  // Cleanup after each test
+  afterEach(() => {
+    try {
+      db.authOps.deleteUserByEmail(testUser.email);
+    } catch (error) {
+      // Ignore cleanup errors
+    }
+  });
 
   describe('POST /api/auth/register', () => {
     it('should register a new user', async () => {

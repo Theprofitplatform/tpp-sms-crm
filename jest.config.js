@@ -49,6 +49,7 @@ export default {
         '^@/hooks/use-toast$': '<rootDir>/tests/mocks/toastMock.js',
         '^@/components/ui/(.*)$': '<rootDir>/tests/mocks/uiComponentsMock.js'
       },
+      extensionsToTreatAsEsm: ['.jsx'],
       testPathIgnorePatterns: [
         '/node_modules/',
         '/_archive/',
