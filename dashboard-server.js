@@ -86,8 +86,11 @@ const httpServer = createServer(app);
 const io = new Server(httpServer);
 const PORT = 9000;
 
+// Trust Cloudflare proxy for rate limiting and IP detection
+app.set('trust proxy', 1);
+
 // Configure multer for file uploads
-const upload = multer({ 
+const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
