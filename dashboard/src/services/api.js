@@ -366,6 +366,38 @@ export const autoFixAPI = {
 }
 
 /**
+ * Auto-Fix Review APIs (Manual Review Mode)
+ */
+export const autofixReviewAPI = {
+  // Run detection without auto-applying fixes
+  async runDetection(engineId, clientId = null) {
+    const response = await fetch(`${API_BASE}/autofix/engines/${engineId}/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, mode: 'detect-only' })
+    })
+    return response.json()
+  },
+
+  // Get detected proposals for review
+  async getProposals(engineId, clientId = null) {
+    const params = new URLSearchParams({ engineId, ...(clientId && { clientId }) })
+    const response = await fetch(`${API_BASE}/autofix/proposals?${params}`)
+    return response.json()
+  },
+
+  // Apply selected proposals
+  async applyProposals(proposalIds) {
+    const response = await fetch(`${API_BASE}/autofix/proposals/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proposalIds })
+    })
+    return response.json()
+  }
+}
+
+/**
  * Recommendations APIs
  */
 export const recommendationsAPI = {
