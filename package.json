@@ -40,7 +40,11 @@
     "prod:check": "./check-production-apis.sh",
     "prod:health": "curl -sf https://seodashboard.theprofitplatform.com.au/api/v2/health | jq '.' || echo 'Production health check failed'",
     "prod:dashboard": "curl -sf https://seodashboard.theprofitplatform.com.au/api/dashboard | jq '.stats' || echo 'Dashboard API check failed'",
-    "prod:status": "curl -sf https://seodashboard.theprofitplatform.com.au/api/v2/health | jq -r '\"Status: \\(.success) | Version: \\(.version) | Uptime: \\(.uptime)s\"' || echo 'Production status check failed'"
+    "prod:status": "curl -sf https://seodashboard.theprofitplatform.com.au/api/v2/health | jq -r '\"Status: \\(.success) | Version: \\(.version) | Uptime: \\(.uptime)s\"' || echo 'Production status check failed'",
+    "dev:check": "./check-dev-server.sh",
+    "dev:health": "curl -sf http://localhost:9000/api/v2/health | jq '.' || echo 'Dev health check failed'",
+    "dev:dashboard": "curl -sf http://localhost:9000/api/dashboard | jq '.stats' || echo 'Dev dashboard API check failed'",
+    "dev:status": "curl -sf http://localhost:9000/api/v2/health | jq -r '\"Dev Status: \\(.success) | Version: \\(.version) | Uptime: \\(.uptime)s\"' || echo 'Dev status check failed'"
   },
   "keywords": [
     "seo",
