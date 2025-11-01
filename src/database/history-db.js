@@ -496,15 +496,111 @@ export function getOptimizationQueue() {
  */
 export function getClientOptimizationHistory(clientId, limit = 50) {
   const db = readDB();
-  
+
   if (!db.optimizations) {
     return [];
   }
-  
+
   return db.optimizations
     .filter(opt => opt.clientId === clientId)
     .sort((a, b) => new Date(b.queuedAt) - new Date(a.queuedAt))
     .slice(0, limit);
+}
+
+/**
+ * Get optimization analytics for specified time period
+ */
+export function getOptimizationAnalytics(days = 30) {
+  const db = readDB();
+
+  if (!db.optimizations) {
+    return {
+      totalOptimizations: 0,
+      appliedOptimizations: 0,
+      pendingOptimizations: 0,
+      averageScore: 0,
+      totalImprovements: 0
+    };
+  }
+
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - days);
+
+  const recentOptimizations = db.optimizations.filter(opt =>
+    new Date(opt.queuedAt) >= cutoffDate
+  );
+
+  const appliedOptimizations = recentOptimizations.filter(opt => opt.applied);
+  const totalScore = appliedOptimizations.reduce((sum, opt) => sum + (opt.seoScore || 0), 0);
+
+  return {
+    totalOptimizations: recentOptimizations.length,
+    appliedOptimizations: appliedOptimizations.length,
+    pendingOptimizations: recentOptimizations.filter(opt => opt.status === 'pending').length,
+    averageScore: appliedOptimizations.length > 0 ? totalScore / appliedOptimizations.length : 0,
+    totalImprovements: appliedOptimizations.reduce((sum, opt) => sum + (opt.estimatedImprovement || 0), 0)
+  };
+}
+
+/**
+ * Get optimization recommendations for a client
+ */
+export function getOptimizationRecommendations(clientId) {
+  const db = readDB();
+
+  if (!db.optimizations) {
+    return {
+      quickWins: [],
+      highPriority: [],
+      recommendations: []
+    };
+  }
+
+  const clientOptimizations = db.optimizations
+    .filter(opt => opt.clientId === clientId)
+    .sort((a, b) => new Date(b.queuedAt) - new Date(a.queuedAt));
+
+  return {
+    quickWins: clientOptimizations.filter(opt => opt.seoScore >= 50 && opt.seoScore < 70 && !opt.applied).slice(0, 5),
+    highPriority: clientOptimizations.filter(opt => opt.seoScore < 50 && !opt.applied).slice(0, 5),
+    recommendations: clientOptimizations.filter(opt => !opt.applied).slice(0, 10)
+  };
+}
+
+/**
+ * Rollback optimization (restore original content)
+ */
+export function rollbackOptimization(id) {
+  const db = readDB();
+
+  if (!db.optimizations) {
+    return { success: false, error: 'No optimizations found' };
+  }
+
+  const optimizationIndex = db.optimizations.findIndex(opt => opt.id === id);
+
+  if (optimizationIndex === -1) {
+    return { success: false, error: 'Optimization not found' };
+  }
+
+  const optimization = db.optimizations[optimizationIndex];
+
+  if (!optimization.applied) {
+    return { success: false, error: 'Optimization was never applied' };
+  }
+
+  // Mark as rolled back
+  db.optimizations[optimizationIndex].applied = false;
+  db.optimizations[optimizationIndex].rolledBack = true;
+  db.optimizations[optimizationIndex].rolledBackAt = new Date().toISOString();
+  db.optimizations[optimizationIndex].status = 'rolled_back';
+
+  writeDB(db);
+
+  return {
+    success: true,
+    optimization: db.optimizations[optimizationIndex]
+  };
 }
 
 export default {
@@ -529,5 +625,8 @@ export default {
   updateOptimizationResults,
   updateOptimizationApplied,
   getOptimizationQueue,
-  getClientOptimizationHistory
+  getClientOptimizationHistory,
+  getOptimizationAnalytics,
+  getOptimizationRecommendations,
+  rollbackOptimization
 };
