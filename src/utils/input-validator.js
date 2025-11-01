@@ -5,6 +5,8 @@
  * especially for preventing command injection and path traversal.
  */
 
+import path from 'path';
+
 /**
  * Validate client ID to prevent command injection
  * Only allows alphanumeric characters, hyphens, and underscores
@@ -60,9 +62,6 @@ export function sanitizeFilePath(filePath, allowedDir) {
   if (filePath.includes('..') || filePath.includes('~')) {
     throw new Error('Path traversal not allowed');
   }
-
-  // Import path module (dynamic to avoid top-level await issues)
-  const path = await import('path');
 
   // Resolve to absolute path
   const resolvedPath = path.resolve(allowedDir, filePath);

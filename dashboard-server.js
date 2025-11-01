@@ -63,7 +63,7 @@ import { localSEOScheduler } from './src/services/local-seo-scheduler.js';
 import { notificationService } from './src/services/notification-service.js';
 import { ComparisonService } from './src/services/comparison-service.js';
 import { alertService } from './src/services/alert-service.js';
-import { exportService } from './src/services/export-service.js';
+import exportService from './src/services/export-service.js';
 import { webhookManager, WebhookEvents } from './src/services/webhook-manager.js';
 import gscService from './src/services/gsc-service.js';
 import autofixReviewRoutes from './src/api/autofix-review-routes.js';
