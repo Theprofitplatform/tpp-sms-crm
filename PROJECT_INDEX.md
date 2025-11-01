@@ -26,6 +26,47 @@ New to the system? Start here:
 
 ---
 
+## 🆕 Recent Updates & Integrations
+
+### Pixel Management Integration (Phase 4A) - Nov 2, 2025 ✅
+
+**Status:** COMPLETE
+**Impact:** Critical platform integrations
+
+**What Was Added:**
+- ✅ **pixelAPI** in centralized service layer (`dashboard/src/services/api.js`)
+  - 15 methods for complete pixel data access
+  - Platform-wide statistics aggregation
+  - Consistent error handling across platform
+
+- ✅ **PixelHealthSummary Component** (`dashboard/src/components/PixelHealthSummary.jsx`)
+  - Real-time pixel status and uptime monitoring
+  - SEO score tracking with trends
+  - Critical issue alerts and breakdown
+  - Quick navigation to detailed views
+
+- ✅ **ClientDetailPage Enhancement**
+  - New "SEO Health" tab
+  - Unified client view with all metrics
+  - Seamless pixel data integration
+
+- ✅ **AnalyticsPage Enhancement**
+  - Platform-wide SEO Health Metrics section
+  - Total/active pixels visibility
+  - Average SEO score tracking
+  - Aggregate issue detection
+
+**Documentation:**
+- [PIXEL_INTEGRATION_REVIEW.md](PIXEL_INTEGRATION_REVIEW.md) - Gap analysis & roadmap (608 lines)
+- [PHASE_4A_INTEGRATION_COMPLETE.md](PHASE_4A_INTEGRATION_COMPLETE.md) - Completion report (550+ lines)
+- [DEPLOYMENT_REPORT_2025-11-02.md](DEPLOYMENT_REPORT_2025-11-02.md) - Initial deployment (450+ lines)
+
+**Total Added:** 1,140 lines of production code + 1,608 lines of documentation
+
+**Next Up:** Phase 4B - Recommendations & AutoFix integration
+
+---
+
 ## 📖 Documentation Library
 
 ### Getting Started Guides
@@ -61,7 +102,13 @@ New to the system? Start here:
 | **[MONITORING_GUIDE.md](MONITORING_GUIDE.md)** | Monitoring setup | Setting up alerts | 700+ |
 | **[DEPLOYMENT_SUMMARY.md](DEPLOYMENT_SUMMARY.md)** | PM2 deployment | Using PM2 | 300+ |
 
-**Total Documentation: 6,435+ lines across 12 comprehensive guides**
+### Testing & Quality Assurance
+
+| Document | Purpose | When to Read | Lines |
+|----------|---------|--------------|-------|
+| **[TESTING_AND_ENHANCEMENT_SUMMARY.md](TESTING_AND_ENHANCEMENT_SUMMARY.md)** | Testing infrastructure overview | Understanding testing strategy | 500+ |
+
+**Total Documentation: 6,935+ lines across 13 comprehensive guides**
 
 ---
 
@@ -136,9 +183,31 @@ New to the system? Start here:
 
 ### Test Scripts
 
+#### API & Integration Tests
+
 | Script | Purpose | Usage | Status |
 |--------|---------|-------|--------|
-| **`test-manual-review-workflow.js`** | End-to-end workflow test | `node test-manual-review-workflow.js` | ✅ Ready |
+| **`test-api-integration.js`** | Complete API integration tests (17 tests) | `node test-api-integration.js` | ✅ NEW |
+| **`test-e2e-workflow.js`** | Full workflow: detect→review→apply | `node test-e2e-workflow.js --dry-run` | ✅ NEW |
+| **`test-manual-review-workflow.js`** | Legacy workflow test | `node test-manual-review-workflow.js` | ✅ Ready |
+
+#### Engine-Specific Tests
+
+| Script | Purpose | Usage | Status |
+|--------|---------|-------|--------|
+| **`test-title-meta-optimizer.js`** | Title/Meta Optimizer v2 test | `node test-title-meta-optimizer.js` | ✅ Ready |
+| **`test-broken-link-detector.js`** | Broken Link Detector v2 test | `node test-broken-link-detector.js` | ✅ Ready |
+
+#### Performance & Benchmarks
+
+| Script | Purpose | Usage | Status |
+|--------|---------|-------|--------|
+| **`scripts/benchmark-engines.js`** | Performance benchmarks (all engines) | `node --expose-gc scripts/benchmark-engines.js` | ✅ NEW |
+
+#### Examples
+
+| Script | Purpose | Usage | Status |
+|--------|---------|-------|--------|
 | **`examples/simple-review-workflow.js`** | Integration examples | Copy-paste snippets | ✅ Ready |
 
 ### Health & Diagnostic Scripts
