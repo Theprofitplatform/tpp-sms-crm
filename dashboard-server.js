@@ -67,6 +67,7 @@ import exportService from './src/services/export-service.js';
 import { webhookManager, WebhookEvents } from './src/services/webhook-manager.js';
 import gscService from './src/services/gsc-service.js';
 import autofixReviewRoutes from './src/api/autofix-review-routes.js';
+import ottoFeaturesRoutes from './src/api/v2/otto-features.js';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import cors from 'cors';
@@ -1871,6 +1872,14 @@ console.log('[Activity Log] Routes available at /api/activity-log/*');
 console.log('[Auto-Fix Review] Mounting auto-fix review API...');
 app.use('/api/autofix', autofixReviewRoutes);
 console.log('[Auto-Fix Review] Routes available at /api/autofix/*');
+
+// ============================================
+// OTTO SEO FEATURES API ROUTES
+// ============================================
+
+console.log('[Otto Features] Mounting Otto SEO enhancement routes...');
+app.use('/api/v2', ottoFeaturesRoutes);
+console.log('[Otto Features] Routes available at /api/v2/pixel/*, /api/v2/schema/*, /api/v2/ssr/*');
 
 // ============================================
 // KEYWORD RESEARCH PROXY ROUTES (Legacy)
