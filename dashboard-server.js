@@ -2872,47 +2872,47 @@ app.get('/api/settings', (req, res) => {
 app.put('/api/settings', async (req, res) => {
   try {
     const settingsPath = path.join(__dirname, 'config', 'settings.json');
-    
+
     // Ensure config directory exists
     const configDir = path.join(__dirname, 'config');
     if (!fs.existsSync(configDir)) {
       fs.mkdirSync(configDir, { recursive: true });
     }
-    
+
     // Read existing settings
     let settings = {};
     if (fs.existsSync(settingsPath)) {
       settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
     }
-    
+
     const updates = req.body;
-    
+
     // Handle GSC settings separately
     if (updates.integrations?.gsc) {
       const gscSettings = updates.integrations.gsc;
-      
+
       // Load existing GSC settings
       const existingGSC = gscService.loadGSCSettings();
-      
+
       // Build the updated GSC data, keeping existing values if not provided
       const gscData = {
         propertyType: gscSettings.propertyType || existingGSC.propertyType || 'domain',
         propertyUrl: gscSettings.propertyUrl || existingGSC.propertyUrl || '',
         clientEmail: gscSettings.clientEmail || existingGSC.clientEmail || '',
         // Keep existing private key if new one is empty or masked
-        privateKey: (gscSettings.privateKey && 
-                     gscSettings.privateKey !== '***CONFIGURED***' && 
+        privateKey: (gscSettings.privateKey &&
+                     gscSettings.privateKey !== '***CONFIGURED***' &&
                      gscSettings.privateKey.trim() !== '')
-                    ? gscSettings.privateKey 
+                    ? gscSettings.privateKey
                     : existingGSC.privateKey || '',
         connected: existingGSC.connected || false
       };
-      
+
       // Only test connection if a new private key was provided
-      const hasNewPrivateKey = gscSettings.privateKey && 
-                               gscSettings.privateKey !== '***CONFIGURED***' && 
+      const hasNewPrivateKey = gscSettings.privateKey &&
+                               gscSettings.privateKey !== '***CONFIGURED***' &&
                                gscSettings.privateKey.trim() !== '';
-      
+
       if (hasNewPrivateKey) {
         // Test connection with new credentials
         if (gscData.clientEmail && gscData.privateKey && gscData.propertyUrl) {
@@ -2944,24 +2944,131 @@ app.put('/api/settings', async (req, res) => {
       } else {
         console.log('[GSC] Updated settings without changing private key');
       }
-      
+
       // Always save the GSC settings (even if just updating property URL or type)
       gscService.saveGSCSettings(gscData);
-      
+
       // Remove GSC from the main settings object
       delete updates.integrations.gsc;
     }
-    
+
     // Merge with updates
     settings = { ...settings, ...updates };
-    
+
     // Save settings
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-    
+
     // Reload and send back current settings
     const currentSettings = await getFullSettings();
     res.json({ success: true, ...currentSettings });
   } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Update settings by category (for frontend compatibility)
+app.put('/api/settings/:category', async (req, res) => {
+  try {
+    const { category } = req.params;
+    const settingsPath = path.join(__dirname, 'config', 'settings.json');
+
+    // Ensure config directory exists
+    const configDir = path.join(__dirname, 'config');
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+
+    // Read existing settings
+    let settings = {};
+    if (fs.existsSync(settingsPath)) {
+      settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    }
+
+    const updates = req.body;
+
+    // If category is 'all', update entire settings object
+    if (category === 'all') {
+      // Handle GSC settings separately
+      if (updates.integrations?.gsc) {
+        const gscSettings = updates.integrations.gsc;
+
+        // Load existing GSC settings
+        const existingGSC = gscService.loadGSCSettings();
+
+        // Build the updated GSC data, keeping existing values if not provided
+        const gscData = {
+          propertyType: gscSettings.propertyType || existingGSC.propertyType || 'domain',
+          propertyUrl: gscSettings.propertyUrl || existingGSC.propertyUrl || '',
+          clientEmail: gscSettings.clientEmail || existingGSC.clientEmail || '',
+          // Keep existing private key if new one is empty or masked
+          privateKey: (gscSettings.privateKey &&
+                       gscSettings.privateKey !== '***CONFIGURED***' &&
+                       gscSettings.privateKey.trim() !== '')
+                      ? gscSettings.privateKey
+                      : existingGSC.privateKey || '',
+          connected: existingGSC.connected || false
+        };
+
+        // Only test connection if a new private key was provided
+        const hasNewPrivateKey = gscSettings.privateKey &&
+                                 gscSettings.privateKey !== '***CONFIGURED***' &&
+                                 gscSettings.privateKey.trim() !== '';
+
+        if (hasNewPrivateKey) {
+          // Test connection with new credentials
+          if (gscData.clientEmail && gscData.privateKey && gscData.propertyUrl) {
+            console.log('[GSC] Testing connection with new credentials...');
+            try {
+              const testResult = await gscService.testGSCConnection(
+                gscData.clientEmail,
+                gscData.privateKey,
+                gscData.propertyUrl,
+                gscData.propertyType
+              );
+              gscData.connected = testResult.success;
+              console.log('[GSC] Connection test:', testResult.success ? 'SUCCESS' : 'FAILED');
+              if (!testResult.success) {
+                return res.status(400).json({
+                  success: false,
+                  error: `GSC connection test failed: ${testResult.error}`
+                });
+              }
+            } catch (error) {
+              console.error('[GSC] Connection test error:', error.message);
+              return res.status(400).json({
+                success: false,
+                error: `GSC connection test failed: ${error.message}`
+              });
+            }
+          }
+          console.log('[GSC] New credentials saved successfully');
+        } else {
+          console.log('[GSC] Updated settings without changing private key');
+        }
+
+        // Always save the GSC settings (even if just updating property URL or type)
+        gscService.saveGSCSettings(gscData);
+
+        // Remove GSC from the main settings object
+        delete updates.integrations.gsc;
+      }
+
+      // Merge with updates
+      settings = { ...settings, ...updates };
+    } else {
+      // Update specific category
+      settings[category] = { ...(settings[category] || {}), ...updates };
+    }
+
+    // Save settings
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+    console.log(`[Settings] Saved ${category} settings to ${settingsPath}`);
+
+    // Reload and send back current settings
+    const currentSettings = await getFullSettings();
+    res.json({ success: true, ...currentSettings });
+  } catch (error) {
+    console.error('[Settings] Save error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

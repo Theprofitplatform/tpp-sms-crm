@@ -12,6 +12,7 @@ import keywordsRouter from './keywords.js';
 import researchRouter from './research.js';
 import syncRouter from './sync.js';
 import ottoFeaturesRouter from './otto-features.js';
+import pixelEnhancementsRouter from './pixel-enhancements-routes.js';
 import { corsMiddleware, optionalAuthenticate } from './middleware/auth.js';
 
 const router = express.Router();
@@ -102,6 +103,9 @@ router.use('/sync', syncRouter);
 
 // Otto SEO Features
 router.use('/', ottoFeaturesRouter);
+
+// Pixel Management Enhancements
+router.use('/', pixelEnhancementsRouter);
 
 // 404 handler for v2 routes
 router.use((req, res) => {

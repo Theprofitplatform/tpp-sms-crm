@@ -9,6 +9,7 @@
 
 import express from 'express';
 import pixelService from '../../services/pixel-service.js';
+import enhancedPixelService from '../../services/pixel-service-enhanced.js';
 import schemaEngine from '../../services/schema-engine.js';
 import ssrOptimizationService from '../../services/ssr-optimization-service.js';
 
@@ -56,6 +57,8 @@ router.post('/pixel/generate', async (req, res) => {
 /**
  * Track pixel data (called by pixel script)
  * POST /api/v2/pixel/track
+ *
+ * Now uses enhanced service with advanced issue detection
  */
 router.post('/pixel/track', async (req, res) => {
   try {
@@ -68,11 +71,15 @@ router.post('/pixel/track', async (req, res) => {
       });
     }
 
-    const result = pixelService.trackPixelData(apiKey, data);
+    // Use enhanced service for advanced issue detection and analytics
+    const result = enhancedPixelService.trackPixelData(apiKey, data);
 
     res.json({
       success: true,
-      data: result
+      data: result,
+      message: result.issuesDetected > 0
+        ? `Detected ${result.issuesDetected} SEO issues`
+        : 'No issues detected'
     });
   } catch (error) {
     console.error('Error tracking pixel data:', error);

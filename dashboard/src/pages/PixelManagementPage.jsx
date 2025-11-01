@@ -2,7 +2,7 @@
  * PIXEL MANAGEMENT PAGE
  *
  * Manage SEO monitoring pixels for clients
- * Similar to Otto SEO's pixel deployment
+ * Enhanced with issue tracking, analytics, and health monitoring
  */
 
 import { useState, useEffect } from 'react';
@@ -18,8 +18,15 @@ import {
   TrendingUp,
   Eye,
   Calendar,
-  ExternalLink
+  ExternalLink,
+  BarChart3,
+  FileText,
+  Shield
 } from 'lucide-react';
+import IssueTracker from '../components/IssueTracker.jsx';
+import IssueSummaryCards from '../components/IssueSummaryCards.jsx';
+import AnalyticsDashboard from '../components/AnalyticsDashboard.jsx';
+import PixelHealthIndicator from '../components/PixelHealthIndicator.jsx';
 
 export default function PixelManagementPage() {
   const [clients, setClients] = useState([]);
@@ -36,6 +43,8 @@ export default function PixelManagementPage() {
   });
   const [generatedPixel, setGeneratedPixel] = useState(null);
   const [selectedPixelId, setSelectedPixelId] = useState(null);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [issueFilters, setIssueFilters] = useState({});
 
   // Load clients on mount
   useEffect(() => {
@@ -49,6 +58,16 @@ export default function PixelManagementPage() {
       loadPixelPages(selectedClient);
     }
   }, [selectedClient]);
+
+  // Auto-select first active pixel when pixels load
+  useEffect(() => {
+    if (pixels.length > 0 && !selectedPixelId) {
+      const activePixel = pixels.find(p => p.status === 'active');
+      if (activePixel) {
+        setSelectedPixelId(activePixel.id);
+      }
+    }
+  }, [pixels]);
 
   const loadClients = async () => {
     try {
@@ -193,6 +212,21 @@ export default function PixelManagementPage() {
     return 'bg-red-100 text-red-700';
   };
 
+  const handleIssueFilterChange = (filters) => {
+    setIssueFilters(filters);
+    setActiveTab('issues');
+  };
+
+  const selectedPixel = pixels.find(p => p.id === selectedPixelId);
+
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: Activity },
+    { id: 'issues', label: 'Issues', icon: AlertCircle },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'health', label: 'Health', icon: Shield },
+    { id: 'pages', label: 'Pages', icon: FileText }
+  ];
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -229,8 +263,60 @@ export default function PixelManagementPage() {
 
       {selectedClient && (
         <>
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+          {/* Pixel Selector */}
+          {pixels.length > 0 && (
+            <div className="mb-6 bg-white rounded-lg shadow p-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Pixel for Detailed View:
+              </label>
+              <select
+                value={selectedPixelId || ''}
+                onChange={(e) => setSelectedPixelId(parseInt(e.target.value))}
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Choose a pixel...</option>
+                {pixels.map(pixel => (
+                  <option key={pixel.id} value={pixel.id}>
+                    {pixel.domain} - {pixel.status} ({pixel.pages_tracked} pages)
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Tabs Navigation */}
+          <div className="mb-6 bg-white rounded-lg shadow">
+            <div className="border-b">
+              <nav className="flex -mb-px">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`
+                        flex items-center gap-2 px-6 py-4 font-medium text-sm border-b-2 transition-colors
+                        ${isActive
+                          ? 'border-blue-600 text-blue-600'
+                          : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                        }
+                      `}
+                    >
+                      <Icon className="w-5 h-5" />
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          </div>
+
+          {/* Tab Content */}
+          {activeTab === 'overview' && (
+            <>
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-medium text-gray-600">Active Pixels</h3>
@@ -381,8 +467,146 @@ export default function PixelManagementPage() {
             </div>
           </div>
 
-          {/* Tracked Pages */}
-          <div className="bg-white rounded-lg shadow">
+          {/* Pixels List */}
+          <div className="bg-white rounded-lg shadow mb-6">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Deployed Pixels</h2>
+              <button
+                onClick={() => loadPixels(selectedClient)}
+                className="p-2 hover:bg-gray-100 rounded"
+              >
+                <RefreshCw className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              {loading && pixels.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">Loading pixels...</div>
+              ) : pixels.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Code className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No pixels deployed yet</p>
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="mt-4 text-blue-600 hover:underline"
+                  >
+                    Generate your first pixel
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pixels.map(pixel => (
+                    <div key={pixel.id} className={`border rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer ${selectedPixelId === pixel.id ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`} onClick={() => setSelectedPixelId(pixel.id)}>
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="font-semibold text-lg">{pixel.domain}</h3>
+                            {getStatusBadge(pixel)}
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                            <div>
+                              <span className="font-medium">Deployment:</span> {pixel.deployment_type}
+                            </div>
+                            <div>
+                              <span className="font-medium">Pages Tracked:</span> {pixel.pages_tracked}
+                            </div>
+                            <div>
+                              <span className="font-medium">Last Seen:</span> {formatDate(pixel.last_ping_at)}
+                            </div>
+                            <div>
+                              <span className="font-medium">Last URL:</span>{' '}
+                              {pixel.last_seen_url ? (
+                                <a
+                                  href={pixel.last_seen_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline flex items-center gap-1"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  View <ExternalLink className="w-3 h-3" />
+                                </a>
+                              ) : 'N/A'}
+                            </div>
+                          </div>
+                          <div className="mt-2">
+                            <span className="text-xs text-gray-500">Features: </span>
+                            {pixel.features_enabled.map(feature => (
+                              <span key={feature} className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded mr-2">
+                                {feature}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => {
+                              setGeneratedPixel({
+                                pixelCode: pixel.pixel_code,
+                                apiKey: pixel.api_key
+                              });
+                              setShowCreateModal(true);
+                            }}
+                            className="p-2 text-gray-600 hover:bg-gray-200 rounded"
+                            title="View Code"
+                          >
+                            <Code className="w-5 h-5" />
+                          </button>
+                          {pixel.status === 'active' && (
+                            <button
+                              onClick={() => deactivatePixel(pixel.id)}
+                              className="p-2 text-yellow-600 hover:bg-yellow-100 rounded"
+                              title="Deactivate"
+                            >
+                              <XCircle className="w-5 h-5" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => deletePixel(pixel.id)}
+                            className="p-2 text-red-600 hover:bg-red-100 rounded"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+            </>
+          )}
+
+          {/* Issues Tab */}
+          {activeTab === 'issues' && selectedPixelId && (
+            <div className="space-y-6">
+              <IssueSummaryCards
+                pixelId={selectedPixelId}
+                onFilterChange={handleIssueFilterChange}
+              />
+              <IssueTracker
+                pixelId={selectedPixelId}
+                onRefresh={() => loadPixels(selectedClient)}
+              />
+            </div>
+          )}
+
+          {/* Analytics Tab */}
+          {activeTab === 'analytics' && selectedPixelId && (
+            <AnalyticsDashboard pixelId={selectedPixelId} />
+          )}
+
+          {/* Health Tab */}
+          {activeTab === 'health' && selectedPixelId && (
+            <PixelHealthIndicator
+              pixelId={selectedPixelId}
+              lastPingAt={selectedPixel?.last_ping_at}
+            />
+          )}
+
+          {/* Pages Tab */}
+          {activeTab === 'pages' && (
+            <div className="bg-white rounded-lg shadow">
             <div className="px-6 py-4 border-b">
               <h2 className="text-xl font-semibold">Tracked Pages</h2>
             </div>
@@ -459,7 +683,21 @@ export default function PixelManagementPage() {
                 </tbody>
               </table>
             </div>
-          </div>
+            </div>
+          )}
+
+          {/* No Pixel Selected Message */}
+          {(activeTab === 'issues' || activeTab === 'analytics' || activeTab === 'health') && !selectedPixelId && (
+            <div className="bg-white rounded-lg shadow p-12 text-center">
+              <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                No Pixel Selected
+              </h3>
+              <p className="text-gray-600">
+                Please select a pixel from the dropdown above to view detailed {activeTab} information.
+              </p>
+            </div>
+          )}
         </>
       )}
 
