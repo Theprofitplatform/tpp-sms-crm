@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
-import { autoFixAPI, autofixReviewAPI } from '@/services/api'
+import { autoFixAPI } from '@/services/api'
 import { useAPIRequest, useAPIData } from '@/hooks/useAPIRequest'
 import AutoFixChangeHistory from '@/components/AutoFixChangeHistory'
 
@@ -81,7 +81,7 @@ export default function AutoFixPage({ onNavigate }) {
     if (reviewMode) {
       // Run detection only (Phase 1)
       await runEngine(
-        () => autofixReviewAPI.runDetection(engineId, null),
+        () => autoFixAPI.runEngine(engineId, null),
         {
           showSuccessToast: false,
           onSuccess: (data) => {
