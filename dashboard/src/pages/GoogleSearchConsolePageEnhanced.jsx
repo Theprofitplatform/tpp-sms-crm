@@ -50,11 +50,23 @@ export default function GoogleSearchConsolePageEnhanced() {
   // Calculate summary metrics
   const summary = useMemo(() => {
     if (!gscData) return { totalClicks: 0, totalImpressions: 0, avgCTR: 0, avgPosition: 0 }
+
+    const totalClicks = Number(gscData.totalClicks) || 0
+    const totalImpressions = Number(gscData.totalImpressions) || 0
+    const avgPosition = Number(gscData.avgPosition) || 0
+
+    // Calculate CTR safely
+    let avgCTR = 0
+    if (totalImpressions > 0 && totalClicks >= 0) {
+      const ctr = (totalClicks / totalImpressions) * 100
+      avgCTR = isFinite(ctr) ? Number(ctr.toFixed(2)) : 0
+    }
+
     return {
-      totalClicks: gscData.totalClicks || 0,
-      totalImpressions: gscData.totalImpressions || 0,
-      avgCTR: ((gscData.totalClicks / gscData.totalImpressions) * 100).toFixed(2) || 0,
-      avgPosition: gscData.avgPosition?.toFixed(1) || 0
+      totalClicks,
+      totalImpressions,
+      avgCTR,
+      avgPosition: isFinite(avgPosition) && avgPosition > 0 ? Number(avgPosition.toFixed(1)) : 0
     }
   }, [gscData])
 
@@ -81,7 +93,9 @@ export default function GoogleSearchConsolePageEnhanced() {
     let csvContent = 'Query,Position,Clicks,Impressions,CTR,Potential Clicks,Traffic Gain,Priority\n'
     
     ;(categorized?.quickWins || []).forEach(q => {
-      csvContent += `"${q.query}",${q.position},${q.clicks},${q.impressions},${(q.clicks/q.impressions*100).toFixed(2)}%,${q.traffic.potential},${q.traffic.gain},${q.recommendations.priority}\n`
+      const ctr = q.impressions > 0 ? (q.clicks / q.impressions * 100) : 0
+      const formattedCTR = isFinite(ctr) ? ctr.toFixed(2) : '0.00'
+      csvContent += `"${q.query}",${q.position},${q.clicks},${q.impressions},${formattedCTR}%,${q.traffic.potential},${q.traffic.gain},${q.recommendations.priority}\n`
     })
     
     const blob = new Blob([csvContent], { type: 'text/csv' })
@@ -399,7 +413,8 @@ export default function GoogleSearchConsolePageEnhanced() {
                   </TableHeader>
                   <TableBody>
                     {categorized.lowCTR.map((query, idx) => {
-                      const ctr = ((query.clicks / query.impressions) * 100).toFixed(2)
+                      const ctrValue = query.impressions > 0 ? (query.clicks / query.impressions) * 100 : 0
+                      const ctr = isFinite(ctrValue) ? ctrValue.toFixed(2) : '0.00'
                       return (
                         <TableRow key={idx}>
                           <TableCell className="font-medium">{query.query}</TableCell>
@@ -458,16 +473,19 @@ export default function GoogleSearchConsolePageEnhanced() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {categorized.top3Maintain.map((query, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell className="font-medium">{query.query}</TableCell>
-                        <TableCell>
-                          <Badge className="bg-green-600">#{Math.round(query.position)}</Badge>
-                        </TableCell>
-                        <TableCell>{query.clicks}</TableCell>
-                        <TableCell>
-                          {((query.clicks / query.impressions) * 100).toFixed(2)}%
-                        </TableCell>
+                    {categorized.top3Maintain.map((query, idx) => {
+                      const ctrValue = query.impressions > 0 ? (query.clicks / query.impressions) * 100 : 0
+                      const ctr = isFinite(ctrValue) ? ctrValue.toFixed(2) : '0.00'
+                      return (
+                        <TableRow key={idx}>
+                          <TableCell className="font-medium">{query.query}</TableCell>
+                          <TableCell>
+                            <Badge className="bg-green-600">#{Math.round(query.position)}</Badge>
+                          </TableCell>
+                          <TableCell>{query.clicks}</TableCell>
+                          <TableCell>
+                            {ctr}%
+                          </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-green-600">
                             <CheckCircle className="h-3 w-3 mr-1" />
@@ -475,7 +493,8 @@ export default function GoogleSearchConsolePageEnhanced() {
                           </Badge>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      )
+                    })}
                   </TableBody>
                 </Table>
               )}
@@ -565,17 +584,21 @@ export default function GoogleSearchConsolePageEnhanced() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {gscData.topQueries.slice(0, 50).map((query, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell className="font-medium">{query.query}</TableCell>
-                        <TableCell>#{Math.round(query.position)}</TableCell>
-                        <TableCell>{query.clicks}</TableCell>
-                        <TableCell>{query.impressions}</TableCell>
-                        <TableCell>
-                          {((query.clicks / query.impressions) * 100).toFixed(2)}%
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {gscData.topQueries.slice(0, 50).map((query, idx) => {
+                      const ctrValue = query.impressions > 0 ? (query.clicks / query.impressions) * 100 : 0
+                      const ctr = isFinite(ctrValue) ? ctrValue.toFixed(2) : '0.00'
+                      return (
+                        <TableRow key={idx}>
+                          <TableCell className="font-medium">{query.query}</TableCell>
+                          <TableCell>#{Math.round(query.position)}</TableCell>
+                          <TableCell>{query.clicks}</TableCell>
+                          <TableCell>{query.impressions}</TableCell>
+                          <TableCell>
+                            {ctr}%
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
                   </TableBody>
                 </Table>
               )}

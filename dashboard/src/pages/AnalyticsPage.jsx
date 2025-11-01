@@ -50,8 +50,11 @@ export default function AnalyticsPage() {
     const positionChange = Math.floor(Math.random() * 20 - 5) // Mock - would use historical data
     const auditsChange = Math.floor(Math.random() * 30 - 10)
 
+    // Safely format avgPosition
+    const formattedPosition = (avgPosition && isFinite(avgPosition)) ? Number(avgPosition).toFixed(1) : '0.0'
+
     return {
-      avgPosition: avgPosition.toFixed(1),
+      avgPosition: formattedPosition,
       positionChange: positionChange > 0 ? `+${positionChange}%` : `${positionChange}%`,
       positionTrend: positionChange >= 0 ? 'up' : 'down',
       totalAudits,
@@ -202,7 +205,7 @@ export default function AnalyticsPage() {
                   )}
                 </div>
                 <div className="text-2xl font-bold">
-                  {(pixelStatsData.avgSEOScore || 0).toFixed(0)}
+                  {isFinite(pixelStatsData.avgSEOScore) ? Number(pixelStatsData.avgSEOScore).toFixed(0) : '0'}
                   <span className="text-sm text-muted-foreground">/100</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Across all pixels</p>
@@ -263,13 +266,15 @@ export default function AnalyticsPage() {
         </CardContent>
       </Card>
 
-      {/* Bottom Section */}
+      {/* Bottom Section - Commented out until ClientsTable component is implemented */}
+      {/*
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <ClientsTable clients={clients} onClientClick={onClientClick} />
         </div>
         <RecentActivity activities={activities} />
       </div>
+      */}
     </div>
   )
 }
