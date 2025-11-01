@@ -8,11 +8,8 @@ import { renderHook, act, waitFor } from '@testing-library/react'
 import { useAPIRequest, useAPIData } from '../../../../dashboard/src/hooks/useAPIRequest.js'
 import * as errorHandler from '../../../../dashboard/src/utils/errorHandler.js'
 
-// Mock toast
+// Mock toast - already mocked via jest.config.js moduleNameMapper
 const mockToast = jest.fn()
-jest.mock('../../../../dashboard/src/hooks/use-toast', () => ({
-  useToast: () => ({ toast: mockToast })
-}))
 
 describe('useAPIRequest Hook', () => {
   beforeEach(() => {

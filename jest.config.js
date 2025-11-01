@@ -46,7 +46,8 @@ export default {
         '^@/(.*)$': '<rootDir>/dashboard/src/$1',
         '\\.(css|less|scss|sass)$': '<rootDir>/tests/mocks/styleMock.js',
         '^@/lib/utils$': '<rootDir>/tests/mocks/utilsMock.js',
-        '^@/hooks/use-toast$': '<rootDir>/tests/mocks/toastMock.js'
+        '^@/hooks/use-toast$': '<rootDir>/tests/mocks/toastMock.js',
+        '^@/components/ui/(.*)$': '<rootDir>/tests/mocks/uiComponentsMock.js'
       },
       testPathIgnorePatterns: [
         '/node_modules/',

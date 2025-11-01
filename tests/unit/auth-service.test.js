@@ -10,10 +10,10 @@ import db from '../../src/database/index.js';
 import bcrypt from 'bcryptjs';
 
 describe('AuthService', () => {
-  // Test user data
+  // Test user data - use unique email for each test run
   const testUser = {
     clientId: 'test-client',
-    email: 'test@example.com',
+    email: `test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@example.com`,
     password: 'SecurePass123!',
     firstName: 'Test',
     lastName: 'User',
