@@ -1,0 +1,112 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                                                           ║
+║               📋 MANUAL REVIEW SYSTEM - QUICK REFERENCE                   ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+🚀 SERVER MANAGEMENT
+─────────────────────────────────────────────────────────────────────────────
+  Start:     npm start > logs/server.log 2>&1 & echo $! > logs/server.pid
+  Stop:      kill $(cat logs/server.pid)
+  Restart:   kill $(cat logs/server.pid) && npm start > logs/server.log 2>&1 &
+  Logs:      tail -f logs/server.log
+  Status:    curl http://localhost:4000/health
+
+📡 QUICK API CALLS
+─────────────────────────────────────────────────────────────────────────────
+  Health:
+    curl http://localhost:4000/health
+
+  List Proposals:
+    curl http://localhost:4000/api/autofix/proposals?status=pending
+
+  Statistics:
+    curl http://localhost:4000/api/autofix/statistics
+
+🎯 RUN DETECTION (Choose your client)
+─────────────────────────────────────────────────────────────────────────────
+  Instant Auto Traders:
+    curl -X POST http://localhost:4000/api/autofix/detect \
+      -H "Content-Type: application/json" \
+      -d '{"engineId":"nap-fixer","clientId":"instantautotraders"}'
+
+  Hot Tyres:
+    curl -X POST http://localhost:4000/api/autofix/detect \
+      -H "Content-Type: application/json" \
+      -d '{"engineId":"content-optimizer-v2","clientId":"hottyres"}'
+
+  SADC:
+    curl -X POST http://localhost:4000/api/autofix/detect \
+      -H "Content-Type: application/json" \
+      -d '{"engineId":"broken-link-detector-v2","clientId":"sadcdisabilityservices"}'
+
+🔧 AVAILABLE ENGINES
+─────────────────────────────────────────────────────────────────────────────
+  1.  nap-fixer                 - Business info consistency
+  2.  content-optimizer-v2      - Content quality
+  3.  schema-injector-v2        - Structured data
+  4.  title-meta-optimizer-v2   - AI-powered titles/meta
+  5.  broken-link-detector-v2   - 404 detection
+  6.  image-optimizer-v2        - Alt text & accessibility
+  7.  redirect-checker-v2       - Redirect chains
+  8.  internal-link-builder-v2  - Internal linking
+  9.  sitemap-optimizer-v2      - XML sitemap validation
+  10. robots-txt-manager-v2     - Robots.txt management
+
+✅ REVIEW & APPROVE
+─────────────────────────────────────────────────────────────────────────────
+  Accept Low Risk Only:
+    curl -X POST http://localhost:4000/api/autofix/proposals/accept-low-risk \
+      -H "Content-Type: application/json" \
+      -d '{"groupId":"GROUP_ID","maxRiskLevel":"low"}'
+
+  Review Single Proposal:
+    curl -X POST http://localhost:4000/api/autofix/proposals/PROPOSAL_ID/review \
+      -H "Content-Type: application/json" \
+      -d '{"action":"approve","notes":"Looks good"}'
+
+🚀 APPLY FIXES
+─────────────────────────────────────────────────────────────────────────────
+  curl -X POST http://localhost:4000/api/autofix/apply \
+    -H "Content-Type: application/json" \
+    -d '{"groupId":"GROUP_ID","engineId":"ENGINE_ID","clientId":"CLIENT_ID"}'
+
+🧪 TESTING
+─────────────────────────────────────────────────────────────────────────────
+  Live Test:            ./test-live-deployment.sh
+  API Tests:            node test-api-integration.js
+  E2E Workflow:         node test-e2e-workflow.js --dry-run
+  Performance:          node --expose-gc scripts/benchmark-engines.js
+
+🔧 MAINTENANCE
+─────────────────────────────────────────────────────────────────────────────
+  Database Cleanup:     node scripts/db-maintenance.js cleanup --days=7
+  Database Optimize:    node scripts/db-maintenance.js optimize
+  Database Backup:      node scripts/db-maintenance.js backup
+  Database Stats:       node scripts/db-maintenance.js stats
+
+📚 DOCUMENTATION
+─────────────────────────────────────────────────────────────────────────────
+  Deployment:           DEPLOYMENT_COMPLETE.md
+  System Overview:      MANUAL_REVIEW_README.md
+  API Reference:        API_QUICK_REFERENCE.md
+  Testing Guide:        TESTING_AND_ENHANCEMENT_SUMMARY.md
+  Monitoring:           MONITORING_GUIDE.md
+
+💡 CONFIGURED CLIENTS
+─────────────────────────────────────────────────────────────────────────────
+  instantautotraders    - https://instantautotraders.com.au
+  hottyres              - https://www.hottyres.com.au
+  sadcdisabilityservices - https://sadcdisabilityservices.com.au
+
+🌐 SERVER INFO
+─────────────────────────────────────────────────────────────────────────────
+  URL:        http://localhost:4000
+  Health:     http://localhost:4000/health
+  API Docs:   http://localhost:4000/api
+  Version:    2.0.0
+  Status:     ✅ Running
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║  🎉 Ready for Production!                                                 ║
+╚═══════════════════════════════════════════════════════════════════════════╝

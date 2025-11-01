@@ -22,14 +22,14 @@ function checkFile(filePath, required = true) {
   const exists = fs.existsSync(fullPath);
   
   if (exists) {
-    console.log(\`✅ \${filePath}\`);
+    console.log(`✅ ${filePath}`);
     return true;
   } else {
     if (required) {
-      console.log(\`❌ \${filePath} - MISSING\`);
+      console.log(`❌ ${filePath} - MISSING`);
       allPassed = false;
     } else {
-      console.log(\`⚠️  \${filePath} - MISSING (optional)\`);
+      console.log(`⚠️  ${filePath} - MISSING (optional)`);
       warnings++;
     }
     return false;

@@ -538,13 +538,20 @@ router.get('/sessions', async (req, res) => {
 async function loadEngine(engineId, clientId) {
   // Map engine IDs to module paths (relative to project root)
   const engineMap = {
-    // Modern engines with review workflow (✅ RECOMMENDED)
+    // ✅ ALL 10 V2 ENGINES - Production Ready with Manual Review Workflow
     'nap-auto-fixer': './src/automation/auto-fixers/nap-fixer.js',
     'nap-fixer': './src/automation/auto-fixers/nap-fixer.js',
     'content-optimizer-v2': './src/automation/auto-fixers/content-optimizer-v2.js',
     'schema-injector-v2': './src/automation/auto-fixers/schema-injector-v2.js',
+    'title-meta-optimizer-v2': './src/automation/auto-fixers/title-meta-optimizer-v2.js',
+    'broken-link-detector-v2': './src/automation/auto-fixers/broken-link-detector-v2.js',
+    'image-optimizer-v2': './src/automation/auto-fixers/image-optimizer-v2.js',
+    'redirect-checker-v2': './src/automation/auto-fixers/redirect-checker-v2.js',
+    'internal-link-builder-v2': './src/automation/auto-fixers/internal-link-builder-v2.js',
+    'sitemap-optimizer-v2': './src/automation/auto-fixers/sitemap-optimizer-v2.js',
+    'robots-txt-manager-v2': './src/automation/auto-fixers/robots-txt-manager-v2.js',
 
-    // Legacy engines (need refactoring for full review workflow)
+    // Legacy engines (deprecated - use v2 versions above)
     'content-optimizer': './src/automation/auto-fixers/content-optimizer.js',
     'title-meta-optimizer': './src/automation/auto-fixers/title-meta-optimizer.js',
     'meta-description-optimizer': './src/automation/auto-fixers/meta-description-optimizer.js',

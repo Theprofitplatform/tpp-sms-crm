@@ -18,6 +18,7 @@
  */
 
 import express from 'express';
+import crypto from 'crypto';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { exec } from 'child_process';
@@ -2830,12 +2831,14 @@ app.get('/api/settings', (req, res) => {
         auditCompletion: true,
         optimizationResults: true,
         systemErrors: true,
-        weeklyReports: true
+        weeklyReports: true,
+        emailEnabled: false,
+        email: '',
+        discordWebhook: ''
       },
       integrations: {},
       api: {
-        apiKey: '',
-        webhookUrl: ''
+        apiKey: ''
       },
       appearance: {
         theme: 'system',
@@ -2862,7 +2865,26 @@ app.get('/api/settings', (req, res) => {
         connected: gscSettings.connected || false
       };
     }
-    
+
+    // Load most recent API key (masked)
+    try {
+      const db = getDB();
+      const apiKey = db.prepare(`
+        SELECT key FROM api_keys
+        WHERE revoked = 0
+        ORDER BY created_at DESC
+        LIMIT 1
+      `).get();
+
+      if (apiKey) {
+        settings.api = settings.api || {};
+        // Mask the API key for security
+        settings.api.apiKey = apiKey.key.substring(0, 12) + '...' + apiKey.key.substring(apiKey.key.length - 4);
+      }
+    } catch (error) {
+      console.error('[Settings] Error loading API key:', error.message);
+    }
+
     res.json(settings);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -3070,6 +3092,274 @@ app.put('/api/settings/:category', async (req, res) => {
   } catch (error) {
     console.error('[Settings] Save error:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// API KEYS MANAGEMENT
+// ============================================
+
+// Generate new API key
+app.post('/api/settings/api-keys', async (req, res) => {
+  try {
+    const { name } = req.body;
+
+    if (!name || name.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'API key name is required'
+      });
+    }
+
+    // Get database instance
+    const db = getDB();
+
+    // Generate secure random API key
+    const apiKey = 'sk_' + crypto.randomBytes(32).toString('hex');
+
+    // Insert into database
+    const insert = db.prepare(`
+      INSERT INTO api_keys (key, name, user_id)
+      VALUES (?, ?, ?)
+    `);
+
+    const result = insert.run(apiKey, name.trim(), 'admin');
+
+    console.log(`[API Keys] Generated new API key: ${name} (ID: ${result.lastInsertRowid})`);
+
+    // Get the created key
+    const apiKeyRecord = db.prepare('SELECT * FROM api_keys WHERE id = ?').get(result.lastInsertRowid);
+
+    res.json({
+      success: true,
+      apiKey: apiKey,
+      id: result.lastInsertRowid,
+      name: apiKeyRecord.name,
+      created_at: apiKeyRecord.created_at
+    });
+
+  } catch (error) {
+    console.error('[API Keys] Generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get all API keys (without revealing full key)
+app.get('/api/settings/api-keys', async (req, res) => {
+  try {
+    // Get database instance
+    const db = getDB();
+
+    const apiKeys = db.prepare(`
+      SELECT
+        id,
+        name,
+        SUBSTR(key, 1, 12) || '...' || SUBSTR(key, -4) as masked_key,
+        user_id,
+        created_at,
+        expires_at,
+        last_used_at,
+        revoked,
+        revoked_at
+      FROM api_keys
+      WHERE revoked = 0
+      ORDER BY created_at DESC
+    `).all();
+
+    res.json({
+      success: true,
+      apiKeys: apiKeys
+    });
+
+  } catch (error) {
+    console.error('[API Keys] List error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Revoke/Delete API key
+app.delete('/api/settings/api-keys/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get database instance
+    const db = getDB();
+
+    // Check if key exists
+    const apiKey = db.prepare('SELECT * FROM api_keys WHERE id = ?').get(id);
+
+    if (!apiKey) {
+      return res.status(404).json({
+        success: false,
+        error: 'API key not found'
+      });
+    }
+
+    if (apiKey.revoked) {
+      return res.status(400).json({
+        success: false,
+        error: 'API key already revoked'
+      });
+    }
+
+    // Revoke the key
+    const update = db.prepare(`
+      UPDATE api_keys
+      SET revoked = 1, revoked_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `);
+
+    update.run(id);
+
+    console.log(`[API Keys] Revoked API key ID: ${id} (${apiKey.name})`);
+
+    res.json({
+      success: true,
+      message: 'API key revoked successfully',
+      id: parseInt(id)
+    });
+
+  } catch (error) {
+    console.error('[API Keys] Revoke error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================
+// NOTIFICATION ENDPOINTS
+// ============================================
+
+// Test Discord Webhook
+app.post('/api/notifications/test-discord', async (req, res) => {
+  try {
+    const { webhook } = req.body;
+
+    if (!webhook || !webhook.startsWith('https://discord.com/api/webhooks/')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid Discord webhook URL'
+      });
+    }
+
+    // Send test message to Discord
+    const testMessage = {
+      embeds: [{
+        title: '✅ Discord Webhook Test',
+        description: 'This is a test message from your SEO Dashboard!',
+        color: 5814783, // Green color
+        fields: [
+          {
+            name: 'Status',
+            value: 'Webhook configured successfully',
+            inline: true
+          },
+          {
+            name: 'Time',
+            value: new Date().toLocaleString(),
+            inline: true
+          }
+        ],
+        footer: {
+          text: 'SEO Automation Dashboard'
+        },
+        timestamp: new Date().toISOString()
+      }]
+    };
+
+    const response = await fetch(webhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(testMessage)
+    });
+
+    if (response.ok) {
+      console.log('[Discord] Test webhook sent successfully');
+      res.json({
+        success: true,
+        message: 'Test message sent to Discord'
+      });
+    } else {
+      const errorText = await response.text();
+      console.error('[Discord] Webhook failed:', errorText);
+      res.status(400).json({
+        success: false,
+        error: `Discord API error: ${response.status} ${response.statusText}`
+      });
+    }
+
+  } catch (error) {
+    console.error('[Discord] Test webhook error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Send notification to Discord (used by system)
+app.post('/api/notifications/discord', async (req, res) => {
+  try {
+    // Get Discord webhook from settings
+    const settingsPath = path.join(__dirname, 'config', 'settings.json');
+    let discordWebhook = null;
+
+    if (fs.existsSync(settingsPath)) {
+      const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+      discordWebhook = settings.notifications?.discordWebhook;
+    }
+
+    if (!discordWebhook) {
+      return res.status(400).json({
+        success: false,
+        error: 'Discord webhook not configured in settings'
+      });
+    }
+
+    const { title, description, fields, color } = req.body;
+
+    const message = {
+      embeds: [{
+        title: title || 'Notification',
+        description: description || '',
+        color: color || 3447003, // Default blue
+        fields: fields || [],
+        footer: {
+          text: 'SEO Automation Dashboard'
+        },
+        timestamp: new Date().toISOString()
+      }]
+    };
+
+    const response = await fetch(discordWebhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(message)
+    });
+
+    if (response.ok) {
+      res.json({ success: true });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: 'Failed to send Discord notification'
+      });
+    }
+
+  } catch (error) {
+    console.error('[Discord] Notification error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
 });
 

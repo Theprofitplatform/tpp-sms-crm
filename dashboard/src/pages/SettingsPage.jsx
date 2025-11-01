@@ -46,7 +46,10 @@ export default function SettingsPage() {
       auditCompletion: true,
       optimizationResults: true,
       systemErrors: true,
-      weeklyReports: true
+      weeklyReports: true,
+      emailEnabled: false,
+      email: '',
+      discordWebhook: ''
     },
     integrations: {
       gsc: {
@@ -58,8 +61,7 @@ export default function SettingsPage() {
       }
     },
     api: {
-      apiKey: '',
-      webhookUrl: ''
+      apiKey: ''
     },
     appearance: {
       theme: 'system',
@@ -167,9 +169,9 @@ export default function SettingsPage() {
       newErrors['general.adminEmail'] = 'Invalid email format'
     }
 
-    // Validate webhook URL if provided
-    if (settings.api?.webhookUrl && !VALIDATION_PATTERNS.URL.test(settings.api.webhookUrl)) {
-      newErrors['api.webhookUrl'] = 'Invalid URL format'
+    // Validate Discord webhook URL if provided
+    if (settings.notifications?.discordWebhook && !settings.notifications.discordWebhook.startsWith('https://discord.com/api/webhooks/')) {
+      newErrors['notifications.discordWebhook'] = 'Invalid Discord webhook URL'
     }
 
     // Validate platform name
@@ -220,10 +222,35 @@ export default function SettingsPage() {
     await execute(
       () => settingsAPI.generateAPIKey('Default Key'),
       {
-        showSuccessToast: true,
-        successMessage: 'API key regenerated successfully',
         onSuccess: (data) => {
-          handleChange('api', 'apiKey', data.apiKey)
+          if (data.success && data.apiKey) {
+            // Show the full API key in an alert for the user to copy
+            alert(
+              `API Key Generated Successfully!\n\n` +
+              `Your new API key is:\n\n${data.apiKey}\n\n` +
+              `⚠️ IMPORTANT: Copy this key now! You won't be able to see it again.\n\n` +
+              `The key has been copied to your clipboard.`
+            )
+
+            // Copy to clipboard
+            navigator.clipboard.writeText(data.apiKey)
+
+            // Update the masked key in the UI
+            const maskedKey = data.apiKey.substring(0, 12) + '...' + data.apiKey.substring(data.apiKey.length - 4)
+            handleChange('api', 'apiKey', maskedKey)
+
+            toast({
+              title: 'API Key Generated',
+              description: 'Your new API key has been copied to clipboard'
+            })
+          }
+        },
+        onError: (error) => {
+          toast({
+            title: 'Generation Failed',
+            description: error.message || 'Failed to generate API key',
+            variant: 'destructive'
+          })
         }
       }
     )
@@ -395,6 +422,7 @@ export default function SettingsPage() {
 
         {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-4">
+          {/* Notification Preferences */}
           <Card>
             <CardHeader>
               <CardTitle>Notification Preferences</CardTitle>
@@ -421,6 +449,130 @@ export default function SettingsPage() {
                   />
                 </div>
               ))}
+            </CardContent>
+          </Card>
+
+          {/* Email Notifications */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Email Notifications</CardTitle>
+              <CardDescription>
+                Configure email settings to receive notifications
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Email Enable Toggle */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="email-enabled" className="cursor-pointer">
+                    Enable Email Notifications
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Send notifications to your email address
+                  </p>
+                </div>
+                <Switch
+                  id="email-enabled"
+                  checked={settings.notifications?.emailEnabled || false}
+                  onCheckedChange={(checked) => handleChange('notifications', 'emailEnabled', checked)}
+                />
+              </div>
+
+              {/* Notification Email */}
+              <div className="space-y-2">
+                <Label htmlFor="notification-email">Notification Email</Label>
+                <Input
+                  id="notification-email"
+                  type="email"
+                  value={settings.notifications?.email || ''}
+                  onChange={(e) => handleChange('notifications', 'email', e.target.value)}
+                  placeholder="you@example.com"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Email address where notifications will be sent
+                </p>
+              </div>
+
+              {/* SMTP Configuration */}
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  SMTP settings are configured on the server. Contact your administrator to set up email delivery.
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+
+          {/* Discord Webhook */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Discord Webhook</CardTitle>
+              <CardDescription>
+                Receive real-time notifications in Discord
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Discord Webhook URL */}
+              <div className="space-y-2">
+                <Label htmlFor="discord-webhook">Discord Webhook URL (Optional)</Label>
+                <Input
+                  id="discord-webhook"
+                  type="url"
+                  value={settings.notifications?.discordWebhook || ''}
+                  onChange={(e) => handleChange('notifications', 'discordWebhook', e.target.value)}
+                  placeholder="https://discord.com/api/webhooks/..."
+                />
+                <p className="text-sm text-muted-foreground">
+                  Create a webhook in your Discord server settings. <a href="https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks" target="_blank" rel="noopener noreferrer" className="text-primary underline">Learn how</a>
+                </p>
+              </div>
+
+              {/* Test Button */}
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  if (!settings.notifications?.discordWebhook) {
+                    toast({
+                      title: 'Webhook URL Required',
+                      description: 'Please enter a Discord webhook URL first',
+                      variant: 'destructive'
+                    })
+                    return
+                  }
+
+                  try {
+                    const response = await fetch('/api/notifications/test-discord', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ webhook: settings.notifications.discordWebhook })
+                    })
+                    const data = await response.json()
+
+                    if (data.success) {
+                      toast({
+                        title: 'Test Sent',
+                        description: 'Check your Discord channel for the test message'
+                      })
+                    } else {
+                      toast({
+                        title: 'Test Failed',
+                        description: data.error || 'Failed to send test message',
+                        variant: 'destructive'
+                      })
+                    }
+                  } catch (error) {
+                    toast({
+                      title: 'Test Failed',
+                      description: error.message,
+                      variant: 'destructive'
+                    })
+                  }
+                }}
+                disabled={!settings.notifications?.discordWebhook || loading}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Test Discord Webhook
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -480,27 +632,13 @@ export default function SettingsPage() {
                 </p>
               </div>
 
-              {/* Webhook URL */}
-              <div className="space-y-2">
-                <Label htmlFor="webhook-url">Webhook URL (Optional)</Label>
-                <Input
-                  id="webhook-url"
-                  type="url"
-                  value={settings.api?.webhookUrl || ''}
-                  onChange={(e) => handleChange('api', 'webhookUrl', e.target.value)}
-                  placeholder="https://your-domain.com/webhook"
-                  aria-invalid={!!errors['api.webhookUrl']}
-                  aria-describedby={errors['api.webhookUrl'] ? 'webhook-url-error' : undefined}
-                />
-                {errors['api.webhookUrl'] && (
-                  <p id="webhook-url-error" className="text-sm text-red-500">
-                    {errors['api.webhookUrl']}
-                  </p>
-                )}
-                <p className="text-sm text-muted-foreground">
-                  Receive real-time notifications at this URL
-                </p>
-              </div>
+              {/* Info about webhooks */}
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Looking for webhooks? Configure Discord webhook notifications in the <strong>Notifications</strong> tab.
+                </AlertDescription>
+              </Alert>
             </CardContent>
           </Card>
         </TabsContent>
