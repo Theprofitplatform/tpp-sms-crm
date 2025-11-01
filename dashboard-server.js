@@ -3178,6 +3178,49 @@ app.get('/api/gsc/summary', async (req, res) => {
   }
 });
 
+// GSC Test Connection API
+app.post('/api/gsc/test-connection', async (req, res) => {
+  try {
+    const { clientEmail, privateKey, propertyUrl, propertyType } = req.body;
+
+    if (!clientEmail || !privateKey || !propertyUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: clientEmail, privateKey, and propertyUrl are required'
+      });
+    }
+
+    console.log('[GSC] Testing connection with provided credentials...');
+    const testResult = await gscService.testGSCConnection(
+      clientEmail,
+      privateKey,
+      propertyUrl,
+      propertyType || 'domain'
+    );
+
+    if (testResult.success) {
+      console.log('[GSC] Test connection successful');
+      res.json({
+        success: true,
+        message: 'Connection successful',
+        data: testResult.data
+      });
+    } else {
+      console.log('[GSC] Test connection failed:', testResult.error);
+      res.status(400).json({
+        success: false,
+        error: testResult.error || 'Connection test failed'
+      });
+    }
+  } catch (error) {
+    console.error('[GSC] Test connection error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // GSC Sync API - Trigger Manual Refresh
 app.post('/api/gsc/sync', async (req, res) => {
   try {

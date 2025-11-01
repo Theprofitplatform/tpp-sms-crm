@@ -370,7 +370,7 @@ function App() {
           {!['dashboard', 'clients', 'reports', 'automation', 'autofix', 'autofix-review', 'autofix-settings', 'activity-log', 'ai-optimizer', 'scheduler',
               'bulk-operations', 'position-tracking', 'domains', 'keywords', 'google-console', 'local-seo', 'wordpress', 'recommendations',
               'keyword-research', 'unified-keywords', 'goals', 'emails', 'notifications', 'webhooks',
-              'api-docs', 'export-backup', 'whitelabel', 'analytics', 'settings', 'client-detail'].includes(currentSection) && (
+              'api-docs', 'export-backup', 'whitelabel', 'analytics', 'settings', 'client-detail', 'pixel-management', 'schema-automation', 'ssr-optimization'].includes(currentSection) && (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
                 <h2 className="text-2xl font-bold mb-2 capitalize">

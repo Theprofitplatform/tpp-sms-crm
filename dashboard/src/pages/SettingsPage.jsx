@@ -48,7 +48,15 @@ export default function SettingsPage() {
       systemErrors: true,
       weeklyReports: true
     },
-    integrations: [],
+    integrations: {
+      gsc: {
+        propertyType: 'domain',
+        propertyUrl: '',
+        clientEmail: '',
+        privateKey: '',
+        connected: false
+      }
+    },
     api: {
       apiKey: '',
       webhookUrl: ''
@@ -106,13 +114,26 @@ export default function SettingsPage() {
   }
 
   const handleChange = useCallback((category, field, value) => {
-    setSettings(prev => ({
-      ...prev,
-      [category]: {
-        ...(prev[category] || {}),
-        [field]: value
+    setSettings(prev => {
+      // Handle nested objects like integrations.gsc
+      if (category === 'integrations' && typeof field === 'object') {
+        return {
+          ...prev,
+          integrations: {
+            ...(prev.integrations || {}),
+            ...field
+          }
+        }
       }
-    }))
+
+      return {
+        ...prev,
+        [category]: {
+          ...(prev[category] || {}),
+          [field]: value
+        }
+      }
+    })
     setIsDirty(true)
 
     // Clear error for this field
@@ -121,6 +142,21 @@ export default function SettingsPage() {
       delete newErrors[`${category}.${field}`]
       return newErrors
     })
+  }, [])
+
+  // Helper function for updating GSC settings
+  const handleGSCChange = useCallback((field, value) => {
+    setSettings(prev => ({
+      ...prev,
+      integrations: {
+        ...(prev.integrations || {}),
+        gsc: {
+          ...(prev.integrations?.gsc || {}),
+          [field]: value
+        }
+      }
+    }))
+    setIsDirty(true)
   }, [])
 
   const validateSettings = () => {
@@ -565,17 +601,7 @@ export default function SettingsPage() {
                 <Label htmlFor="gsc-property-type">Property Type</Label>
                 <Select
                   value={settings.integrations?.gsc?.propertyType || 'domain'}
-                  onValueChange={(value) => {
-                    const currentGSC = settings.integrations?.gsc || {}
-                    setSettings(prev => ({
-                      ...prev,
-                      integrations: {
-                        ...(prev.integrations || {}),
-                        gsc: { ...currentGSC, propertyType: value }
-                      }
-                    }))
-                    setIsDirty(true)
-                  }}
+                  onValueChange={(value) => handleGSCChange('propertyType', value)}
                 >
                   <SelectTrigger id="gsc-property-type">
                     <SelectValue />
@@ -587,32 +613,24 @@ export default function SettingsPage() {
                 </Select>
               </div>
 
-              {/* Property URL (shown only for URL type) */}
-              {settings.integrations?.gsc?.propertyType === 'url' && (
-                <div className="space-y-2">
-                  <Label htmlFor="gsc-property-url">Property URL</Label>
-                  <Input
-                    id="gsc-property-url"
-                    type="url"
-                    value={settings.integrations?.gsc?.propertyUrl || ''}
-                    onChange={(e) => {
-                      const currentGSC = settings.integrations?.gsc || {}
-                      setSettings(prev => ({
-                        ...prev,
-                        integrations: {
-                          ...(prev.integrations || {}),
-                          gsc: { ...currentGSC, propertyUrl: e.target.value }
-                        }
-                      }))
-                      setIsDirty(true)
-                    }}
-                    placeholder="https://example.com/"
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Must match exactly as it appears in Google Search Console
-                  </p>
-                </div>
-              )}
+              {/* Property URL/Domain */}
+              <div className="space-y-2">
+                <Label htmlFor="gsc-property-url">
+                  {settings.integrations?.gsc?.propertyType === 'domain' ? 'Domain Name' : 'Property URL'}
+                </Label>
+                <Input
+                  id="gsc-property-url"
+                  type={settings.integrations?.gsc?.propertyType === 'url' ? 'url' : 'text'}
+                  value={settings.integrations?.gsc?.propertyUrl || ''}
+                  onChange={(e) => handleGSCChange('propertyUrl', e.target.value)}
+                  placeholder={settings.integrations?.gsc?.propertyType === 'domain' ? 'example.com' : 'https://example.com/'}
+                />
+                <p className="text-sm text-muted-foreground">
+                  {settings.integrations?.gsc?.propertyType === 'domain'
+                    ? 'Enter your domain name (e.g., example.com)'
+                    : 'Must match exactly as it appears in Google Search Console'}
+                </p>
+              </div>
 
               {/* Client Email */}
               <div className="space-y-2">
@@ -621,17 +639,7 @@ export default function SettingsPage() {
                   id="gsc-client-email"
                   type="email"
                   value={settings.integrations?.gsc?.clientEmail || ''}
-                  onChange={(e) => {
-                    const currentGSC = settings.integrations?.gsc || {}
-                    setSettings(prev => ({
-                      ...prev,
-                      integrations: {
-                        ...(prev.integrations || {}),
-                        gsc: { ...currentGSC, clientEmail: e.target.value }
-                      }
-                    }))
-                    setIsDirty(true)
-                  }}
+                  onChange={(e) => handleGSCChange('clientEmail', e.target.value)}
                   placeholder="your-service-account@your-project.iam.gserviceaccount.com"
                 />
                 <p className="text-sm text-muted-foreground">
@@ -646,17 +654,7 @@ export default function SettingsPage() {
                   id="gsc-private-key"
                   className="w-full min-h-[120px] p-2 border border-input rounded-md bg-background text-sm font-mono"
                   value={settings.integrations?.gsc?.privateKey || ''}
-                  onChange={(e) => {
-                    const currentGSC = settings.integrations?.gsc || {}
-                    setSettings(prev => ({
-                      ...prev,
-                      integrations: {
-                        ...(prev.integrations || {}),
-                        gsc: { ...currentGSC, privateKey: e.target.value }
-                      }
-                    }))
-                    setIsDirty(true)
-                  }}
+                  onChange={(e) => handleGSCChange('privateKey', e.target.value)}
                   placeholder="-----BEGIN PRIVATE KEY-----&#10;MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...&#10;-----END PRIVATE KEY-----"
                 />
                 <p className="text-sm text-muted-foreground">
@@ -664,25 +662,84 @@ export default function SettingsPage() {
                 </p>
               </div>
 
+              {/* Connection Status */}
+              {settings.integrations?.gsc?.connected && (
+                <Alert className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+                  <AlertCircle className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="text-green-800 dark:text-green-200">
+                    Connected successfully to Google Search Console
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {/* Test Connection Button */}
               <Button
                 variant="outline"
-                disabled={!settings.integrations?.gsc?.clientEmail || !settings.integrations?.gsc?.privateKey}
+                disabled={!settings.integrations?.gsc?.clientEmail || !settings.integrations?.gsc?.privateKey || !settings.integrations?.gsc?.propertyUrl || loading}
                 onClick={async () => {
-                  toast({
-                    title: 'Connection Test',
-                    description: 'Testing GSC connection...'
-                  })
-                  // Add test connection logic here
-                  setTimeout(() => {
+                  const gscSettings = settings.integrations?.gsc
+                  if (!gscSettings?.clientEmail || !gscSettings?.privateKey || !gscSettings?.propertyUrl) {
                     toast({
-                      title: 'Connection Successful',
-                      description: 'Google Search Console is properly configured'
+                      title: 'Missing Information',
+                      description: 'Please fill in all GSC fields before testing',
+                      variant: 'destructive'
                     })
-                  }, 2000)
+                    return
+                  }
+
+                  await execute(
+                    async () => {
+                      const response = await fetch('/api/gsc/test-connection', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          clientEmail: gscSettings.clientEmail,
+                          privateKey: gscSettings.privateKey,
+                          propertyUrl: gscSettings.propertyUrl,
+                          propertyType: gscSettings.propertyType || 'domain'
+                        })
+                      })
+                      return response.json()
+                    },
+                    {
+                      onSuccess: (data) => {
+                        if (data.success) {
+                          // Update connection status
+                          setSettings(prev => ({
+                            ...prev,
+                            integrations: {
+                              ...(prev.integrations || {}),
+                              gsc: { ...prev.integrations.gsc, connected: true }
+                            }
+                          }))
+                          toast({
+                            title: 'Connection Successful',
+                            description: 'Google Search Console is properly configured'
+                          })
+                        } else {
+                          toast({
+                            title: 'Connection Failed',
+                            description: data.error || 'Failed to connect to GSC',
+                            variant: 'destructive'
+                          })
+                        }
+                      },
+                      onError: (error) => {
+                        toast({
+                          title: 'Connection Failed',
+                          description: error.message || 'Failed to test GSC connection',
+                          variant: 'destructive'
+                        })
+                      }
+                    }
+                  )
                 }}
               >
-                <Link2 className="h-4 w-4 mr-2" />
+                {loading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Link2 className="h-4 w-4 mr-2" />
+                )}
                 Test Connection
               </Button>
             </CardContent>
