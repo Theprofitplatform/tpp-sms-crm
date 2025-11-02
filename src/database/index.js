@@ -511,12 +511,14 @@ CREATE TABLE IF NOT EXISTS pixel_page_data (
   load_time_ms INTEGER,
   page_size_kb INTEGER,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  tracked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (pixel_id) REFERENCES pixel_deployments(id),
   FOREIGN KEY (client_id) REFERENCES clients(id)
 );
 CREATE INDEX IF NOT EXISTS idx_pixel_data_pixel ON pixel_page_data(pixel_id);
 CREATE INDEX IF NOT EXISTS idx_pixel_data_client_url ON pixel_page_data(client_id, url);
 CREATE INDEX IF NOT EXISTS idx_pixel_data_created ON pixel_page_data(created_at);
+CREATE INDEX IF NOT EXISTS idx_pixel_data_tracked ON pixel_page_data(tracked_at);
 
 -- Schema markup library
 CREATE TABLE IF NOT EXISTS schema_markup (
@@ -627,6 +629,29 @@ CREATE INDEX IF NOT EXISTS idx_perf_created ON page_performance(created_at);
 
 
 /**
+ * Run database migrations for schema updates
+ */
+function runMigrations() {
+  try {
+    // Migration 1: Add tracked_at column to pixel_page_data if it doesn't exist
+    const tableInfo = db.prepare("PRAGMA table_info(pixel_page_data)").all();
+    const hasTrackedAt = tableInfo.some(col => col.name === 'tracked_at');
+
+    if (!hasTrackedAt) {
+      console.log('  📝 Adding tracked_at column to pixel_page_data...');
+      db.exec(`
+        ALTER TABLE pixel_page_data ADD COLUMN tracked_at DATETIME DEFAULT CURRENT_TIMESTAMP;
+        CREATE INDEX IF NOT EXISTS idx_pixel_data_tracked ON pixel_page_data(tracked_at);
+      `);
+      console.log('  ✅ Migration complete: tracked_at column added');
+    }
+  } catch (error) {
+    console.error('  ⚠️  Migration warning:', error.message);
+    // Don't throw - migrations are best effort for existing databases
+  }
+}
+
+/**
  * Initialize database with schema
  */
 export function initializeDatabase() {
@@ -635,6 +660,10 @@ export function initializeDatabase() {
   try {
     db.exec(SCHEMA);
     console.log('✅ Database schema created/verified');
+
+    // Run migrations for existing databases
+    runMigrations();
+
     return true;
   } catch (error) {
     console.error('❌ Database initialization error:', error);

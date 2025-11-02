@@ -14,6 +14,9 @@ import { fileURLToPath } from 'url';
 import metaTagsFixerEngine from './engines/pixel-meta-tags-fixer.js';
 import imageAltFixerEngine from './engines/pixel-image-alt-fixer.js';
 import schemaFixerEngine from './engines/pixel-schema-fixer.js';
+import performanceFixerEngine from './engines/pixel-performance-fixer.js';
+import contentFixerEngine from './engines/pixel-content-fixer.js';
+import technicalFixerEngine from './engines/pixel-technical-fixer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,7 +31,10 @@ export class PixelAutoFixOrchestrator {
     this.engines = {
       'pixel-meta-tags-fixer': metaTagsFixerEngine,
       'pixel-image-alt-fixer': imageAltFixerEngine,
-      'pixel-schema-fixer': schemaFixerEngine
+      'pixel-schema-fixer': schemaFixerEngine,
+      'pixel-performance-fixer': performanceFixerEngine,
+      'pixel-content-fixer': contentFixerEngine,
+      'pixel-technical-fixer': technicalFixerEngine
     };
 
     // Map issue types to engines
@@ -49,7 +55,10 @@ export class PixelAutoFixOrchestrator {
         'MISSING_OG_TAGS', 'MISSING_TWITTER_CARD',
         'IMAGES_WITHOUT_ALT', 'IMAGE_ALT_TOO_SHORT', 'IMAGE_ALT_TOO_LONG', 'IMAGE_ALT_GENERIC',
         'MISSING_SCHEMA', 'MISSING_ORGANIZATION_SCHEMA', 'MISSING_WEBPAGE_SCHEMA',
-        'MISSING_BREADCRUMB_SCHEMA', 'INVALID_SCHEMA'
+        'MISSING_BREADCRUMB_SCHEMA', 'INVALID_SCHEMA',
+        'POOR_LCP', 'POOR_FID', 'POOR_CLS',
+        'MISSING_H1', 'THIN_CONTENT',
+        'MISSING_VIEWPORT'
       ];
 
       testIssues.forEach(issueType => {
