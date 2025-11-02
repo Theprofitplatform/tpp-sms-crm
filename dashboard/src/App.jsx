@@ -12,7 +12,9 @@ import KeywordsPage from './pages/KeywordsPageEnhanced'
 import AutoFixPage from './pages/AutoFixPage'
 import AutoFixReviewPage from './pages/AutoFixReviewPage'
 import AutoFixSettingsPage from './pages/AutoFixSettingsPage'
-import RecommendationsPage from './pages/RecommendationsPage'
+import ManualReviewDashboard from './pages/ManualReviewDashboard'
+import EnginesControlPage from './pages/EnginesControlPage'
+import RecommendationsPage from './pages/RecommendationsPage.phase4b'
 import KeywordResearchPage from './pages/KeywordResearchPage'
 import UnifiedKeywordsPage from './pages/UnifiedKeywordsPage'
 import GoalsPage from './pages/GoalsPage'
@@ -33,6 +35,7 @@ import NotificationCenterPage from './pages/NotificationCenterPage'
 import APIDocumentationPage from './pages/APIDocumentationPage'
 import ActivityLogPage from './pages/ActivityLogPage'
 import PixelManagementPage from './pages/PixelManagementPage'
+import PixelIssuesPage from './pages/PixelIssuesPage'
 import SchemaAutomationPage from './pages/SchemaAutomationPage'
 import SSROptimizationPage from './pages/SSROptimizationPage'
 import { Button } from './components/ui/button'
@@ -339,9 +342,12 @@ function App() {
           {currentSection === 'autofix' && <AutoFixPage onNavigate={handleNavigate} />}
           {currentSection === 'autofix-review' && <AutoFixReviewPage onNavigate={handleNavigate} />}
           {currentSection === 'autofix-settings' && <AutoFixSettingsPage onNavigate={handleNavigate} />}
+          {currentSection === 'manual-review' && <ManualReviewDashboard onNavigate={handleNavigate} />}
+          {currentSection === 'engines-control' && <EnginesControlPage onNavigate={handleNavigate} />}
           {currentSection === 'activity-log' && <ActivityLogPage />}
           {currentSection === 'ai-optimizer' && <AIOptimizerPage />}
           {currentSection === 'pixel-management' && <PixelManagementPage />}
+          {currentSection === 'pixel-issues' && <PixelIssuesPage />}
           {currentSection === 'schema-automation' && <SchemaAutomationPage />}
           {currentSection === 'ssr-optimization' && <SSROptimizationPage />}
           {currentSection === 'scheduler' && <SchedulerPage />}
@@ -370,7 +376,7 @@ function App() {
           {!['dashboard', 'clients', 'reports', 'automation', 'autofix', 'autofix-review', 'autofix-settings', 'activity-log', 'ai-optimizer', 'scheduler',
               'bulk-operations', 'position-tracking', 'domains', 'keywords', 'google-console', 'local-seo', 'wordpress', 'recommendations',
               'keyword-research', 'unified-keywords', 'goals', 'emails', 'notifications', 'webhooks',
-              'api-docs', 'export-backup', 'whitelabel', 'analytics', 'settings', 'client-detail', 'pixel-management', 'schema-automation', 'ssr-optimization'].includes(currentSection) && (
+              'api-docs', 'export-backup', 'whitelabel', 'analytics', 'settings', 'client-detail', 'pixel-management', 'pixel-issues', 'schema-automation', 'ssr-optimization'].includes(currentSection) && (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
                 <h2 className="text-2xl font-bold mb-2 capitalize">

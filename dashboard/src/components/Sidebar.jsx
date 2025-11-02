@@ -25,10 +25,13 @@ import {
   Code,
   TrendingUp,
   Server,
-  Boxes
+  Boxes,
+  CheckCircle,
+  Play
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import NotificationsBell from '@/components/NotificationsBell'
 
 const navGroups = [
   {
@@ -43,6 +46,8 @@ const navGroups = [
     items: [
       { icon: Rocket, label: 'Control Center', href: '#automation' },
       { icon: Bot, label: 'Auto-Fix Engines', href: '#autofix' },
+      { icon: CheckCircle, label: 'Manual Review', href: '#manual-review' },
+      { icon: Play, label: 'Engines Control', href: '#engines-control' },
       { icon: Activity, label: 'Activity Log', href: '#activity-log' },
       { icon: Sparkles, label: 'AI Optimizer', href: '#ai-optimizer' },
       { icon: Clock, label: 'Scheduler', href: '#scheduler' },
@@ -53,6 +58,7 @@ const navGroups = [
     title: 'Otto Features',
     items: [
       { icon: Code, label: 'Pixel Management', href: '#pixel-management' },
+      { icon: Activity, label: 'Pixel Issues', href: '#pixel-issues' },
       { icon: Boxes, label: 'Schema Automation', href: '#schema-automation' },
       { icon: Server, label: 'SSR Optimization', href: '#ssr-optimization' },
     ]
@@ -108,10 +114,13 @@ export function Sidebar({ currentSection = 'dashboard', onNavigate }) {
     <aside className="w-64 border-r bg-card h-screen flex flex-col">
       {/* Header */}
       <div className="p-6 border-b">
-        <h1 className="text-xl font-bold flex items-center gap-2">
-          <Rocket className="h-6 w-6 text-primary" />
-          SEO Platform
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold flex items-center gap-2">
+            <Rocket className="h-6 w-6 text-primary" />
+            SEO Platform
+          </h1>
+          <NotificationsBell />
+        </div>
       </div>
 
       {/* Navigation */}
