@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast'
 import { clientAPI, analyticsAPI, keywordAPI } from '@/services/api'
 import { useAPIRequest, useAPIData } from '@/hooks/useAPIRequest'
 import PixelHealthSummary from '@/components/PixelHealthSummary'
+import AutoFixPanel from '@/components/AutoFixPanel'
 
 import {
   ArrowLeft,
@@ -263,6 +264,7 @@ export default function ClientDetailPage({ clientId, onBack }) {
           <TabsTrigger value="keywords">Keywords ({keywords.length})</TabsTrigger>
           <TabsTrigger value="audits">Audits ({audits.length})</TabsTrigger>
           <TabsTrigger value="seo-health">SEO Health</TabsTrigger>
+          <TabsTrigger value="autofix">AutoFix ✨</TabsTrigger>
         </TabsList>
 
         <TabsContent value="keywords">
@@ -320,6 +322,10 @@ export default function ClientDetailPage({ clientId, onBack }) {
 
         <TabsContent value="seo-health">
           <PixelHealthSummary clientId={clientId} />
+        </TabsContent>
+
+        <TabsContent value="autofix">
+          <AutoFixPanel clientId={clientId} />
         </TabsContent>
       </Tabs>
     </div>

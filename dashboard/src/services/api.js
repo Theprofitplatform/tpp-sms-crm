@@ -1147,6 +1147,60 @@ export const pixelAPI = {
       console.warn('Failed to fetch platform stats:', error)
       return { totalPixels: 0, activePixels: 0, totalIssues: 0 }
     }
+  },
+
+  // =====================================================
+  // PHASE 4B: AutoFix API Methods
+  // =====================================================
+
+  // Get fixable issues for a pixel
+  async getFixableIssues(pixelId) {
+    const response = await fetch(`${API_BASE}/v2/pixel/autofix/${pixelId}/fixable`)
+    if (!response.ok) throw new Error('Failed to fetch fixable issues')
+    return response.json()
+  },
+
+  // Get fix proposal for a specific issue
+  async getFixProposal(issueId) {
+    const response = await fetch(`${API_BASE}/v2/pixel/autofix/issue/${issueId}/proposal`)
+    if (!response.ok) throw new Error('Failed to fetch fix proposal')
+    return response.json()
+  },
+
+  // Get a specific proposal by ID
+  async getProposal(proposalId) {
+    const response = await fetch(`${API_BASE}/v2/pixel/autofix/proposal/${proposalId}`)
+    if (!response.ok) throw new Error('Failed to fetch proposal')
+    return response.json()
+  },
+
+  // Apply a fix proposal
+  async applyFix(proposalId, approved = true, approvedBy = 'user') {
+    const response = await fetch(`${API_BASE}/v2/pixel/autofix/proposal/${proposalId}/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approved, approvedBy })
+    })
+    if (!response.ok) throw new Error('Failed to apply fix')
+    return response.json()
+  },
+
+  // Apply multiple fixes in batch
+  async applyBatchFixes(pixelId, proposalIds, approved = true, approvedBy = 'user') {
+    const response = await fetch(`${API_BASE}/v2/pixel/autofix/${pixelId}/apply-batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proposalIds, approved, approvedBy })
+    })
+    if (!response.ok) throw new Error('Failed to apply batch fixes')
+    return response.json()
+  },
+
+  // Get AutoFix statistics
+  async getAutofixStats() {
+    const response = await fetch(`${API_BASE}/v2/pixel/autofix/stats`)
+    if (!response.ok) throw new Error('Failed to fetch AutoFix stats')
+    return response.json()
   }
 }
 
