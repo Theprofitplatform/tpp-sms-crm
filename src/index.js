@@ -68,6 +68,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Compression
 app.use(compression());
 
+// Serve static files from public directory
+const publicPath = path.join(__dirname, '..', 'public');
+app.use(express.static(publicPath));
+console.log(`Static files served from: ${publicPath}`);
+
 // Logging (only in development or if explicitly enabled)
 if (NODE_ENV === 'development' || process.env.ENABLE_REQUEST_LOGGING === 'true') {
   app.use(morgan('dev'));

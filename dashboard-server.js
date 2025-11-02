@@ -146,7 +146,7 @@ app.use(cors(corsOptions));
 // Rate limiting
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 1000, // limit each IP to 1000 requests per windowMs (increased for development)
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false
@@ -168,7 +168,7 @@ app.use('/api/auth/', authLimiter);
 console.log('✅ Security middleware configured:');
 console.log('   - Helmet security headers');
 console.log('   - CORS protection');
-console.log('   - Rate limiting (100 req/15min API, 5 req/15min auth)');
+console.log('   - Rate limiting (1000 req/15min API, 5 req/15min auth)');
 
 // ============================================
 // BASIC MIDDLEWARE
