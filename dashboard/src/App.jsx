@@ -39,6 +39,7 @@ import PixelManagementPage from './pages/PixelManagementPage'
 import PixelIssuesPage from './pages/PixelIssuesPage'
 import SchemaAutomationPage from './pages/SchemaAutomationPage'
 import SSROptimizationPage from './pages/SSROptimizationPage'
+import HealthCheckPage from './pages/HealthCheckPage'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { Bell, Search, Moon, Sun } from 'lucide-react'
@@ -351,6 +352,7 @@ function App() {
           {currentSection === 'pixel-issues' && <PixelIssuesPage />}
           {currentSection === 'schema-automation' && <SchemaAutomationPage />}
           {currentSection === 'ssr-optimization' && <SSROptimizationPage />}
+          {currentSection === 'health-check' && <HealthCheckPage />}
           {currentSection === 'scheduler' && <SchedulerPage />}
           {currentSection === 'bulk-operations' && <BulkOperationsPage />}
           {currentSection === 'position-tracking' && <PositionTrackingPage />}
@@ -378,7 +380,7 @@ function App() {
           {!['dashboard', 'clients', 'reports', 'automation', 'autofix', 'autofix-review', 'autofix-settings', 'manual-review', 'engines-control', 'activity-log', 'ai-optimizer', 'scheduler',
               'bulk-operations', 'position-tracking', 'domains', 'keywords', 'google-console', 'gsc-settings', 'local-seo', 'wordpress', 'recommendations',
               'keyword-research', 'unified-keywords', 'goals', 'emails', 'notifications', 'webhooks',
-              'api-docs', 'export-backup', 'whitelabel', 'analytics', 'settings', 'client-detail', 'pixel-management', 'pixel-issues', 'schema-automation', 'ssr-optimization'].includes(currentSection) && (
+              'api-docs', 'export-backup', 'whitelabel', 'analytics', 'settings', 'client-detail', 'pixel-management', 'pixel-issues', 'schema-automation', 'ssr-optimization', 'health-check'].includes(currentSection) && (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
                 <h2 className="text-2xl font-bold mb-2 capitalize">

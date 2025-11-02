@@ -1,0 +1,27 @@
+{
+  "general": {
+    "platformName": "Your Platform Name",
+    "adminEmail": "your-email@example.com",
+    "language": "en",
+    "timezone": "UTC"
+  },
+  "notifications": {
+    "rankChanges": true,
+    "auditCompletion": true,
+    "optimizationResults": true,
+    "systemErrors": true,
+    "weeklyReports": true,
+    "emailEnabled": false,
+    "email": "notifications@example.com",
+    "discordWebhook": "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN"
+  },
+  "integrations": {},
+  "api": {
+    "apiKey": ""
+  },
+  "appearance": {
+    "theme": "system",
+    "primaryColor": "blue",
+    "sidebarPosition": "left"
+  }
+}

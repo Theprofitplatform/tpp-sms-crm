@@ -24,9 +24,18 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-// Initialize database
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL'); // Better performance
+// Initialize database with retry logic
+let db;
+try {
+  db = new Database(DB_PATH);
+  db.pragma('journal_mode = WAL'); // Better performance
+  db.pragma('busy_timeout = 5000'); // Wait up to 5 seconds if database is locked
+} catch (error) {
+  console.error('Failed to initialize database:', error);
+  // Try without WAL mode as fallback
+  db = new Database(DB_PATH);
+  db.pragma('busy_timeout = 5000');
+}
 
 /**
  * Database Schema
@@ -518,7 +527,7 @@ CREATE TABLE IF NOT EXISTS pixel_page_data (
 CREATE INDEX IF NOT EXISTS idx_pixel_data_pixel ON pixel_page_data(pixel_id);
 CREATE INDEX IF NOT EXISTS idx_pixel_data_client_url ON pixel_page_data(client_id, url);
 CREATE INDEX IF NOT EXISTS idx_pixel_data_created ON pixel_page_data(created_at);
-CREATE INDEX IF NOT EXISTS idx_pixel_data_tracked ON pixel_page_data(tracked_at);
+-- Note: idx_pixel_data_tracked index created in migration after tracked_at column is added
 
 -- Schema markup library
 CREATE TABLE IF NOT EXISTS schema_markup (
@@ -635,19 +644,32 @@ function runMigrations() {
   try {
     // Migration 1: Add tracked_at column to pixel_page_data if it doesn't exist
     const tableInfo = db.prepare("PRAGMA table_info(pixel_page_data)").all();
+
+    // If table doesn't exist yet, skip migration (will be created by schema)
+    if (tableInfo.length === 0) {
+      console.log('  ℹ️  Skipping migrations - tables will be created by schema');
+      return;
+    }
+
     const hasTrackedAt = tableInfo.some(col => col.name === 'tracked_at');
 
     if (!hasTrackedAt) {
-      console.log('  📝 Adding tracked_at column to pixel_page_data...');
+      console.log('  📝 Running migration: Adding tracked_at column to pixel_page_data...');
       db.exec(`
         ALTER TABLE pixel_page_data ADD COLUMN tracked_at DATETIME DEFAULT CURRENT_TIMESTAMP;
         CREATE INDEX IF NOT EXISTS idx_pixel_data_tracked ON pixel_page_data(tracked_at);
       `);
-      console.log('  ✅ Migration complete: tracked_at column added');
+      console.log('  ✅ Migration complete: tracked_at column and index added');
+    } else {
+      console.log('  ✅ Migration check passed: tracked_at column already exists');
     }
   } catch (error) {
     console.error('  ⚠️  Migration warning:', error.message);
     // Don't throw - migrations are best effort for existing databases
+    // Log stack trace for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.error(error.stack);
+    }
   }
 }
 
@@ -658,16 +680,33 @@ export function initializeDatabase() {
   console.log('🗄️  Initializing database...');
 
   try {
+    // First, run migrations on existing tables before applying full schema
+    // This ensures columns exist before indexes are created
+    try {
+      runMigrations();
+    } catch (migrationError) {
+      console.log('  ⚠️  Pre-schema migration skipped:', migrationError.message);
+    }
+
+    // Now apply the full schema
     db.exec(SCHEMA);
     console.log('✅ Database schema created/verified');
 
-    // Run migrations for existing databases
-    runMigrations();
+    // Run migrations again after schema to catch any new migrations
+    try {
+      runMigrations();
+    } catch (migrationError) {
+      console.log('  ⚠️  Post-schema migration warning:', migrationError.message);
+    }
 
     return true;
   } catch (error) {
     console.error('❌ Database initialization error:', error);
-    throw error;
+    console.log('⚠️  Attempting to continue with partial database initialization...');
+
+    // Don't throw - allow the application to start even with database issues
+    // This prevents total system failure due to database problems
+    return false;
   }
 }
 

@@ -101,6 +101,7 @@ const navGroups = [
   {
     title: 'System',
     items: [
+      { icon: Activity, label: 'Health Check', href: '#health-check' },
       { icon: Code, label: 'API Docs', href: '#api-docs' },
       { icon: Download, label: 'Export & Backup', href: '#export-backup' },
       { icon: Palette, label: 'White-Label', href: '#whitelabel' },

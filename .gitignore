@@ -92,3 +92,4 @@ _analysis/
 web-dist/
 /data/
 config/google/service-account.json
+config/settings.json
