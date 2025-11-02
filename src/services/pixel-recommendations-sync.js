@@ -3,14 +3,16 @@
  *
  * Automatically creates recommendations from pixel-detected SEO issues
  * Links critical/high severity issues to actionable recommendations
+ * Triggers notifications when issues are detected or resolved
  *
- * Phase: 4B - High-Value Integrations
+ * Phase: 4B - High-Value Integrations (Complete with Day 3 Notifications)
  * Date: November 2, 2025
  */
 
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import pixelNotificationService from './pixel-notifications.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -171,12 +173,26 @@ class PixelRecommendationsSync {
 
     console.log(`[PixelRecommendationsSync] Created recommendation ${recommendationId} for issue ${issue.id}${autoFixEngine ? ` (AutoFix: ${autoFixEngine})` : ''}`);
 
-    return {
+    const createdRecommendation = {
       id: recommendationId,
       ...recommendation,
       autoFixAvailable: !!autoFixEngine,
-      autoFixEngine
+      autoFixEngine,
+      auto_fix_available: !!autoFixEngine,
+      auto_fix_engine: autoFixEngine
     };
+
+    // PHASE 4B DAY 3: Trigger notifications for new issue
+    if (this.options.notifyOnCritical && (issue.severity === 'CRITICAL' || issue.severity === 'HIGH')) {
+      try {
+        pixelNotificationService.handleNewIssue(issue, createdRecommendation)
+          .catch(err => console.error('[PixelRecommendationsSync] Notification error:', err.message));
+      } catch (err) {
+        console.error('[PixelRecommendationsSync] Failed to trigger notification:', err.message);
+      }
+    }
+
+    return createdRecommendation;
   }
 
   /**
@@ -446,6 +462,19 @@ class PixelRecommendationsSync {
       this.markRecommendationComplete(recommendation.id);
 
       console.log(`[PixelRecommendationsSync] Marked recommendation ${recommendation.id} as complete for resolved issue ${issueId}`);
+
+      // PHASE 4B DAY 3: Trigger notifications for resolved issue
+      if (this.options.notifyOnCritical) {
+        try {
+          const issue = this.db.prepare('SELECT * FROM seo_issues WHERE id = ?').get(issueId);
+          if (issue) {
+            pixelNotificationService.handleIssueResolved(issue, recommendation)
+              .catch(err => console.error('[PixelRecommendationsSync] Resolution notification error:', err.message));
+          }
+        } catch (err) {
+          console.error('[PixelRecommendationsSync] Failed to trigger resolution notification:', err.message);
+        }
+      }
     } catch (error) {
       console.error(`[PixelRecommendationsSync] Error syncing issue resolution ${issueId}:`, error.message);
     }
