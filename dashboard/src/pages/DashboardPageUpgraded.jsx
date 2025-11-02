@@ -10,6 +10,7 @@ import { DashboardSkeleton } from '@/components/DashboardSkeleton'
 import { LiveIndicator } from '@/components/LiveIndicator'
 import { ExportMenu } from '@/components/ExportMenu'
 import { ComparisonMode } from '@/components/ComparisonMode'
+import GSCAnalyticsWidget from '@/components/GSCAnalyticsWidget'
 import { Button } from '@/components/ui/button'
 import { RefreshCw, Sparkles, GitCompare } from 'lucide-react'
 import { subDays } from 'date-fns'
@@ -243,6 +244,9 @@ export default function DashboardPageUpgraded({ onClientClick }) {
         <QuickActions onAction={handleQuickAction} />
         <TopPerformers data={topPerformersData} />
       </div>
+
+      {/* GSC Analytics Widget */}
+      <GSCAnalyticsWidget clientId="instantautotraders" />
 
       {/* Main Content - Clients Table & Activity */}
       <div className="grid gap-6 lg:grid-cols-3">

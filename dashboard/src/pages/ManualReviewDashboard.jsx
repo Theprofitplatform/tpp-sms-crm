@@ -71,7 +71,45 @@ export default function ManualReviewDashboard({ onNavigate }) {
       const proposalsRes = await fetch(`${API_BASE}/autofix/proposals?limit=5`)
       const proposalsData = await proposalsRes.json()
       if (proposalsData.success) {
-        setRecentProposals(proposalsData.proposals || [])
+        let proposals = proposalsData.proposals || []
+
+        // Enrich proposals with GSC data
+        if (proposals.length > 0) {
+          try {
+            const enrichRes = await fetch(`${API_BASE}/gsc/enrich-proposals`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                clientId: 'instantautotraders',
+                proposalIds: proposals.map(p => p.id)
+              })
+            })
+            const enrichData = await enrichRes.json()
+
+            if (enrichData.success && enrichData.enriched) {
+              // Merge GSC data into proposals
+              proposals = proposals.map(proposal => {
+                const gscData = enrichData.enriched.find(e => e.proposal_id === proposal.id)
+                if (gscData) {
+                  return { ...proposal, gsc_data: gscData }
+                }
+                return proposal
+              })
+
+              // Sort by priority score (high to low)
+              proposals.sort((a, b) => {
+                const scoreA = a.gsc_data?.priority_score || 0
+                const scoreB = b.gsc_data?.priority_score || 0
+                return scoreB - scoreA
+              })
+            }
+          } catch (gscError) {
+            console.warn('Failed to enrich proposals with GSC data:', gscError)
+            // Continue without GSC data
+          }
+        }
+
+        setRecentProposals(proposals)
       }
     } catch (error) {
       console.error('Failed to load dashboard data:', error)

@@ -448,7 +448,7 @@ export const recommendationsAPI = {
   // PHASE 4B: Apply AutoFix to recommendation
   // =====================================================
   async applyAutoFix(recId) {
-    const response = await fetch(`${API_BASE}/recommendations/${recId}/autofix`, {
+    const response = await fetch(`${API_BASE}/v2/recommendations/${recId}/autofix`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
     })
@@ -881,14 +881,14 @@ export const notificationsAPI = {
   // Get all notifications with optional filters
   async getAll(params = {}) {
     const queryParams = new URLSearchParams(params)
-    const response = await fetch(`${API_BASE}/notifications?${queryParams}`)
+    const response = await fetch(`${API_BASE}/v2/notifications?${queryParams}`)
     if (!response.ok) throw new Error('Failed to fetch notifications')
     return response.json()
   },
 
   // Mark notification as read
   async markAsRead(notificationId) {
-    const response = await fetch(`${API_BASE}/notifications/${notificationId}/read`, {
+    const response = await fetch(`${API_BASE}/v2/notifications/${notificationId}/read`, {
       method: 'POST'
     })
     if (!response.ok) throw new Error('Failed to mark notification as read')
@@ -897,7 +897,7 @@ export const notificationsAPI = {
 
   // Mark all notifications as read
   async markAllAsRead() {
-    const response = await fetch(`${API_BASE}/notifications/mark-all-read`, {
+    const response = await fetch(`${API_BASE}/v2/notifications/mark-all-read`, {
       method: 'POST'
     })
     if (!response.ok) throw new Error('Failed to mark all as read')
@@ -906,7 +906,7 @@ export const notificationsAPI = {
 
   // Delete notification
   async delete(notificationId) {
-    const response = await fetch(`${API_BASE}/notifications/${notificationId}`, {
+    const response = await fetch(`${API_BASE}/v2/notifications/${notificationId}`, {
       method: 'DELETE'
     })
     if (!response.ok) throw new Error('Failed to delete notification')
@@ -915,9 +915,10 @@ export const notificationsAPI = {
 
   // Get unread count
   async getUnreadCount() {
-    const response = await fetch(`${API_BASE}/notifications/unread/count`)
+    const response = await fetch(`${API_BASE}/v2/notifications?status=unread`)
     if (!response.ok) throw new Error('Failed to fetch unread count')
-    return response.json()
+    const data = await response.json()
+    return { count: data.meta.unread }
   },
 
   // =====================================================

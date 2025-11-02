@@ -59,7 +59,38 @@ export default function AutoFixReviewPage({ onNavigate }) {
       const data = await response.json()
 
       if (data.success) {
-        setProposals(data.proposals || [])
+        let proposals = data.proposals || []
+
+        // Enrich proposals with GSC data
+        if (proposals.length > 0) {
+          try {
+            const enrichRes = await fetch(`${API_BASE}/gsc/enrich-proposals`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                clientId: 'instantautotraders',
+                proposalIds: proposals.map(p => p.id)
+              })
+            })
+            const enrichData = await enrichRes.json()
+
+            if (enrichData.success && enrichData.enriched) {
+              // Merge GSC data into proposals
+              proposals = proposals.map(proposal => {
+                const gscData = enrichData.enriched.find(e => e.proposal_id === proposal.id)
+                if (gscData) {
+                  return { ...proposal, gsc_data: gscData }
+                }
+                return proposal
+              })
+            }
+          } catch (gscError) {
+            console.warn('Failed to enrich proposals with GSC data:', gscError)
+            // Continue without GSC data
+          }
+        }
+
+        setProposals(proposals)
       }
     } catch (error) {
       toast({
@@ -150,6 +181,14 @@ export default function AutoFixReviewPage({ onNavigate }) {
           const riskOrder = { high: 3, medium: 2, low: 1 }
           return (riskOrder[b.risk_level] || 0) - (riskOrder[a.risk_level] || 0)
         }
+        case 'priority-desc':
+          return (b.gsc_data?.priority_score || 0) - (a.gsc_data?.priority_score || 0)
+        case 'priority-asc':
+          return (a.gsc_data?.priority_score || 0) - (b.gsc_data?.priority_score || 0)
+        case 'traffic-desc':
+          return (b.gsc_data?.before_clicks_7d || 0) - (a.gsc_data?.before_clicks_7d || 0)
+        case 'traffic-asc':
+          return (a.gsc_data?.before_clicks_7d || 0) - (b.gsc_data?.before_clicks_7d || 0)
         default:
           return 0
       }
@@ -372,7 +411,7 @@ export default function AutoFixReviewPage({ onNavigate }) {
 
       {/* Statistics */}
       {stats && (
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-5">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Total Proposals</CardTitle>
@@ -403,6 +442,17 @@ export default function AutoFixReviewPage({ onNavigate }) {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-600">{stats.applied || 0}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">GSC Enriched</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-600">
+                {proposals.filter(p => p.gsc_data).length}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">with traffic data</p>
             </CardContent>
           </Card>
         </div>
@@ -461,6 +511,10 @@ export default function AutoFixReviewPage({ onNavigate }) {
                 <option value="severity-asc">Severity: Low to High</option>
                 <option value="risk-asc">Risk: Low to High</option>
                 <option value="risk-desc">Risk: High to Low</option>
+                <option value="priority-desc">Priority: High to Low</option>
+                <option value="priority-asc">Priority: Low to High</option>
+                <option value="traffic-desc">Traffic: High to Low</option>
+                <option value="traffic-asc">Traffic: Low to High</option>
               </select>
             </div>
 

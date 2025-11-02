@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Checkbox } from './ui/checkbox'
-import { ThumbsUp, ThumbsDown, Info, AlertTriangle } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, Info, AlertTriangle, TrendingUp, MousePointer, Eye, Target } from 'lucide-react'
 
 export function ProposalCard({
   proposal,
@@ -78,8 +78,8 @@ export function ProposalCard({
               <Badge variant={getRiskColor(proposal.risk_level)} className="text-xs">
                 {proposal.risk_level} risk
               </Badge>
-              <Badge 
-                variant={getSeverityColor(proposal.severity)} 
+              <Badge
+                variant={getSeverityColor(proposal.severity)}
                 className="text-xs flex items-center gap-1"
               >
                 {getSeverityIcon(proposal.severity)}
@@ -88,6 +88,30 @@ export function ProposalCard({
               <Badge variant="secondary" className="text-xs">
                 {proposal.category}
               </Badge>
+              {proposal.gsc_data?.priority_score && (
+                <Badge
+                  variant={
+                    proposal.gsc_data.priority_score >= 70 ? 'default' :
+                    proposal.gsc_data.priority_score >= 40 ? 'secondary' : 'outline'
+                  }
+                  className="text-xs flex items-center gap-1"
+                >
+                  <Target className="h-3 w-3" />
+                  Priority: {proposal.gsc_data.priority_score}
+                </Badge>
+              )}
+              {proposal.gsc_data?.traffic_potential && (
+                <Badge
+                  variant={
+                    proposal.gsc_data.traffic_potential === 'high' ? 'default' :
+                    proposal.gsc_data.traffic_potential === 'medium' ? 'secondary' : 'outline'
+                  }
+                  className="text-xs flex items-center gap-1"
+                >
+                  <TrendingUp className="h-3 w-3" />
+                  {proposal.gsc_data.traffic_potential} traffic
+                </Badge>
+              )}
             </div>
 
             <CardTitle className="text-base mb-1">
@@ -101,6 +125,43 @@ export function ProposalCard({
             <div className="text-xs text-muted-foreground mt-2">
               <strong>Target:</strong> {proposal.target_title || `${proposal.target_type} ${proposal.target_id}`} ({proposal.field_name})
             </div>
+
+            {/* GSC Traffic Metrics */}
+            {proposal.gsc_data && (
+              <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
+                <div className="flex items-center gap-4 text-xs">
+                  {proposal.gsc_data.before_clicks_7d !== null && (
+                    <div className="flex items-center gap-1">
+                      <MousePointer className="h-3 w-3 text-blue-600" />
+                      <span className="font-medium">{proposal.gsc_data.before_clicks_7d}</span>
+                      <span className="text-muted-foreground">clicks/7d</span>
+                    </div>
+                  )}
+                  {proposal.gsc_data.before_impressions_7d !== null && (
+                    <div className="flex items-center gap-1">
+                      <Eye className="h-3 w-3 text-purple-600" />
+                      <span className="font-medium">{proposal.gsc_data.before_impressions_7d}</span>
+                      <span className="text-muted-foreground">impr/7d</span>
+                    </div>
+                  )}
+                  {proposal.gsc_data.before_position !== null && (
+                    <div className="flex items-center gap-1">
+                      <Target className="h-3 w-3 text-orange-600" />
+                      <span className="font-medium">Pos {proposal.gsc_data.before_position.toFixed(1)}</span>
+                    </div>
+                  )}
+                  {proposal.gsc_data.clicks_trend && (
+                    <div className="flex items-center gap-1">
+                      <TrendingUp className={`h-3 w-3 ${
+                        proposal.gsc_data.clicks_trend === 'up' ? 'text-green-600' :
+                        proposal.gsc_data.clicks_trend === 'down' ? 'text-red-600' : 'text-gray-400'
+                      }`} />
+                      <span className="text-muted-foreground capitalize">{proposal.gsc_data.clicks_trend}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </CardHeader>
