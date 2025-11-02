@@ -184,7 +184,7 @@ export class ComprehensiveHealthCheck {
 
       // Try to connect and query
       const db = new Database(dbPath, { readonly: true });
-      const result = db.prepare('SELECT COUNT(*) as count FROM sqlite_master WHERE type="table"').get();
+      const result = db.prepare("SELECT COUNT(*) as count FROM sqlite_master WHERE type='table'").get();
       db.close();
 
       const latency = Date.now() - startTime;
