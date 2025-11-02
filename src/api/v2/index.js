@@ -14,6 +14,8 @@ import syncRouter from './sync.js';
 import ottoFeaturesRouter from './otto-features.js';
 import pixelEnhancementsRouter from './pixel-enhancements-routes.js';
 import pixelAutofixRouter from './pixel-autofix-routes.js';
+import notificationsRouter from './notifications-routes.js';
+import recommendationsRouter from './recommendations-routes.js';
 import { corsMiddleware, optionalAuthenticate } from './middleware/auth.js';
 
 const router = express.Router();
@@ -76,6 +78,16 @@ router.get('/', (req, res) => {
           base: '/api/v2/ssr',
           description: 'Otto SEO - Server-side rendering optimizations',
           methods: ['GET', 'POST']
+        },
+        notifications: {
+          base: '/api/notifications',
+          description: 'Phase 4B - Notification management',
+          methods: ['GET', 'POST', 'DELETE']
+        },
+        recommendations: {
+          base: '/api/recommendations',
+          description: 'Phase 4B - Recommendations and AutoFix',
+          methods: ['GET', 'POST', 'PATCH']
         }
       },
       authentication: {
@@ -108,6 +120,10 @@ router.use('/', ottoFeaturesRouter);
 // Pixel Management Enhancements
 router.use('/', pixelEnhancementsRouter);
 router.use('/', pixelAutofixRouter);
+
+// Phase 4B: Notifications and Recommendations
+router.use('/', notificationsRouter);
+router.use('/', recommendationsRouter);
 
 // 404 handler for v2 routes
 router.use((req, res) => {

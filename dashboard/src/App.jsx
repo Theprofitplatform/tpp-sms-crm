@@ -25,6 +25,7 @@ import AnalyticsPage from './pages/AnalyticsPage'
 import SettingsPage from './pages/SettingsPage'
 import ClientDetailPage from './pages/ClientDetailPage'
 import GoogleSearchConsolePageEnhanced from './pages/GoogleSearchConsolePageEnhanced'
+import GSCSettingsPage from './pages/GSCSettingsPage'
 import LocalSEOPage from './pages/LocalSEOPage'
 import AIOptimizerPage from './pages/AIOptimizerPage'
 import WordPressManagerPage from './pages/WordPressManagerPage'
@@ -356,6 +357,7 @@ function App() {
           {currentSection === 'domains' && <DomainsPage />}
           {currentSection === 'keywords' && <KeywordsPage />}
           {currentSection === 'google-console' && <GoogleSearchConsolePageEnhanced />}
+          {currentSection === 'gsc-settings' && <GSCSettingsPage />}
           {currentSection === 'local-seo' && <LocalSEOPage />}
           {currentSection === 'wordpress' && <WordPressManagerPage />}
           {currentSection === 'recommendations' && <RecommendationsPage />}
@@ -373,8 +375,8 @@ function App() {
           {currentSection === 'client-detail' && (
             <ClientDetailPage clientId={selectedClient} onBack={handleBackToDashboard} />
           )}
-          {!['dashboard', 'clients', 'reports', 'automation', 'autofix', 'autofix-review', 'autofix-settings', 'activity-log', 'ai-optimizer', 'scheduler',
-              'bulk-operations', 'position-tracking', 'domains', 'keywords', 'google-console', 'local-seo', 'wordpress', 'recommendations',
+          {!['dashboard', 'clients', 'reports', 'automation', 'autofix', 'autofix-review', 'autofix-settings', 'manual-review', 'engines-control', 'activity-log', 'ai-optimizer', 'scheduler',
+              'bulk-operations', 'position-tracking', 'domains', 'keywords', 'google-console', 'gsc-settings', 'local-seo', 'wordpress', 'recommendations',
               'keyword-research', 'unified-keywords', 'goals', 'emails', 'notifications', 'webhooks',
               'api-docs', 'export-backup', 'whitelabel', 'analytics', 'settings', 'client-detail', 'pixel-management', 'pixel-issues', 'schema-automation', 'ssr-optimization'].includes(currentSection) && (
             <div className="h-full flex items-center justify-center">

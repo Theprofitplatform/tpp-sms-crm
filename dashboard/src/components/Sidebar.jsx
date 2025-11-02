@@ -70,6 +70,7 @@ const navGroups = [
       { icon: Target, label: 'Keywords Tracking', href: '#keywords' },
       { icon: TrendingUp, label: 'Position Analysis', href: '#position-tracking' },
       { icon: Globe, label: 'Google Console', href: '#google-console' },
+      { icon: Settings, label: 'GSC Settings', href: '#gsc-settings' },
       { icon: MapPin, label: 'Local SEO', href: '#local-seo' },
       { icon: FileCode, label: 'WordPress', href: '#wordpress' },
     ]
