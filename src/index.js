@@ -21,6 +21,9 @@ import gscRoutes from './api/gsc-routes.js';
 // Import database initialization
 import { initializeDatabase } from './database/index.js';
 
+// Import health check
+import { ComprehensiveHealthCheck } from './monitoring/comprehensive-health.js';
+
 // Load environment variables
 dotenv.config();
 
@@ -82,7 +85,7 @@ if (NODE_ENV === 'development' || process.env.ENABLE_REQUEST_LOGGING === 'true')
   app.use(morgan('combined', { stream: accessLogStream }));
 }
 
-// Health check endpoint
+// Basic health check endpoint (backward compatible)
 app.get('/health', (req, res) => {
   res.json({
     success: true,
@@ -93,6 +96,27 @@ app.get('/health', (req, res) => {
     version: '2.0.0',
     service: 'Manual Review System'
   });
+});
+
+// Comprehensive health check endpoint
+app.get('/api/v2/health', async (req, res) => {
+  try {
+    const healthCheck = new ComprehensiveHealthCheck();
+    const results = await healthCheck.runAll();
+
+    res.status(healthCheck.getStatusCode()).json({
+      success: results.status === 'healthy' || results.status === 'degraded',
+      ...results
+    });
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({
+      success: false,
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
 });
 
 // API documentation endpoint
@@ -129,20 +153,46 @@ app.get('/api', (req, res) => {
 app.use('/api/autofix', autofixReviewRoutes);
 app.use('/api/gsc', gscRoutes);
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: 'Not Found',
-    message: `Cannot ${req.method} ${req.path}`,
-    availableEndpoints: [
-      'GET /health',
-      'GET /api',
-      'GET /api/autofix/proposals',
-      'POST /api/autofix/detect'
-    ]
+// Serve static files from the dashboard build (in production)
+const dashboardDistPath = path.join(__dirname, '..', 'dashboard', 'dist');
+if (fs.existsSync(dashboardDistPath)) {
+  console.log(`Serving frontend from: ${dashboardDistPath}`);
+
+  // Serve static files
+  app.use(express.static(dashboardDistPath));
+
+  // Handle client-side routing - serve index.html for all non-API routes
+  app.get('*', (req, res) => {
+    // Don't serve index.html for API routes
+    if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: `Cannot ${req.method} ${req.path}`
+      });
+    }
+
+    res.sendFile(path.join(dashboardDistPath, 'index.html'));
   });
-});
+} else {
+  console.warn(`Warning: Dashboard dist folder not found at ${dashboardDistPath}`);
+  console.warn('Frontend will not be served. Build the dashboard first: cd dashboard && npm run build');
+
+  // 404 handler when no frontend is available
+  app.use((req, res) => {
+    res.status(404).json({
+      success: false,
+      error: 'Not Found',
+      message: `Cannot ${req.method} ${req.path}`,
+      availableEndpoints: [
+        'GET /health',
+        'GET /api',
+        'GET /api/autofix/proposals',
+        'POST /api/autofix/detect'
+      ]
+    });
+  });
+}
 
 // Error handler
 app.use((err, req, res, next) => {
