@@ -8,7 +8,11 @@ export function ComparisonMode({ currentPeriod, previousPeriod, metric = 'value'
   const currentValue = currentPeriod?.[metric] || 0
   const previousValue = previousPeriod?.[metric] || 0
   const change = currentValue - previousValue
-  const percentChange = previousValue !== 0 ? ((change / previousValue) * 100).toFixed(1) : 0
+  const percentChange = (() => {
+    if (previousValue === 0) return 0
+    const calc = (change / previousValue) * 100
+    return isFinite(calc) ? Number(calc.toFixed(1)) : 0
+  })()
 
   const getTrendIcon = () => {
     if (change > 0) return ArrowUp

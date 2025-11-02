@@ -51,7 +51,10 @@ export function EnhancedStatsCards({ stats = {}, trends = {} }) {
     {
       icon: TrendingUp,
       title: 'Avg. Ranking',
-      value: stats.avgRanking ? `#${parseFloat(stats.avgRanking).toFixed(1)}` : '--',
+      value: (() => {
+        const val = parseFloat(stats.avgRanking)
+        return val && isFinite(val) ? `#${val.toFixed(1)}` : '--'
+      })(),
       change: trends.rankingChange || -8.5, // Negative is good for ranking
       sparklineData: trends.rankingSparkline || [
         { value: 25 }, { value: 23 }, { value: 21 }, { value: 19 }, { value: 18 }, { value: 17 }, { value: 15 }
@@ -96,7 +99,10 @@ export function EnhancedStatsCards({ stats = {}, trends = {} }) {
                   <div className={`flex items-center gap-1 px-2 py-1 rounded-full ${trendBg}`}>
                     <TrendIcon className={`h-3 w-3 ${trendColor}`} />
                     <span className={`text-xs font-semibold ${trendColor}`}>
-                      {Math.abs(card.change).toFixed(1)}%
+                      {(() => {
+                        const absChange = Math.abs(Number(card.change) || 0)
+                        return isFinite(absChange) ? absChange.toFixed(1) : '0.0'
+                      })()}%
                     </span>
                   </div>
                 </div>
