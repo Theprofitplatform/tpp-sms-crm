@@ -2546,6 +2546,143 @@ export const whiteLabelOps = {
   }
 };
 
+/**
+ * Proposal Operations (Manual Review System)
+ */
+export const proposalOps = {
+  /**
+   * Get proposals with filters
+   */
+  getProposals(filters = {}) {
+    const { clientId, status, engineId, groupId, severity, riskLevel, limit = 50 } = filters;
+
+    let query = 'SELECT * FROM autofix_proposals WHERE 1=1';
+    const params = [];
+
+    if (clientId) {
+      query += ' AND client_id = ?';
+      params.push(clientId);
+    }
+    if (status) {
+      query += ' AND status = ?';
+      params.push(status);
+    }
+    if (engineId) {
+      query += ' AND engine_id = ?';
+      params.push(engineId);
+    }
+    if (groupId) {
+      query += ' AND proposal_group_id = ?';
+      params.push(groupId);
+    }
+    if (severity) {
+      query += ' AND severity = ?';
+      params.push(severity);
+    }
+    if (riskLevel) {
+      query += ' AND risk_level = ?';
+      params.push(riskLevel);
+    }
+
+    query += ' ORDER BY created_at DESC LIMIT ?';
+    params.push(limit);
+
+    const stmt = db.prepare(query);
+    return stmt.all(...params);
+  },
+
+  /**
+   * Get proposal by ID
+   */
+  getProposalById(id) {
+    const stmt = db.prepare('SELECT * FROM autofix_proposals WHERE id = ?');
+    return stmt.get(id);
+  },
+
+  /**
+   * Create review session
+   */
+  createReviewSession(data) {
+    const stmt = db.prepare(`
+      INSERT INTO autofix_review_sessions (
+        proposal_group_id, client_id, engine_id, engine_name,
+        total_proposals, status, metadata
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const result = stmt.run(
+      data.proposal_group_id,
+      data.client_id,
+      data.engine_id,
+      data.engine_name,
+      data.total_proposals || 0,
+      data.status || 'pending',
+      data.metadata ? JSON.stringify(data.metadata) : null
+    );
+
+    return { id: result.lastInsertRowid, ...data };
+  },
+
+  /**
+   * Get review session
+   */
+  getReviewSession(groupId) {
+    const stmt = db.prepare('SELECT * FROM autofix_review_sessions WHERE proposal_group_id = ?');
+    const session = stmt.get(groupId);
+
+    if (session && session.metadata) {
+      session.metadata = JSON.parse(session.metadata);
+    }
+
+    return session;
+  },
+
+  /**
+   * Update review session
+   */
+  updateReviewSession(groupId, data) {
+    const updates = [];
+    const params = [];
+
+    if (data.approved_count !== undefined) {
+      updates.push('approved_count = ?');
+      params.push(data.approved_count);
+    }
+    if (data.rejected_count !== undefined) {
+      updates.push('rejected_count = ?');
+      params.push(data.rejected_count);
+    }
+    if (data.applied_count !== undefined) {
+      updates.push('applied_count = ?');
+      params.push(data.applied_count);
+    }
+    if (data.status) {
+      updates.push('status = ?');
+      params.push(data.status);
+    }
+    if (data.reviewed_at) {
+      updates.push('reviewed_at = ?');
+      params.push(data.reviewed_at);
+    }
+    if (data.completed_at) {
+      updates.push('completed_at = ?');
+      params.push(data.completed_at);
+    }
+
+    if (updates.length === 0) return;
+
+    params.push(groupId);
+
+    const stmt = db.prepare(`
+      UPDATE autofix_review_sessions
+      SET ${updates.join(', ')}
+      WHERE proposal_group_id = ?
+    `);
+
+    return stmt.run(...params);
+  }
+};
+
 // Initialize on import
 initializeDatabase();
 
@@ -2572,6 +2709,7 @@ export default {
   leadOps,
   emailOps,
   whiteLabelOps,
+  proposalOps,
   db,
   getDB
 };
