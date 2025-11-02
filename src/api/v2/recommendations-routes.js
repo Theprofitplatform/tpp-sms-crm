@@ -9,6 +9,7 @@
 
 import express from 'express';
 import { db } from '../../database/index.js';
+import recommendationsDB from '../../database/recommendations-db.js';
 import MetaTagsFixer from '../../automation/auto-fixers/meta-tags-fixer.js';
 import ImageAltFixer from '../../automation/auto-fixers/image-alt-fixer.js';
 import SchemaFixer from '../../automation/auto-fixers/schema-fixer.js';

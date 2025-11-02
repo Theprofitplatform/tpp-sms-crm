@@ -16,6 +16,7 @@ import fs from 'fs';
 
 // Import routes
 import autofixReviewRoutes from './api/autofix-review-routes.js';
+import gscRoutes from './api/gsc-routes.js';
 
 // Import database initialization
 import { initializeDatabase } from './database/index.js';
@@ -103,17 +104,30 @@ app.get('/api', (req, res) => {
     documentation: 'See API_QUICK_REFERENCE.md',
     endpoints: {
       health: 'GET /health',
-      proposals: 'GET /api/autofix/proposals',
-      detect: 'POST /api/autofix/detect',
-      review: 'POST /api/autofix/proposals/:id/review',
-      apply: 'POST /api/autofix/apply',
-      statistics: 'GET /api/autofix/statistics'
+      autofix: {
+        proposals: 'GET /api/autofix/proposals',
+        detect: 'POST /api/autofix/detect',
+        review: 'POST /api/autofix/proposals/:id/review',
+        apply: 'POST /api/autofix/apply',
+        statistics: 'GET /api/autofix/statistics'
+      },
+      gsc: {
+        authUrl: 'GET /api/gsc/auth-url',
+        properties: 'GET /api/gsc/properties',
+        sync: 'POST /api/gsc/sync',
+        analytics: 'GET /api/gsc/analytics/:propertyId',
+        pagePerformance: 'GET /api/gsc/page-performance/:propertyId',
+        topPages: 'GET /api/gsc/top-pages',
+        issues: 'GET /api/gsc/issues',
+        stats: 'GET /api/gsc/stats'
+      }
     }
   });
 });
 
 // Mount API routes
 app.use('/api/autofix', autofixReviewRoutes);
+app.use('/api/gsc', gscRoutes);
 
 // 404 handler
 app.use((req, res) => {

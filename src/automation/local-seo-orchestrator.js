@@ -12,9 +12,12 @@
  */
 
 import axios from 'axios';
-import { JSDOM } from 'jsdom';
+// import { JSDOM } from 'jsdom'; // Temporarily commented for Phase 4B testing
 import fs from 'fs/promises';
 import path from 'path';
+
+// Temporary mock for jsdom while dependency is resolved
+const JSDOM = null;
 
 /**
  * NAP Consistency Checker

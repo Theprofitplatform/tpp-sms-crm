@@ -442,6 +442,18 @@ export const recommendationsAPI = {
       method: 'DELETE'
     })
     return response.json()
+  },
+
+  // =====================================================
+  // PHASE 4B: Apply AutoFix to recommendation
+  // =====================================================
+  async applyAutoFix(recId) {
+    const response = await fetch(`${API_BASE}/recommendations/${recId}/autofix`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    })
+    if (!response.ok) throw new Error('Failed to apply AutoFix')
+    return response.json()
   }
 }
 
@@ -862,6 +874,56 @@ export const exportAPI = {
  * Notifications API
  */
 export const notificationsAPI = {
+  // =====================================================
+  // PHASE 4B: Notification Management
+  // =====================================================
+
+  // Get all notifications with optional filters
+  async getAll(params = {}) {
+    const queryParams = new URLSearchParams(params)
+    const response = await fetch(`${API_BASE}/notifications?${queryParams}`)
+    if (!response.ok) throw new Error('Failed to fetch notifications')
+    return response.json()
+  },
+
+  // Mark notification as read
+  async markAsRead(notificationId) {
+    const response = await fetch(`${API_BASE}/notifications/${notificationId}/read`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Failed to mark notification as read')
+    return response.json()
+  },
+
+  // Mark all notifications as read
+  async markAllAsRead() {
+    const response = await fetch(`${API_BASE}/notifications/mark-all-read`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Failed to mark all as read')
+    return response.json()
+  },
+
+  // Delete notification
+  async delete(notificationId) {
+    const response = await fetch(`${API_BASE}/notifications/${notificationId}`, {
+      method: 'DELETE'
+    })
+    if (!response.ok) throw new Error('Failed to delete notification')
+    return response.json()
+  },
+
+  // Get unread count
+  async getUnreadCount() {
+    const response = await fetch(`${API_BASE}/notifications/unread/count`)
+    if (!response.ok) throw new Error('Failed to fetch unread count')
+    return response.json()
+  },
+
+  // =====================================================
+  // Notification Settings
+  // =====================================================
+
   // Get notification settings
   async getSettings() {
     const response = await fetch(`${API_BASE}/notifications/settings`)

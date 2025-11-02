@@ -1267,10 +1267,12 @@ export const keywordOps = {
 
 /**
  * GSC Metrics Operations
+ * Note: gsc_metrics table is for daily snapshots (legacy)
+ * New GSC integration uses gsc_properties, gsc_search_analytics, gsc_page_performance, etc.
  */
 export const gscOps = {
   /**
-   * Record daily metrics
+   * Record daily metrics (legacy)
    */
   recordDaily(clientId, metrics) {
     const stmt = db.prepare(`
@@ -1297,7 +1299,7 @@ export const gscOps = {
   },
 
   /**
-   * Get metrics trend
+   * Get metrics trend (legacy)
    */
   getTrend(clientId, days = 90) {
     const stmt = db.prepare(`
@@ -1307,6 +1309,403 @@ export const gscOps = {
       ORDER BY date ASC
     `);
     return stmt.all(clientId, days);
+  },
+
+  // =========================================
+  // NEW GSC INTEGRATION OPERATIONS
+  // =========================================
+
+  /**
+   * Property Management
+   */
+  properties: {
+    /**
+     * Create or update GSC property
+     */
+    upsert(propertyData) {
+      const stmt = db.prepare(`
+        INSERT INTO gsc_properties (
+          client_id, property_url, property_type,
+          verified, verified_at,
+          access_token, refresh_token, token_expires_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(client_id, property_url) DO UPDATE SET
+          verified = excluded.verified,
+          verified_at = excluded.verified_at,
+          access_token = excluded.access_token,
+          refresh_token = excluded.refresh_token,
+          token_expires_at = excluded.token_expires_at,
+          updated_at = CURRENT_TIMESTAMP
+        RETURNING id
+      `);
+
+      return stmt.get(
+        propertyData.client_id,
+        propertyData.property_url,
+        propertyData.property_type || 'URL_PREFIX',
+        propertyData.verified ? 1 : 0,
+        propertyData.verified_at || new Date().toISOString(),
+        propertyData.access_token || null,
+        propertyData.refresh_token || null,
+        propertyData.token_expires_at || null
+      );
+    },
+
+    /**
+     * Get property by ID
+     */
+    getById(propertyId) {
+      const stmt = db.prepare('SELECT * FROM gsc_properties WHERE id = ?');
+      return stmt.get(propertyId);
+    },
+
+    /**
+     * Get properties by client
+     */
+    getByClient(clientId) {
+      const stmt = db.prepare(`
+        SELECT * FROM gsc_properties
+        WHERE client_id = ?
+        ORDER BY verified DESC, created_at DESC
+      `);
+      return stmt.all(clientId);
+    },
+
+    /**
+     * Get verified property for client
+     */
+    getVerified(clientId) {
+      const stmt = db.prepare(`
+        SELECT * FROM gsc_properties
+        WHERE client_id = ? AND verified = 1
+        ORDER BY verified_at DESC
+        LIMIT 1
+      `);
+      return stmt.get(clientId);
+    },
+
+    /**
+     * Update sync status
+     */
+    updateSyncStatus(propertyId, status, error = null) {
+      const stmt = db.prepare(`
+        UPDATE gsc_properties
+        SET last_sync = CURRENT_TIMESTAMP,
+            last_sync_status = ?,
+            last_sync_error = ?
+        WHERE id = ?
+      `);
+      return stmt.run(status, error, propertyId);
+    }
+  },
+
+  /**
+   * Search Analytics Operations
+   */
+  analytics: {
+    /**
+     * Batch insert search analytics data
+     */
+    batchInsert(propertyId, rows, date) {
+      const stmt = db.prepare(`
+        INSERT INTO gsc_search_analytics (
+          property_id, page_url, query, clicks, impressions, ctr, position, date
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(property_id, page_url, query, date, device)
+        DO UPDATE SET
+          clicks = excluded.clicks,
+          impressions = excluded.impressions,
+          ctr = excluded.ctr,
+          position = excluded.position
+      `);
+
+      const insert = db.transaction((data) => {
+        for (const row of data) {
+          stmt.run(
+            propertyId,
+            row.page_url,
+            row.query || null,
+            row.clicks || 0,
+            row.impressions || 0,
+            row.ctr || 0,
+            row.position || 0,
+            date
+          );
+        }
+      });
+
+      return insert(rows);
+    },
+
+    /**
+     * Get analytics by property and date range
+     */
+    getByProperty(propertyId, startDate, endDate, limit = 1000) {
+      const stmt = db.prepare(`
+        SELECT * FROM gsc_search_analytics
+        WHERE property_id = ?
+          AND date >= ?
+          AND date <= ?
+        ORDER BY clicks DESC
+        LIMIT ?
+      `);
+      return stmt.all(propertyId, startDate, endDate, limit);
+    },
+
+    /**
+     * Get analytics for specific page
+     */
+    getByPage(propertyId, pageUrl, startDate, endDate) {
+      const stmt = db.prepare(`
+        SELECT * FROM gsc_search_analytics
+        WHERE property_id = ? AND page_url = ?
+          AND date >= ? AND date <= ?
+        ORDER BY date DESC
+      `);
+      return stmt.all(propertyId, pageUrl, startDate, endDate);
+    }
+  },
+
+  /**
+   * Page Performance Operations
+   */
+  pagePerformance: {
+    /**
+     * Upsert page performance summary
+     */
+    upsert(performanceData) {
+      const stmt = db.prepare(`
+        INSERT INTO gsc_page_performance (
+          property_id, page_url,
+          clicks_7d, impressions_7d, ctr_7d, position_7d,
+          clicks_30d, impressions_30d, ctr_30d, position_30d,
+          clicks_90d, impressions_90d, ctr_90d, position_90d,
+          clicks_trend, impressions_trend, position_trend,
+          top_queries, avg_query_position
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(property_id, page_url) DO UPDATE SET
+          clicks_7d = excluded.clicks_7d,
+          impressions_7d = excluded.impressions_7d,
+          ctr_7d = excluded.ctr_7d,
+          position_7d = excluded.position_7d,
+          clicks_30d = excluded.clicks_30d,
+          impressions_30d = excluded.impressions_30d,
+          ctr_30d = excluded.ctr_30d,
+          position_30d = excluded.position_30d,
+          clicks_90d = excluded.clicks_90d,
+          impressions_90d = excluded.impressions_90d,
+          ctr_90d = excluded.ctr_90d,
+          position_90d = excluded.position_90d,
+          clicks_trend = excluded.clicks_trend,
+          impressions_trend = excluded.impressions_trend,
+          position_trend = excluded.position_trend,
+          top_queries = excluded.top_queries,
+          avg_query_position = excluded.avg_query_position,
+          last_updated = CURRENT_TIMESTAMP
+      `);
+
+      return stmt.run(
+        performanceData.property_id,
+        performanceData.page_url,
+        performanceData.clicks_7d || 0,
+        performanceData.impressions_7d || 0,
+        performanceData.ctr_7d || 0,
+        performanceData.position_7d || 0,
+        performanceData.clicks_30d || 0,
+        performanceData.impressions_30d || 0,
+        performanceData.ctr_30d || 0,
+        performanceData.position_30d || 0,
+        performanceData.clicks_90d || 0,
+        performanceData.impressions_90d || 0,
+        performanceData.ctr_90d || 0,
+        performanceData.position_90d || 0,
+        performanceData.clicks_trend || 'stable',
+        performanceData.impressions_trend || 'stable',
+        performanceData.position_trend || 'stable',
+        performanceData.top_queries || '[]',
+        performanceData.avg_query_position || 0
+      );
+    },
+
+    /**
+     * Get page performance by URL
+     */
+    getByUrl(propertyId, pageUrl) {
+      const stmt = db.prepare(`
+        SELECT * FROM gsc_page_performance
+        WHERE property_id = ? AND page_url = ?
+      `);
+      return stmt.get(propertyId, pageUrl);
+    },
+
+    /**
+     * Get top pages by property
+     */
+    getTopPages(propertyId, orderBy = 'clicks_30d', limit = 100) {
+      // Validate orderBy to prevent SQL injection
+      const allowedColumns = [
+        'clicks_7d', 'clicks_30d', 'clicks_90d',
+        'impressions_7d', 'impressions_30d', 'impressions_90d'
+      ];
+      const safeOrderBy = allowedColumns.includes(orderBy) ? orderBy : 'clicks_30d';
+
+      const stmt = db.prepare(`
+        SELECT * FROM gsc_page_performance
+        WHERE property_id = ?
+        ORDER BY ${safeOrderBy} DESC
+        LIMIT ?
+      `);
+      return stmt.all(propertyId, limit);
+    }
+  },
+
+  /**
+   * URL Issues Operations
+   */
+  urlIssues: {
+    /**
+     * Create URL issue
+     */
+    create(issueData) {
+      const stmt = db.prepare(`
+        INSERT INTO gsc_url_issues (
+          property_id, page_url, issue_type, issue_category,
+          severity, issue_description, recommended_fix,
+          status, detected_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const result = stmt.run(
+        issueData.property_id,
+        issueData.page_url,
+        issueData.issue_type,
+        issueData.issue_category || null,
+        issueData.severity || 'medium',
+        issueData.issue_description || null,
+        issueData.recommended_fix || null,
+        issueData.status || 'active',
+        issueData.detected_at || new Date().toISOString()
+      );
+
+      return result.lastInsertRowid;
+    },
+
+    /**
+     * Get issues by property
+     */
+    getByProperty(propertyId, status = 'active') {
+      const stmt = db.prepare(`
+        SELECT * FROM gsc_url_issues
+        WHERE property_id = ? AND status = ?
+        ORDER BY detected_at DESC
+      `);
+      return stmt.all(propertyId, status);
+    },
+
+    /**
+     * Resolve issue
+     */
+    resolve(issueId) {
+      const stmt = db.prepare(`
+        UPDATE gsc_url_issues
+        SET status = 'resolved',
+            resolved_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `);
+      return stmt.run(issueId);
+    }
+  },
+
+  /**
+   * Proposal GSC Data Operations
+   */
+  proposalData: {
+    /**
+     * Create proposal GSC data record
+     */
+    create(data) {
+      const stmt = db.prepare(`
+        INSERT INTO proposal_gsc_data (
+          proposal_id,
+          before_clicks_7d, before_impressions_7d, before_ctr_7d, before_position_7d,
+          priority_score, traffic_potential, before_date
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const result = stmt.run(
+        data.proposal_id,
+        data.before_clicks_7d || 0,
+        data.before_impressions_7d || 0,
+        data.before_ctr_7d || 0,
+        data.before_position_7d || 0,
+        data.priority_score || 50,
+        data.traffic_potential || 'low',
+        data.before_date || new Date().toISOString().split('T')[0]
+      );
+
+      return result.lastInsertRowid;
+    },
+
+    /**
+     * Get GSC data by proposal ID
+     */
+    getByProposal(proposalId) {
+      const stmt = db.prepare(`
+        SELECT * FROM proposal_gsc_data
+        WHERE proposal_id = ?
+      `);
+      return stmt.get(proposalId);
+    },
+
+    /**
+     * Update after metrics (post-application)
+     */
+    updateAfterMetrics(proposalId, afterData) {
+      const stmt = db.prepare(`
+        UPDATE proposal_gsc_data
+        SET after_clicks_7d = ?,
+            after_impressions_7d = ?,
+            after_ctr_7d = ?,
+            after_position_7d = ?,
+            clicks_change = ? - before_clicks_7d,
+            impressions_change = ? - before_impressions_7d,
+            ctr_change = ? - before_ctr_7d,
+            position_change = ? - before_position_7d,
+            after_date = ?,
+            measured_at = CURRENT_TIMESTAMP
+        WHERE proposal_id = ?
+      `);
+
+      return stmt.run(
+        afterData.clicks || 0,
+        afterData.impressions || 0,
+        afterData.ctr || 0,
+        afterData.position || 0,
+        afterData.clicks || 0,
+        afterData.impressions || 0,
+        afterData.ctr || 0,
+        afterData.position || 0,
+        afterData.date || new Date().toISOString().split('T')[0],
+        proposalId
+      );
+    },
+
+    /**
+     * Get proposals with high traffic potential
+     */
+    getHighPotential(clientId, limit = 50) {
+      const stmt = db.prepare(`
+        SELECT p.*, pgd.*
+        FROM autofix_proposals p
+        JOIN proposal_gsc_data pgd ON p.id = pgd.proposal_id
+        WHERE p.client_id = ?
+          AND pgd.traffic_potential = 'high'
+          AND p.status IN ('pending', 'approved')
+        ORDER BY pgd.priority_score DESC
+        LIMIT ?
+      `);
+      return stmt.all(clientId, limit);
+    }
   }
 };
 
