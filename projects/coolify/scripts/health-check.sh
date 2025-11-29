@@ -24,24 +24,32 @@ send_alert() {
     fi
 }
 
-# Check MCP service
+# Check MCP service (Note: MCP servers are on-demand, not persistent daemons)
 check_mcp_service() {
-    if systemctl is-active --quiet "$MCP_SERVICE" 2>/dev/null; then
-        echo "[$(date)] MCP Service: OK"
+    # MCP servers run via stdio and exit after initialization
+    # Check if the build exists and is executable instead
+    local mcp_build="/home/avi/projects/coolify/coolify-mcp/build/index.js"
+    if [[ -f "$mcp_build" ]]; then
+        echo "[$(date)] MCP Server Build: OK"
         return 0
     else
-        send_alert "MCP service is not running!"
+        send_alert "MCP server build not found at $mcp_build"
         return 1
     fi
 }
 
 # Check Coolify API
 check_coolify_api() {
-    if curl -s -f "${COOLIFY_URL}/api/v1/healthcheck" > /dev/null 2>&1; then
-        echo "[$(date)] Coolify API: OK"
+    # Use /api/v1/version endpoint as healthcheck (healthcheck returns 404)
+    local response=$(curl -s -w "%{http_code}" "${COOLIFY_URL}/api/v1/version" 2>/dev/null)
+    local http_code="${response: -3}"
+
+    if [[ "$http_code" == "200" ]] || [[ "$http_code" == "401" ]]; then
+        # 200 = OK, 401 = API is up but needs auth (still healthy)
+        echo "[$(date)] Coolify API: OK (HTTP $http_code)"
         return 0
     else
-        send_alert "Coolify API not responding at ${COOLIFY_URL}"
+        send_alert "Coolify API not responding at ${COOLIFY_URL} (HTTP $http_code)"
         return 1
     fi
 }
