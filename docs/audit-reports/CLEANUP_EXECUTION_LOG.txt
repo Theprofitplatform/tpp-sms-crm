@@ -1,0 +1,190 @@
+Docker Cleanup Audit - Execution Log Template
+==============================================
+Date Generated: 2025-12-10
+
+Use this file to track your cleanup execution:
+
+═══════════════════════════════════════════════════════════════
+
+PRE-CLEANUP CHECKS
+──────────────────
+□ Review full audit report (/home/avi/docs/audit-reports/docker-cleanup-20251210.md)
+□ Review quick start guide (/home/avi/docs/audit-reports/DOCKER_CLEANUP_QUICKSTART.md)
+□ Run dry-run test (/home/avi/scripts/docker-cleanup-safe.sh --dry-run)
+□ Schedule maintenance window
+□ Notify team members
+□ Backup critical volumes
+
+BEFORE CLEANUP STATE
+────────────────────
+Date & Time: _____________________
+
+docker system df output:
+─────────────────────────────────────────
+[Paste output here]
+─────────────────────────────────────────
+
+Total Disk Usage: __________
+Reclaimable Space: __________
+Docker Directory Size: __________
+
+═══════════════════════════════════════════════════════════════
+
+PHASE 1: DANGLING IMAGES (Very Safe - 198 MB)
+──────────────────────────────────────────────
+Date Started: _____________________
+Time Started: _____________________
+
+Command Executed:
+docker image prune -f --filter "dangling=true"
+
+Output:
+─────────────────────────────────────────
+[Paste output here]
+─────────────────────────────────────────
+
+□ Completed Successfully
+Space Freed: __________
+Date Completed: _____________________
+Time Completed: _____________________
+
+═══════════════════════════════════════════════════════════════
+
+PHASE 2: VOLUME ANALYSIS (Planning Stage)
+──────────────────────────────────────────
+Date: _____________________
+
+Volumes Identified for Removal:
+[List volumes marked for removal]
+1. _____________________________
+2. _____________________________
+3. _____________________________
+
+Total Size to Reclaim: __________
+
+Volumes to Keep:
+[List volumes to keep and why]
+1. _____________________________ (Reason: ____________)
+2. _____________________________ (Reason: ____________)
+
+═══════════════════════════════════════════════════════════════
+
+PHASE 3: VOLUME BACKUP (Before Deletion)
+─────────────────────────────────────────
+Date Started: _____________________
+
+Backup Directory: /home/avi/backups/docker-volumes/
+
+Backup Progress:
+  □ Volume 1: _________________________ (Size: ________) [Date: _____]
+  □ Volume 2: _________________________ (Size: ________) [Date: _____]
+  □ Volume 3: _________________________ (Size: ________) [Date: _____]
+
+Total Backup Size: __________
+Verification: All backups verified? □ Yes □ No
+
+═══════════════════════════════════════════════════════════════
+
+PHASE 4: VOLUME REMOVAL (Deletion)
+──────────────────────────────────
+Date Started: _____________________
+
+Volumes Removed:
+  □ Volume 1: _________________________ [Date: _____, Time: _____]
+  □ Volume 2: _________________________ [Date: _____, Time: _____]
+  □ Volume 3: _________________________ [Date: _____, Time: _____]
+
+Issues Encountered:
+─────────────────────────────────────────
+[Note any errors or unexpected issues]
+─────────────────────────────────────────
+
+═══════════════════════════════════════════════════════════════
+
+PHASE 5: IMAGE OPTIMIZATION (Optional - Long Term)
+───────────────────────────────────────────────────
+Status: □ Planned □ In Progress □ Completed □ Not Done
+
+Images Targeted for Optimization:
+  □ seo-automation (1.1 GB)
+  □ eo444kos48oss40ksck0w8ow-api (1.85 GB)
+  □ eo444kos48oss40ksck0w8ow-scheduler (1.03 GB)
+
+Actions Taken:
+─────────────────────────────────────────
+[Document optimization work]
+─────────────────────────────────────────
+
+═══════════════════════════════════════════════════════════════
+
+FINAL VERIFICATION
+───────────────────
+Date & Time: _____________________
+
+docker system df output (after cleanup):
+─────────────────────────────────────────
+[Paste output here]
+─────────────────────────────────────────
+
+Total Disk Usage: __________
+Reclaimable Space: __________
+Docker Directory Size: __________
+
+Space Freed Summary:
+  Phase 1 (Dangling Images): __________
+  Phase 4 (Volumes): __________
+  ────────────────────
+  TOTAL FREED: __________
+
+Services Status After Cleanup:
+  □ All containers running
+  □ All services healthy
+  □ No errors in logs
+  □ Performance normal
+
+═══════════════════════════════════════════════════════════════
+
+AUTOMATION SETUP (Optional)
+────────────────────────────
+□ Cron job configured: sudo /home/avi/scripts/setup-docker-cleanup-cron.sh
+□ Cron job scheduled for: ___________________
+□ Log file monitoring: tail -f /var/log/docker-cleanup-cron.log
+
+═══════════════════════════════════════════════════════════════
+
+COMPLETION SUMMARY
+───────────────────
+Cleanup Started: _____________________
+Cleanup Completed: _____________________
+Total Duration: _____________________
+
+Overall Status: □ Successful □ Partial □ Failed
+
+Issues or Rollbacks Needed:
+─────────────────────────────────────────
+[Document any issues and resolutions]
+─────────────────────────────────────────
+
+Lessons Learned:
+─────────────────────────────────────────
+[Note what worked well, what could improve]
+─────────────────────────────────────────
+
+Next Steps:
+─────────────────────────────────────────
+□ Monitor disk usage for next 7 days
+□ Review logs for any issues
+□ Schedule next cleanup (date: __________)
+□ Implement cron job if not done
+□ Consider image optimization plan
+
+═══════════════════════════════════════════════════════════════
+
+SIGNED OFF
+───────────
+Executed By: _____________________
+Approved By: _____________________
+Date: _____________________
+Time: _____________________
+
+═══════════════════════════════════════════════════════════════
