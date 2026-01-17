@@ -32,6 +32,11 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import ConfirmDialog from '../components/ConfirmDialog'
+import StatCard from '@/components/data-display/StatCard'
+import PriceDisplay, { PercentDisplay } from '@/components/data-display/PriceDisplay'
+import { EmptyPositions } from '@/components/feedback/EmptyState'
+import { SkeletonStatCard, SkeletonTable, SkeletonChart } from '@/components/ui/Skeleton'
+import { formatCurrency, formatPercent, getValueVariant } from '@/utils/formatters'
 
 // Mock positions data
 const mockPositions = [
@@ -43,30 +48,6 @@ const mockPositions = [
 ]
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--warning))', 'hsl(var(--destructive))', '#8b5cf6']
-
-function StatCard({ icon: IconComponent, label, value, variant = 'default', className }) {
-  const variantStyles = {
-    default: '',
-    positive: 'text-green-500',
-    negative: 'text-red-500',
-  }
-
-  return (
-    <Card className={className}>
-      <CardContent className="flex items-center gap-4 p-6">
-        <div className="rounded-lg bg-primary/10 p-3">
-          <IconComponent className="h-6 w-6 text-primary" />
-        </div>
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <p className={cn("text-2xl font-bold font-mono", variantStyles[variant])}>
-            {value}
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
 
 export default function PositionsPage() {
   const [positions, setPositions] = useState(mockPositions)
@@ -155,8 +136,9 @@ export default function PositionsPage() {
           variant="outline"
           onClick={fetchPositions}
           disabled={loading}
+          aria-label="Refresh positions data"
         >
-          <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
+          <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} aria-hidden="true" />
           Refresh
         </Button>
       </div>
@@ -164,11 +146,16 @@ export default function PositionsPage() {
       {/* Error Alert */}
       {error && (
         <Alert variant="destructive" onClose={() => setError(null)}>
-          <AlertTriangle className="h-4 w-4" />
+          <AlertTriangle className="h-4 w-4" aria-hidden="true" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>
             {error}
-            <Button variant="link" className="h-auto p-0 pl-1" onClick={fetchPositions}>
+            <Button
+              variant="link"
+              className="h-auto p-0 pl-1"
+              onClick={fetchPositions}
+              aria-label="Retry fetching positions"
+            >
               Retry
             </Button>
           </AlertDescription>
@@ -177,28 +164,43 @@ export default function PositionsPage() {
 
       {/* Stats Row */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          icon={DollarSign}
-          label="Total Value"
-          value={`$${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
-        />
-        <StatCard
-          icon={Percent}
-          label="Total P&L"
-          value={`$${totalPnL.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
-          variant={totalPnL >= 0 ? 'positive' : 'negative'}
-        />
-        <StatCard
-          icon={Briefcase}
-          label="Open Positions"
-          value={positions.length}
-        />
-        <StatCard
-          icon={totalPnL >= 0 ? TrendingUp : TrendingDown}
-          label="Return %"
-          value={`${((totalPnL / totalCost) * 100).toFixed(2)}%`}
-          variant={totalPnL >= 0 ? 'positive' : 'negative'}
-        />
+        {loading ? (
+          <>
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+          </>
+        ) : (
+          <>
+            <StatCard
+              icon={<DollarSign className="h-6 w-6" />}
+              label="Total Value"
+              value={formatCurrency(totalValue)}
+              ariaLabel={`Total portfolio value: ${formatCurrency(totalValue)}`}
+            />
+            <StatCard
+              icon={<Percent className="h-6 w-6" />}
+              label="Total P&L"
+              value={formatCurrency(totalPnL, { showSign: true })}
+              variant={getValueVariant(totalPnL)}
+              ariaLabel={`Total profit and loss: ${formatCurrency(totalPnL, { showSign: true })}`}
+            />
+            <StatCard
+              icon={<Briefcase className="h-6 w-6" />}
+              label="Open Positions"
+              value={positions.length}
+              ariaLabel={`Open positions count: ${positions.length}`}
+            />
+            <StatCard
+              icon={totalPnL >= 0 ? <TrendingUp className="h-6 w-6" /> : <TrendingDown className="h-6 w-6" />}
+              label="Return %"
+              value={formatPercent((totalPnL / totalCost) * 100)}
+              variant={getValueVariant(totalPnL)}
+              ariaLabel={`Return percentage: ${formatPercent((totalPnL / totalCost) * 100)}`}
+            />
+          </>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -211,14 +213,12 @@ export default function PositionsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {positions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                <Briefcase className="h-12 w-12 opacity-50 mb-4" />
-                <p className="text-lg font-medium">No open positions</p>
-                <p className="text-sm">Execute a signal to get started</p>
-              </div>
+            {loading ? (
+              <SkeletonTable rows={5} columns={6} />
+            ) : positions.length === 0 ? (
+              <EmptyPositions />
             ) : (
-              <Table>
+              <Table aria-label="Open positions table">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Symbol</TableHead>
@@ -234,28 +234,23 @@ export default function PositionsPage() {
                 <TableBody>
                   {positions.map(pos => {
                     const pnl = calculatePnL(pos)
-                    const pnlPercent = calculatePnLPercent(pos)
+                    const pnlPercent = parseFloat(calculatePnLPercent(pos))
                     return (
                       <TableRow key={pos.id}>
                         <TableCell className="font-semibold">{pos.symbol}</TableCell>
                         <TableCell className="text-muted-foreground hidden md:table-cell">{pos.name}</TableCell>
                         <TableCell className="text-right font-mono">{pos.quantity}</TableCell>
-                        <TableCell className="text-right font-mono hidden sm:table-cell">${pos.avgPrice.toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-mono hidden sm:table-cell">${pos.currentPrice.toFixed(2)}</TableCell>
-                        <TableCell className={cn(
-                          "text-right font-mono",
-                          pnl >= 0 ? "text-green-500" : "text-red-500"
-                        )}>
-                          <span className="flex items-center justify-end gap-1">
-                            {pnl >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                            ${Math.abs(pnl).toFixed(2)}
-                          </span>
+                        <TableCell className="text-right hidden sm:table-cell">
+                          <PriceDisplay value={pos.avgPrice} />
                         </TableCell>
-                        <TableCell className={cn(
-                          "text-right font-mono",
-                          pnl >= 0 ? "text-green-500" : "text-red-500"
-                        )}>
-                          {pnlPercent}%
+                        <TableCell className="text-right hidden sm:table-cell">
+                          <PriceDisplay value={pos.currentPrice} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <PriceDisplay value={pnl} showTrend showSign />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <PercentDisplay value={pnlPercent} />
                         </TableCell>
                         <TableCell className="text-right">
                           <Button
@@ -263,7 +258,7 @@ export default function PositionsPage() {
                             size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-destructive"
                             onClick={() => closePosition(pos)}
-                            title="Close Position"
+                            aria-label={`Close position for ${pos.symbol}`}
                           >
                             <X className="h-4 w-4" />
                           </Button>
@@ -283,34 +278,38 @@ export default function PositionsPage() {
             <CardTitle>Portfolio Allocation</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={2}
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
-                    formatter={(value) => [`$${value.toLocaleString()}`, 'Value']}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+            {loading ? (
+              <SkeletonChart height="300px" />
+            ) : (
+              <div className="h-[300px]" role="img" aria-label="Portfolio allocation pie chart">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                      formatter={(value) => [formatCurrency(value), 'Value']}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

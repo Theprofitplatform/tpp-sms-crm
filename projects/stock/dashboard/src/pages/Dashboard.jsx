@@ -5,7 +5,6 @@ import { cn } from '@/lib/utils'
 import { API } from '@/config/api'
 import {
   Activity,
-  AlertTriangle,
   TrendingUp,
   Shield,
   Zap,
@@ -28,7 +27,10 @@ import {
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import StatCard from '@/components/data-display/StatCard'
+import { ErrorBanner } from '@/components/feedback/ErrorState'
+import { SkeletonStatCard, SkeletonChart } from '@/components/ui/Skeleton'
+import { formatCurrency, formatPercent } from '@/utils/formatters'
 
 // Mock performance data for chart
 const generatePerformanceData = () => {
@@ -45,32 +47,6 @@ const generatePerformanceData = () => {
     })
   }
   return data
-}
-
-function StatCard({ icon: Icon, label, value, variant = 'default', className }) {
-  const variantStyles = {
-    default: '',
-    positive: 'text-green-500',
-    negative: 'text-red-500',
-    danger: 'text-red-500',
-    safe: 'text-green-500',
-  }
-
-  return (
-    <Card className={className}>
-      <CardContent className="flex items-center gap-4 p-6">
-        <div className="rounded-lg bg-primary/10 p-3">
-          <Icon className="h-6 w-6 text-primary" />
-        </div>
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <p className={cn("text-2xl font-bold font-mono", variantStyles[variant])}>
-            {value}
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  )
 }
 
 export default function Dashboard() {
@@ -201,11 +177,35 @@ export default function Dashboard() {
 
   if (loading && !mode) {
     return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <div className="text-center">
-          <RefreshCw className="mx-auto h-12 w-12 animate-spin text-primary" />
-          <p className="mt-4 text-muted-foreground">Loading Trading System...</p>
+      <div className="space-y-6">
+        {/* Header skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <TrendingUp className="h-8 w-8 text-primary" />
+            <h1 className="text-2xl font-bold">Trading Dashboard</h1>
+          </div>
         </div>
+
+        {/* Stats Row skeleton */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <SkeletonStatCard />
+          <SkeletonStatCard />
+          <SkeletonStatCard />
+          <SkeletonStatCard />
+        </div>
+
+        {/* Chart skeleton */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Portfolio Performance
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SkeletonChart height="300px" />
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -222,49 +222,49 @@ export default function Dashboard() {
           variant="outline"
           onClick={fetchData}
           disabled={loading}
+          aria-label="Refresh dashboard data"
         >
-          <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
+          <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} aria-hidden="true" />
           Refresh
         </Button>
       </div>
 
       {/* Error Alert */}
       {error && (
-        <Alert variant="destructive" onClose={() => setError(null)}>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Network Error</AlertTitle>
-          <AlertDescription>
-            {error}. Some data may be unavailable.
-            <Button variant="link" className="h-auto p-0 pl-1" onClick={fetchData}>
-              Retry
-            </Button>
-          </AlertDescription>
-        </Alert>
+        <ErrorBanner
+          error={`${error}. Some data may be unavailable.`}
+          onRetry={fetchData}
+          onDismiss={() => setError(null)}
+        />
       )}
 
       {/* Stats Row */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          icon={DollarSign}
+          icon={<DollarSign className="h-6 w-6" />}
           label="Portfolio Value"
-          value={`$${currentValue.toLocaleString()}`}
+          value={formatCurrency(currentValue)}
+          ariaLabel={`Portfolio Value: ${formatCurrency(currentValue)}`}
         />
         <StatCard
-          icon={BarChart3}
+          icon={<BarChart3 className="h-6 w-6" />}
           label="Total Return"
-          value={`${totalReturn}%`}
+          value={formatPercent(parseFloat(totalReturn))}
           variant={parseFloat(totalReturn) >= 0 ? 'positive' : 'negative'}
+          ariaLabel={`Total Return: ${formatPercent(parseFloat(totalReturn))}`}
         />
         <StatCard
-          icon={Activity}
+          icon={<Activity className="h-6 w-6" />}
           label="Active Strategies"
           value={strategies.length}
+          ariaLabel={`Active Strategies: ${strategies.length}`}
         />
         <StatCard
-          icon={Shield}
+          icon={<Shield className="h-6 w-6" />}
           label="Risk Status"
           value={mode?.kill_switch_active ? 'HALTED' : 'ACTIVE'}
           variant={mode?.kill_switch_active ? 'danger' : 'safe'}
+          ariaLabel={`Risk Status: ${mode?.kill_switch_active ? 'Trading Halted' : 'Trading Active'}`}
         />
       </div>
 
@@ -295,7 +295,7 @@ export default function Dashboard() {
                     border: '1px solid hsl(var(--border))',
                     borderRadius: '8px'
                   }}
-                  formatter={(value) => [`$${value.toLocaleString()}`, 'Value']}
+                  formatter={(value) => [formatCurrency(value), 'Value']}
                 />
                 <Area
                   type="monotone"

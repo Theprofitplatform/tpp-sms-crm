@@ -93,12 +93,17 @@ export default function Sidebar({ collapsed = false, onCollapsedChange }) {
               }
               title={collapsed ? `${item.label} (${item.shortcut})` : undefined}
             >
-              <IconComponent className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
-              {!collapsed && <span>{item.label}</span>}
-              {!collapsed && (
-                <span className="ml-auto text-xs text-muted-foreground/60">
-                  {item.shortcut}
-                </span>
+              {({ isActive }) => (
+                <>
+                  <IconComponent className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+                  {!collapsed && <span>{item.label}</span>}
+                  {!collapsed && (
+                    <span className="ml-auto text-xs text-muted-foreground/60">
+                      {item.shortcut}
+                    </span>
+                  )}
+                  {isActive && <span className="sr-only">(current page)</span>}
+                </>
               )}
             </NavLink>
           )

@@ -23,6 +23,13 @@ import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
 
+// Reusable components
+import StatCard from '@/components/data-display/StatCard'
+import StatusBadge from '@/components/data-display/StatusBadge'
+import PriceDisplay from '@/components/data-display/PriceDisplay'
+import EmptyState, { EmptySignals } from '@/components/feedback/EmptyState'
+import Skeleton, { SkeletonStatCard, SkeletonCard } from '@/components/ui/Skeleton'
+
 // Mock signals data
 const mockSignals = [
   { id: 'SIG-001', symbol: 'AAPL', strategy: 'Momentum', direction: 'BUY', strength: 0.85, price: 184.50, target: 195.00, stopLoss: 178.00, status: 'PENDING', reason: 'RSI oversold bounce + MACD bullish crossover', createdAt: '2024-01-15T14:30:00Z' },
@@ -32,37 +39,6 @@ const mockSignals = [
   { id: 'SIG-005', symbol: 'MSFT', strategy: 'Mean Reversion', direction: 'SELL', strength: 0.65, price: 388.00, target: 375.00, stopLoss: 395.00, status: 'REJECTED', reason: 'Overbought RSI + resistance level', createdAt: '2024-01-15T09:30:00Z', rejectedReason: 'Risk limit exceeded' },
   { id: 'SIG-006', symbol: 'META', strategy: 'Momentum', direction: 'BUY', strength: 0.78, price: 475.00, target: 510.00, stopLoss: 460.00, status: 'EXPIRED', reason: 'Strong uptrend continuation pattern', createdAt: '2024-01-14T15:00:00Z', expiredAt: '2024-01-15T09:30:00Z' },
 ]
-
-function StatCard({ icon: IconComponent, label, value, variant = 'default', active = false, onClick, className }) {
-  const variantStyles = {
-    default: '',
-    positive: 'text-green-500',
-    negative: 'text-red-500',
-  }
-
-  return (
-    <Card
-      className={cn(
-        className,
-        onClick && "cursor-pointer transition-colors hover:bg-muted/50",
-        active && "ring-2 ring-primary"
-      )}
-      onClick={onClick}
-    >
-      <CardContent className="flex items-center gap-4 p-6">
-        <div className="rounded-lg bg-primary/10 p-3">
-          <IconComponent className="h-6 w-6 text-primary" />
-        </div>
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <p className={cn("text-2xl font-bold font-mono", variantStyles[variant])}>
-            {value}
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
 
 export default function SignalsPage() {
   const [signals, setSignals] = useState(mockSignals)
@@ -218,16 +194,6 @@ export default function SignalsPage() {
     }
   }
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'EXECUTED': return <CheckCircle className="h-4 w-4" />
-      case 'PENDING': return <Clock className="h-4 w-4" />
-      case 'REJECTED': return <XCircle className="h-4 w-4" />
-      case 'EXPIRED': return <Clock className="h-4 w-4" />
-      default: return <Clock className="h-4 w-4" />
-    }
-  }
-
   const getStrengthColor = (strength) => {
     if (strength >= 0.8) return 'bg-green-500'
     if (strength >= 0.6) return 'bg-yellow-500'
@@ -255,16 +221,17 @@ export default function SignalsPage() {
           <Zap className="h-8 w-8 text-primary" />
           <h1 className="text-2xl font-bold">Trading Signals</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" role="toolbar" aria-label="Signal generation controls">
           <Button
             variant="outline"
             onClick={() => generateSignals('momentum')}
             disabled={generatingSignals || loading}
+            aria-label="Generate trading signals using momentum strategy"
           >
             {generatingSignals ? (
-              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              <RefreshCw className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
             ) : (
-              <Play className="mr-2 h-4 w-4" />
+              <Play className="mr-2 h-4 w-4" aria-hidden="true" />
             )}
             Generate (Momentum)
           </Button>
@@ -272,11 +239,12 @@ export default function SignalsPage() {
             variant="outline"
             onClick={() => generateSignals('mean_reversion')}
             disabled={generatingSignals || loading}
+            aria-label="Generate trading signals using mean reversion strategy"
           >
             {generatingSignals ? (
-              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              <RefreshCw className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
             ) : (
-              <Play className="mr-2 h-4 w-4" />
+              <Play className="mr-2 h-4 w-4" aria-hidden="true" />
             )}
             Generate (Mean Rev)
           </Button>
@@ -284,16 +252,18 @@ export default function SignalsPage() {
             variant="secondary"
             onClick={generateDemoSignals}
             disabled={generatingSignals || loading}
+            aria-label="Generate demo signals for testing"
           >
-            <Sparkles className="mr-2 h-4 w-4" />
+            <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
             Demo Signals
           </Button>
           <Button
             variant="outline"
             onClick={fetchSignals}
             disabled={loading}
+            aria-label="Refresh signals list"
           >
-            <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
+            <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} aria-hidden="true" />
             Refresh
           </Button>
         </div>
@@ -315,32 +285,49 @@ export default function SignalsPage() {
 
       {/* Stats Row */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          icon={Zap}
-          label="Total Signals"
-          value={signalStats.total}
-          onClick={() => setFilter('ALL')}
-          active={filter === 'ALL'}
-        />
-        <StatCard
-          icon={Clock}
-          label="Pending"
-          value={signalStats.pending}
-          onClick={() => setFilter('PENDING')}
-          active={filter === 'PENDING'}
-        />
-        <StatCard
-          icon={TrendingUp}
-          label="Buy Signals"
-          value={signalStats.buySignals}
-          variant="positive"
-        />
-        <StatCard
-          icon={TrendingDown}
-          label="Sell Signals"
-          value={signalStats.sellSignals}
-          variant="negative"
-        />
+        {loading ? (
+          <>
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+          </>
+        ) : (
+          <>
+            <StatCard
+              icon={<Zap className="h-6 w-6" />}
+              label="Total Signals"
+              value={signalStats.total}
+              clickable
+              onClick={() => setFilter('ALL')}
+              active={filter === 'ALL'}
+              ariaLabel={`Total Signals: ${signalStats.total}. Click to show all signals`}
+            />
+            <StatCard
+              icon={<Clock className="h-6 w-6" />}
+              label="Pending"
+              value={signalStats.pending}
+              clickable
+              onClick={() => setFilter('PENDING')}
+              active={filter === 'PENDING'}
+              ariaLabel={`Pending Signals: ${signalStats.pending}. Click to filter pending`}
+            />
+            <StatCard
+              icon={<TrendingUp className="h-6 w-6" />}
+              label="Buy Signals"
+              value={signalStats.buySignals}
+              variant="positive"
+              ariaLabel={`Buy Signals: ${signalStats.buySignals}`}
+            />
+            <StatCard
+              icon={<TrendingDown className="h-6 w-6" />}
+              label="Sell Signals"
+              value={signalStats.sellSignals}
+              variant="negative"
+              ariaLabel={`Sell Signals: ${signalStats.sellSignals}`}
+            />
+          </>
+        )}
       </div>
 
       {/* Active Strategies */}
@@ -376,6 +363,7 @@ export default function SignalsPage() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             className="w-40"
+            aria-label="Filter signals by status"
           >
             <option value="ALL">All Signals</option>
             <option value="PENDING">Pending</option>
@@ -385,12 +373,14 @@ export default function SignalsPage() {
           </Select>
         </CardHeader>
         <CardContent>
-          {filteredSignals.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <Zap className="h-12 w-12 opacity-50 mb-4" />
-              <p className="text-lg font-medium">No signals found</p>
-              <p className="text-sm">Waiting for trading signals...</p>
+          {loading ? (
+            <div className="space-y-4">
+              <SkeletonCard contentRows={4} />
+              <SkeletonCard contentRows={4} />
+              <SkeletonCard contentRows={4} />
             </div>
+          ) : filteredSignals.length === 0 ? (
+            <EmptySignals />
           ) : (
             <div className="space-y-4">
               {filteredSignals.map(signal => (
@@ -416,31 +406,33 @@ export default function SignalsPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-lg font-semibold">{signal.symbol}</span>
+                          <StatusBadge
+                            status={signal.direction.toLowerCase()}
+                            size="sm"
+                            showIcon={false}
+                          />
                           <Badge variant="secondary">{signal.strategy}</Badge>
                         </div>
                         <span className="text-xs text-muted-foreground font-mono">{signal.id}</span>
                       </div>
                     </div>
-                    <Badge variant={signal.status === 'EXECUTED' ? 'executed' : signal.status === 'PENDING' ? 'pending' : signal.status === 'REJECTED' ? 'rejected' : 'expired'} className="gap-1">
-                      {getStatusIcon(signal.status)}
-                      {signal.status}
-                    </Badge>
+                    <StatusBadge status={signal.status.toLowerCase()} />
                   </div>
 
                   {/* Price Targets */}
                   <div className="flex items-center gap-4 mb-4 text-sm">
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">Entry</span>
-                      <span className="font-mono font-semibold">${signal.price.toFixed(2)}</span>
+                      <PriceDisplay value={signal.price} size="md" />
                     </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">Target</span>
-                      <span className="font-mono font-semibold text-green-500">${signal.target.toFixed(2)}</span>
+                      <PriceDisplay value={signal.target} size="md" className="price-positive" />
                     </div>
                     <div className="flex items-center gap-2 ml-auto">
                       <span className="text-muted-foreground">Stop Loss</span>
-                      <span className="font-mono font-semibold text-red-500">${signal.stopLoss.toFixed(2)}</span>
+                      <PriceDisplay value={signal.stopLoss} size="md" className="price-negative" />
                     </div>
                   </div>
 
@@ -461,7 +453,7 @@ export default function SignalsPage() {
 
                   {/* Actions */}
                   {signal.status === 'PENDING' && (
-                    <div className="flex gap-2">
+                    <div className="flex gap-2" role="group" aria-label={`Actions for ${signal.symbol} ${signal.direction} signal`}>
                       <Button
                         variant="success"
                         size="sm"
@@ -469,8 +461,9 @@ export default function SignalsPage() {
                         onClick={() => executeSignal(signal)}
                         loading={executingSignal === signal.id}
                         disabled={executingSignal !== null || rejectingSignal !== null}
+                        aria-label={`Execute ${signal.direction} order for ${signal.symbol} at $${signal.price.toFixed(2)}`}
                       >
-                        {executingSignal !== signal.id && <CheckCircle className="mr-2 h-4 w-4" />}
+                        {executingSignal !== signal.id && <CheckCircle className="mr-2 h-4 w-4" aria-hidden="true" />}
                         {executingSignal === signal.id ? 'Executing...' : 'Execute'}
                       </Button>
                       <Button
@@ -480,8 +473,9 @@ export default function SignalsPage() {
                         onClick={() => rejectSignal(signal)}
                         loading={rejectingSignal === signal.id}
                         disabled={executingSignal !== null || rejectingSignal !== null}
+                        aria-label={`Reject ${signal.direction} signal for ${signal.symbol}`}
                       >
-                        {rejectingSignal !== signal.id && <XCircle className="mr-2 h-4 w-4" />}
+                        {rejectingSignal !== signal.id && <XCircle className="mr-2 h-4 w-4" aria-hidden="true" />}
                         {rejectingSignal === signal.id ? 'Rejecting...' : 'Reject'}
                       </Button>
                     </div>

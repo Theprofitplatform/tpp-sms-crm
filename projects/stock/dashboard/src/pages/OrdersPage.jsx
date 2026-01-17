@@ -9,14 +9,12 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  AlertCircle,
   AlertTriangle,
   Plus
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -31,6 +29,13 @@ import {
 } from '@/components/ui/table'
 import ConfirmDialog from '../components/ConfirmDialog'
 
+// Reusable components
+import StatCard from '../components/data-display/StatCard'
+import StatusBadge from '../components/data-display/StatusBadge'
+import PriceDisplay from '../components/data-display/PriceDisplay'
+import EmptyState from '../components/feedback/EmptyState'
+import { SkeletonStatCard, SkeletonTable } from '../components/ui/Skeleton'
+
 // Mock orders data
 const mockOrders = [
   { id: 'ORD-001', symbol: 'AAPL', side: 'BUY', type: 'LIMIT', quantity: 10, price: 180.00, status: 'FILLED', filledQty: 10, filledPrice: 179.85, createdAt: '2024-01-15T10:30:00Z', filledAt: '2024-01-15T10:30:05Z' },
@@ -41,37 +46,6 @@ const mockOrders = [
   { id: 'ORD-006', symbol: 'AMZN', side: 'SELL', type: 'STOP', quantity: 20, price: 150.00, status: 'PENDING', filledQty: 0, filledPrice: null, createdAt: '2024-01-15T15:30:00Z', filledAt: null },
   { id: 'ORD-007', symbol: 'META', side: 'BUY', type: 'LIMIT', quantity: 12, price: 480.00, status: 'REJECTED', filledQty: 0, filledPrice: null, createdAt: '2024-01-13T11:45:00Z', rejectedAt: '2024-01-13T11:45:01Z', rejectReason: 'Insufficient buying power' },
 ]
-
-function StatCard({ icon: IconComponent, label, value, variant = 'default', active = false, onClick, className }) {
-  const variantStyles = {
-    default: '',
-    positive: 'text-green-500',
-    negative: 'text-red-500',
-  }
-
-  return (
-    <Card
-      className={cn(
-        className,
-        onClick && "cursor-pointer transition-colors hover:bg-muted/50",
-        active && "ring-2 ring-primary"
-      )}
-      onClick={onClick}
-    >
-      <CardContent className="flex items-center gap-4 p-6">
-        <div className="rounded-lg bg-primary/10 p-3">
-          <IconComponent className="h-6 w-6 text-primary" />
-        </div>
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <p className={cn("text-2xl font-bold font-mono", variantStyles[variant])}>
-            {value}
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState(mockOrders)
@@ -174,26 +148,6 @@ export default function OrdersPage() {
     }
   }
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'FILLED': return <CheckCircle className="h-4 w-4" />
-      case 'PENDING': return <Clock className="h-4 w-4" />
-      case 'CANCELLED': return <XCircle className="h-4 w-4" />
-      case 'REJECTED': return <AlertCircle className="h-4 w-4" />
-      default: return <Clock className="h-4 w-4" />
-    }
-  }
-
-  const getStatusVariant = (status) => {
-    switch (status) {
-      case 'FILLED': return 'filled'
-      case 'PENDING': return 'pending'
-      case 'CANCELLED': return 'cancelled'
-      case 'REJECTED': return 'rejected'
-      default: return 'secondary'
-    }
-  }
-
   const filteredOrders = orders.filter(order => {
     if (filter === 'ALL') return true
     return order.status === filter
@@ -207,6 +161,34 @@ export default function OrdersPage() {
     rejected: orders.filter(o => o.status === 'REJECTED').length
   }
 
+  // Loading state with skeletons
+  if (loading && orders.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <FileText className="h-8 w-8 text-primary" />
+            <h1 className="text-2xl font-bold">Orders</h1>
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <SkeletonStatCard />
+          <SkeletonStatCard />
+          <SkeletonStatCard />
+          <SkeletonStatCard />
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Order History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SkeletonTable rows={5} columns={8} />
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -216,7 +198,10 @@ export default function OrdersPage() {
           <h1 className="text-2xl font-bold">Orders</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => setOrderDialogOpen(true)}>
+          <Button
+            onClick={() => setOrderDialogOpen(true)}
+            aria-label="Place a new order"
+          >
             <Plus className="mr-2 h-4 w-4" />
             Place Order
           </Button>
@@ -224,6 +209,7 @@ export default function OrdersPage() {
             variant="outline"
             onClick={fetchOrders}
             disabled={loading}
+            aria-label="Refresh orders list"
           >
             <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
             Refresh
@@ -248,33 +234,41 @@ export default function OrdersPage() {
       {/* Stats Row */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          icon={FileText}
+          icon={<FileText className="h-6 w-6" />}
           label="Total Orders"
           value={orderStats.total}
+          clickable
           onClick={() => setFilter('ALL')}
           active={filter === 'ALL'}
+          ariaLabel={`Filter by all orders, ${orderStats.total} total`}
         />
         <StatCard
-          icon={CheckCircle}
+          icon={<CheckCircle className="h-6 w-6" />}
           label="Filled"
           value={orderStats.filled}
           variant="positive"
+          clickable
           onClick={() => setFilter('FILLED')}
           active={filter === 'FILLED'}
+          ariaLabel={`Filter by filled orders, ${orderStats.filled} total`}
         />
         <StatCard
-          icon={Clock}
+          icon={<Clock className="h-6 w-6" />}
           label="Pending"
           value={orderStats.pending}
+          clickable
           onClick={() => setFilter('PENDING')}
           active={filter === 'PENDING'}
+          ariaLabel={`Filter by pending orders, ${orderStats.pending} total`}
         />
         <StatCard
-          icon={XCircle}
+          icon={<XCircle className="h-6 w-6" />}
           label="Cancelled"
           value={orderStats.cancelled}
+          clickable
           onClick={() => setFilter('CANCELLED')}
           active={filter === 'CANCELLED'}
+          ariaLabel={`Filter by cancelled orders, ${orderStats.cancelled} total`}
         />
       </div>
 
@@ -289,6 +283,7 @@ export default function OrdersPage() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             className="w-40"
+            aria-label="Filter orders by status"
           >
             <option value="ALL">All Orders</option>
             <option value="FILLED">Filled</option>
@@ -299,13 +294,15 @@ export default function OrdersPage() {
         </CardHeader>
         <CardContent>
           {filteredOrders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <FileText className="h-12 w-12 opacity-50 mb-4" />
-              <p className="text-lg font-medium">No orders found</p>
-              <p className="text-sm">
-                {filter !== 'ALL' ? `No ${filter.toLowerCase()} orders` : 'Place your first order'}
-              </p>
-            </div>
+            <EmptyState
+              title="No orders found"
+              description={filter !== 'ALL' ? `No ${filter.toLowerCase()} orders` : 'Place your first order to get started'}
+              icon={FileText}
+              action={filter === 'ALL' ? {
+                label: 'Place Order',
+                onClick: () => setOrderDialogOpen(true)
+              } : undefined}
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -329,24 +326,27 @@ export default function OrdersPage() {
                     <TableCell className="font-mono text-xs">{order.id}</TableCell>
                     <TableCell className="font-semibold">{order.symbol}</TableCell>
                     <TableCell>
-                      <Badge variant={order.side === 'BUY' ? 'buy' : 'sell'}>
-                        {order.side}
-                      </Badge>
+                      <StatusBadge status={order.side.toLowerCase()} size="sm" />
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">{order.type}</TableCell>
                     <TableCell className="text-right font-mono">{order.quantity}</TableCell>
-                    <TableCell className="text-right font-mono hidden sm:table-cell">
-                      {order.price ? `$${order.price.toFixed(2)}` : 'MKT'}
+                    <TableCell className="text-right hidden sm:table-cell">
+                      {order.price ? (
+                        <PriceDisplay value={order.price} />
+                      ) : (
+                        <span className="text-muted-foreground">MKT</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right font-mono hidden lg:table-cell">{order.filledQty}</TableCell>
-                    <TableCell className="text-right font-mono hidden lg:table-cell">
-                      {order.filledPrice ? `$${order.filledPrice.toFixed(2)}` : '-'}
+                    <TableCell className="text-right hidden lg:table-cell">
+                      {order.filledPrice ? (
+                        <PriceDisplay value={order.filledPrice} />
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={getStatusVariant(order.status)} className="gap-1">
-                        {getStatusIcon(order.status)}
-                        {order.status}
-                      </Badge>
+                      <StatusBadge status={order.status.toLowerCase()} size="sm" />
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs hidden md:table-cell">
                       {new Date(order.createdAt).toLocaleString()}
@@ -358,6 +358,7 @@ export default function OrdersPage() {
                           size="sm"
                           className="text-destructive hover:text-destructive"
                           onClick={() => cancelOrder(order)}
+                          aria-label={`Cancel order ${order.id} for ${order.quantity} shares of ${order.symbol}`}
                         >
                           Cancel
                         </Button>
@@ -438,10 +439,18 @@ export default function OrdersPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOrderDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setOrderDialogOpen(false)}
+              aria-label="Cancel and close dialog"
+            >
               Cancel
             </Button>
-            <Button onClick={placeOrder} disabled={placingOrder}>
+            <Button
+              onClick={placeOrder}
+              disabled={placingOrder}
+              aria-label={placingOrder ? 'Placing order, please wait' : `Place ${orderForm.side} order for ${orderForm.quantity} ${orderForm.symbol || 'shares'}`}
+            >
               {placingOrder ? (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
