@@ -12,7 +12,9 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Play,
+  Sparkles
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -70,6 +72,7 @@ export default function SignalsPage() {
   const [filter, setFilter] = useState('ALL')
   const [executingSignal, setExecutingSignal] = useState(null)
   const [rejectingSignal, setRejectingSignal] = useState(null)
+  const [generatingSignals, setGeneratingSignals] = useState(false)
 
   const fetchSignals = useCallback(async () => {
     setLoading(true)
@@ -161,6 +164,60 @@ export default function SignalsPage() {
     }
   }
 
+  const generateSignals = async (strategyId = 'momentum') => {
+    setGeneratingSignals(true)
+    try {
+      const symbols = ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'NVDA', 'META', 'AMZN', 'AMD', 'NFLX']
+      const res = await axios.post(API.signal.generateSignals(), {
+        symbols,
+        market: 'US',
+        strategy_id: strategyId,
+        lookback_days: 100
+      }, { timeout: 30000 })
+
+      if (res.data.signals_generated > 0) {
+        toast.success({
+          title: 'Signals Generated',
+          description: `${res.data.signals_generated} new signals from ${strategyId} strategy`
+        })
+      } else {
+        toast.info({
+          title: 'No Signals',
+          description: 'Market conditions don\'t meet strategy criteria (all HOLD)'
+        })
+      }
+      fetchSignals()
+    } catch (err) {
+      console.error('Generate signals error:', err)
+      toast.error({
+        title: 'Failed to generate signals',
+        description: err.response?.data?.detail || err.message || 'Network error'
+      })
+    } finally {
+      setGeneratingSignals(false)
+    }
+  }
+
+  const generateDemoSignals = async () => {
+    setGeneratingSignals(true)
+    try {
+      const res = await axios.post(API.signal.generateDemo(), {}, { timeout: 10000 })
+      toast.success({
+        title: 'Demo Signals Created',
+        description: `${res.data.signals_created} demo signals generated`
+      })
+      fetchSignals()
+    } catch (err) {
+      console.error('Generate demo signals error:', err)
+      toast.error({
+        title: 'Failed to generate demo signals',
+        description: err.response?.data?.detail || err.message || 'Network error'
+      })
+    } finally {
+      setGeneratingSignals(false)
+    }
+  }
+
   const getStatusIcon = (status) => {
     switch (status) {
       case 'EXECUTED': return <CheckCircle className="h-4 w-4" />
@@ -193,19 +250,53 @@ export default function SignalsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
           <Zap className="h-8 w-8 text-primary" />
           <h1 className="text-2xl font-bold">Trading Signals</h1>
         </div>
-        <Button
-          variant="outline"
-          onClick={fetchSignals}
-          disabled={loading}
-        >
-          <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => generateSignals('momentum')}
+            disabled={generatingSignals || loading}
+          >
+            {generatingSignals ? (
+              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="mr-2 h-4 w-4" />
+            )}
+            Generate (Momentum)
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => generateSignals('mean_reversion')}
+            disabled={generatingSignals || loading}
+          >
+            {generatingSignals ? (
+              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="mr-2 h-4 w-4" />
+            )}
+            Generate (Mean Rev)
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={generateDemoSignals}
+            disabled={generatingSignals || loading}
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            Demo Signals
+          </Button>
+          <Button
+            variant="outline"
+            onClick={fetchSignals}
+            disabled={loading}
+          >
+            <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Error Alert */}

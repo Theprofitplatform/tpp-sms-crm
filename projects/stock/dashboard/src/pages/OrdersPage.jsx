@@ -10,13 +10,17 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  AlertTriangle
+  AlertTriangle,
+  Plus
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import {
   Table,
   TableBody,
@@ -75,6 +79,15 @@ export default function OrdersPage() {
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('ALL')
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false })
+  const [orderDialogOpen, setOrderDialogOpen] = useState(false)
+  const [placingOrder, setPlacingOrder] = useState(false)
+  const [orderForm, setOrderForm] = useState({
+    symbol: '',
+    side: 'BUY',
+    type: 'LIMIT',
+    quantity: 10,
+    price: ''
+  })
 
   const fetchOrders = useCallback(async () => {
     setLoading(true)
@@ -119,6 +132,48 @@ export default function OrdersPage() {
     })
   }
 
+  const placeOrder = async () => {
+    if (!orderForm.symbol.trim()) {
+      toast.error({ title: 'Validation Error', description: 'Symbol is required' })
+      return
+    }
+    if (orderForm.quantity <= 0) {
+      toast.error({ title: 'Validation Error', description: 'Quantity must be greater than 0' })
+      return
+    }
+    if (orderForm.type === 'LIMIT' && (!orderForm.price || parseFloat(orderForm.price) <= 0)) {
+      toast.error({ title: 'Validation Error', description: 'Price is required for limit orders' })
+      return
+    }
+
+    setPlacingOrder(true)
+    try {
+      await axios.post(API.exec.orders(), {
+        symbol: orderForm.symbol.toUpperCase(),
+        side: orderForm.side,
+        type: orderForm.type,
+        quantity: parseInt(orderForm.quantity),
+        price: orderForm.type === 'LIMIT' ? parseFloat(orderForm.price) : null,
+        reason: 'Manual order from dashboard'
+      }, { timeout: 10000 })
+
+      toast.success({
+        title: 'Order Placed',
+        description: `${orderForm.side} order for ${orderForm.quantity} ${orderForm.symbol.toUpperCase()} placed`
+      })
+      setOrderDialogOpen(false)
+      setOrderForm({ symbol: '', side: 'BUY', type: 'LIMIT', quantity: 10, price: '' })
+      fetchOrders()
+    } catch (err) {
+      toast.error({
+        title: 'Failed to place order',
+        description: err.response?.data?.error || err.message
+      })
+    } finally {
+      setPlacingOrder(false)
+    }
+  }
+
   const getStatusIcon = (status) => {
     switch (status) {
       case 'FILLED': return <CheckCircle className="h-4 w-4" />
@@ -160,14 +215,20 @@ export default function OrdersPage() {
           <FileText className="h-8 w-8 text-primary" />
           <h1 className="text-2xl font-bold">Orders</h1>
         </div>
-        <Button
-          variant="outline"
-          onClick={fetchOrders}
-          disabled={loading}
-        >
-          <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setOrderDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Place Order
+          </Button>
+          <Button
+            variant="outline"
+            onClick={fetchOrders}
+            disabled={loading}
+          >
+            <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Error Alert */}
@@ -309,6 +370,93 @@ export default function OrdersPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Place Order Dialog */}
+      <Dialog open={orderDialogOpen} onOpenChange={setOrderDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Place New Order</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="symbol">Symbol</Label>
+              <Input
+                id="symbol"
+                placeholder="AAPL"
+                value={orderForm.symbol}
+                onChange={(e) => setOrderForm(prev => ({ ...prev, symbol: e.target.value.toUpperCase() }))}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="side">Side</Label>
+                <Select
+                  id="side"
+                  value={orderForm.side}
+                  onChange={(e) => setOrderForm(prev => ({ ...prev, side: e.target.value }))}
+                >
+                  <option value="BUY">Buy</option>
+                  <option value="SELL">Sell</option>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="type">Type</Label>
+                <Select
+                  id="type"
+                  value={orderForm.type}
+                  onChange={(e) => setOrderForm(prev => ({ ...prev, type: e.target.value }))}
+                >
+                  <option value="MARKET">Market</option>
+                  <option value="LIMIT">Limit</option>
+                  <option value="STOP">Stop</option>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="quantity">Quantity</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min="1"
+                  value={orderForm.quantity}
+                  onChange={(e) => setOrderForm(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="price">Price {orderForm.type !== 'MARKET' && <span className="text-destructive">*</span>}</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  placeholder={orderForm.type === 'MARKET' ? 'Market' : '0.00'}
+                  disabled={orderForm.type === 'MARKET'}
+                  value={orderForm.price}
+                  onChange={(e) => setOrderForm(prev => ({ ...prev, price: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOrderDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={placeOrder} disabled={placingOrder}>
+              {placingOrder ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Placing...
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Place Order
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog {...confirmDialog} />
     </div>

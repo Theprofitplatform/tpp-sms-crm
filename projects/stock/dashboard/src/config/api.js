@@ -59,6 +59,8 @@ export const API = {
     health: () => `${API_CONFIG.signal}/health`,
     strategies: () => `${API_CONFIG.signal}/api/v1/strategies`,
     signals: () => `${API_CONFIG.signal}/api/v1/signals`,
+    generateSignals: () => `${API_CONFIG.signal}/api/v1/signals/generate`,
+    generateDemo: () => `${API_CONFIG.signal}/api/v1/signals/demo`,
     rejectSignal: (id) => `${API_CONFIG.signal}/api/v1/signals/${id}/reject`,
   },
 

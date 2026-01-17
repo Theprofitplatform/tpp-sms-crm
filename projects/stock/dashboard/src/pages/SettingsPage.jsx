@@ -72,7 +72,7 @@ export default function SettingsPage() {
   const saveSettings = async () => {
     setSaving(true)
     try {
-      await axios.post(API.ops.settings(), settings)
+      await axios.put(API.ops.settings(), settings)
       toast.success({ title: 'Settings Saved', description: 'Your settings have been saved successfully' })
     } catch (err) {
       toast.error({
