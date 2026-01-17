@@ -68,6 +68,8 @@ export default function SignalsPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('ALL')
+  const [executingSignal, setExecutingSignal] = useState(null)
+  const [rejectingSignal, setRejectingSignal] = useState(null)
 
   const fetchSignals = useCallback(async () => {
     setLoading(true)
@@ -97,6 +99,7 @@ export default function SignalsPage() {
   }, [fetchSignals])
 
   const executeSignal = async (signal) => {
+    setExecutingSignal(signal.id)
     try {
       await axios.post(API.exec.orders(), {
         symbol: signal.symbol,
@@ -106,29 +109,36 @@ export default function SignalsPage() {
         price: signal.price,
         signal_id: signal.id,
         reason: `Signal execution: ${signal.reason}`
-      })
+      }, { timeout: 10000 })
       toast.success({ title: 'Order Placed', description: `Order placed for ${signal.symbol}` })
       fetchSignals()
     } catch (err) {
+      console.error('Execute signal error:', err)
       toast.error({
         title: 'Failed to execute signal',
-        description: err.response?.data?.error || err.message
+        description: err.response?.data?.error || err.message || 'Network error'
       })
+    } finally {
+      setExecutingSignal(null)
     }
   }
 
   const rejectSignal = async (signal) => {
+    setRejectingSignal(signal.id)
     try {
       await axios.post(API.signal.rejectSignal(signal.id), {
         reason: 'Manual rejection from dashboard'
-      })
-      toast({ title: 'Signal Rejected', description: `Signal ${signal.id} rejected` })
+      }, { timeout: 10000 })
+      toast.success({ title: 'Signal Rejected', description: `Signal ${signal.id} rejected` })
       fetchSignals()
     } catch (err) {
+      console.error('Reject signal error:', err)
       toast.error({
         title: 'Failed to reject signal',
-        description: err.response?.data?.error || err.message
+        description: err.response?.data?.error || err.message || 'Network error'
       })
+    } finally {
+      setRejectingSignal(null)
     }
   }
 
@@ -347,18 +357,22 @@ export default function SignalsPage() {
                         size="sm"
                         className="flex-1"
                         onClick={() => executeSignal(signal)}
+                        loading={executingSignal === signal.id}
+                        disabled={executingSignal !== null || rejectingSignal !== null}
                       >
-                        <CheckCircle className="mr-2 h-4 w-4" />
-                        Execute
+                        {executingSignal !== signal.id && <CheckCircle className="mr-2 h-4 w-4" />}
+                        {executingSignal === signal.id ? 'Executing...' : 'Execute'}
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         className="flex-1"
                         onClick={() => rejectSignal(signal)}
+                        loading={rejectingSignal === signal.id}
+                        disabled={executingSignal !== null || rejectingSignal !== null}
                       >
-                        <XCircle className="mr-2 h-4 w-4" />
-                        Reject
+                        {rejectingSignal !== signal.id && <XCircle className="mr-2 h-4 w-4" />}
+                        {rejectingSignal === signal.id ? 'Rejecting...' : 'Reject'}
                       </Button>
                     </div>
                   )}
