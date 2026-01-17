@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
   Briefcase,
@@ -6,8 +7,11 @@ import {
   Zap,
   Settings,
   TrendingUp,
-  Activity
+  Activity,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', shortcut: 'g d' },
@@ -17,15 +21,58 @@ const navItems = [
   { to: '/settings', icon: Settings, label: 'Settings', shortcut: 'g ,' },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ collapsed = false, onCollapsedChange }) {
+  const toggleCollapsed = () => {
+    onCollapsedChange?.(!collapsed)
+  }
+
   return (
-    <aside className="sidebar" role="navigation" aria-label="Main navigation">
-      <div className="sidebar-header">
-        <TrendingUp size={28} aria-hidden="true" />
-        <span>Stock Trading</span>
+    <aside
+      className={cn(
+        "fixed left-0 top-0 z-40 h-screen border-r border-border bg-card transition-all duration-300",
+        collapsed ? "w-16" : "w-60"
+      )}
+      role="navigation"
+      aria-label="Main navigation"
+    >
+      {/* Header */}
+      <div className={cn(
+        "flex h-16 items-center border-b border-border px-4",
+        collapsed ? "justify-center" : "justify-between"
+      )}>
+        <div className={cn(
+          "flex items-center gap-3 text-primary",
+          collapsed && "justify-center"
+        )}>
+          <TrendingUp className="h-7 w-7 flex-shrink-0" aria-hidden="true" />
+          {!collapsed && (
+            <span className="text-lg font-semibold text-foreground">
+              Stock Trading
+            </span>
+          )}
+        </div>
+        {onCollapsedChange && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-8 w-8 text-muted-foreground hover:text-foreground",
+              collapsed && "absolute -right-3 top-6 z-50 rounded-full border border-border bg-card shadow-sm"
+            )}
+            onClick={toggleCollapsed}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
+          </Button>
+        )}
       </div>
 
-      <nav className="sidebar-nav" aria-label="Primary">
+      {/* Navigation */}
+      <nav className="flex-1 space-y-1 px-2 py-4" aria-label="Primary">
         {navItems.map((item) => {
           const IconComponent = item.icon
           return (
@@ -33,120 +80,48 @@ export default function Sidebar() {
               key={item.to}
               to={item.to}
               end={item.to === '/'}
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-              title={`${item.label} (${item.shortcut})`}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  "hover:bg-accent hover:text-accent-foreground",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  isActive
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                    : "text-muted-foreground",
+                  collapsed && "justify-center px-2"
+                )
+              }
+              title={collapsed ? `${item.label} (${item.shortcut})` : undefined}
             >
-              <IconComponent size={20} aria-hidden="true" />
-              <span>{item.label}</span>
+              <IconComponent className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+              {!collapsed && <span>{item.label}</span>}
+              {!collapsed && (
+                <span className="ml-auto text-xs text-muted-foreground/60">
+                  {item.shortcut}
+                </span>
+              )}
             </NavLink>
           )
         })}
       </nav>
 
-      <div className="sidebar-footer" role="status" aria-live="polite">
-        <Activity size={16} aria-hidden="true" />
-        <span>System Active</span>
+      {/* Footer */}
+      <div
+        className={cn(
+          "absolute bottom-0 left-0 right-0 border-t border-border p-4",
+          collapsed ? "flex justify-center" : "flex items-center gap-2"
+        )}
+        role="status"
+        aria-live="polite"
+      >
+        <div className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"></span>
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span>
+        </div>
+        {!collapsed && (
+          <span className="text-sm text-green-500">System Active</span>
+        )}
       </div>
     </aside>
   )
 }
-
-// Sidebar styles (added to components.css)
-export const sidebarStyles = `
-/* Sidebar */
-.sidebar {
-  width: var(--sidebar-width);
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border-default);
-  display: flex;
-  flex-direction: column;
-  position: fixed;
-  height: 100vh;
-  z-index: var(--z-fixed);
-}
-
-.sidebar-header {
-  padding: var(--space-5);
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  border-bottom: 1px solid var(--border-default);
-  color: var(--color-blue-500);
-  font-weight: var(--font-semibold);
-  font-size: var(--text-lg);
-}
-
-.sidebar-nav {
-  flex: 1;
-  padding: var(--space-4) var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-lg);
-  color: var(--text-secondary);
-  text-decoration: none;
-  transition: var(--transition-all);
-}
-
-.nav-item:hover {
-  background: var(--bg-card);
-  color: var(--text-primary);
-}
-
-.nav-item:focus-visible {
-  outline: 2px solid var(--color-blue-500);
-  outline-offset: -2px;
-}
-
-.nav-item.active {
-  background: var(--color-blue-500);
-  color: white;
-}
-
-.nav-item.active:focus-visible {
-  outline-color: white;
-}
-
-.sidebar-footer {
-  padding: var(--space-4) var(--space-5);
-  border-top: 1px solid var(--border-default);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--color-green-500);
-}
-
-/* Collapsed sidebar for mobile */
-@media (max-width: 768px) {
-  .sidebar {
-    width: var(--sidebar-width-collapsed);
-  }
-
-  .sidebar-header span,
-  .nav-item span,
-  .sidebar-footer span {
-    display: none;
-  }
-
-  .sidebar-header {
-    justify-content: center;
-  }
-
-  .nav-item {
-    justify-content: center;
-    padding: var(--space-3);
-  }
-
-  .sidebar-footer {
-    justify-content: center;
-  }
-}
-`

@@ -1,48 +1,39 @@
 import { Outlet } from 'react-router-dom'
-import { ToastContainer } from 'react-toastify'
+import { useState } from 'react'
 import Sidebar from './Sidebar'
-import { KeyboardShortcutsHelp } from '../hooks/useKeyboardShortcuts.jsx'
-import useKeyboardShortcuts from '../hooks/useKeyboardShortcuts.jsx'
-import 'react-toastify/dist/ReactToastify.css'
+import { Toaster } from '@/components/ui/toaster'
+import { cn } from '@/lib/utils'
 
 export default function Layout() {
-  const { showHelp, setShowHelp } = useKeyboardShortcuts({
-    // Global shortcuts handled here
-  })
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   return (
-    <div className="app-layout">
+    <div className="min-h-screen bg-background">
       {/* Skip to main content link for keyboard users */}
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
 
-      <Sidebar />
+      <Sidebar
+        collapsed={sidebarCollapsed}
+        onCollapsedChange={setSidebarCollapsed}
+      />
 
-      <main id="main-content" className="main-content" role="main" tabIndex={-1}>
-        <Outlet />
+      <main
+        id="main-content"
+        className={cn(
+          "min-h-screen transition-all duration-300",
+          sidebarCollapsed ? "ml-16" : "ml-60"
+        )}
+        role="main"
+        tabIndex={-1}
+      >
+        <div className="p-6">
+          <Outlet />
+        </div>
       </main>
 
-      {/* Keyboard shortcuts help modal */}
-      <KeyboardShortcutsHelp
-        isOpen={showHelp}
-        onClose={() => setShowHelp(false)}
-      />
-
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="dark"
-        role="alert"
-        aria-live="polite"
-      />
+      <Toaster />
     </div>
   )
 }

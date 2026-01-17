@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
-import { toast } from 'react-toastify'
+import { toast } from '@/hooks/use-toast'
+import { cn } from '@/lib/utils'
 import {
   Activity,
   AlertTriangle,
@@ -10,20 +11,23 @@ import {
   Database,
   RefreshCw,
   DollarSign,
-  BarChart3
+  BarChart3,
+  CheckCircle,
+  XCircle
 } from 'lucide-react'
 import {
-  LineChart,
-  Line,
   AreaChart,
   Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer
+  ResponsiveContainer,
+  Line
 } from 'recharts'
-import ConfirmDialog from '../components/ConfirmDialog'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 const API_BASE = window.location.hostname === 'localhost'
   ? 'http://localhost'
@@ -46,132 +50,151 @@ const generatePerformanceData = () => {
   return data
 }
 
+function StatCard({ icon: IconComponent, label, value, variant = 'default', className }) {
+  const variantStyles = {
+    default: '',
+    positive: 'text-green-500',
+    negative: 'text-red-500',
+    danger: 'text-red-500',
+    safe: 'text-green-500',
+  }
+
+  return (
+    <Card className={className}>
+      <CardContent className="flex items-center gap-4 p-6">
+        <div className="rounded-lg bg-primary/10 p-3">
+          <IconComponent className="h-6 w-6 text-primary" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+          <p className={cn("text-2xl font-bold font-mono", variantStyles[variant])}>
+            {value}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function Dashboard() {
   const [mode, setMode] = useState(null)
   const [health, setHealth] = useState({})
   const [strategies, setStrategies] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false })
   const [performanceData] = useState(generatePerformanceData)
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true)
     setError(null)
+
     try {
-      const [modeRes, opsHealth, dataHealth, signalHealth, riskHealth, execHealth, strategiesRes] = await Promise.all([
-        axios.get(`${API_BASE}:5100/api/v1/mode`),
-        axios.get(`${API_BASE}:5100/health`),
-        axios.get(`${API_BASE}:5101/health`),
-        axios.get(`${API_BASE}:5102/health`),
-        axios.get(`${API_BASE}:5103/health`),
-        axios.get(`${API_BASE}:5104/health`),
-        axios.get(`${API_BASE}:5102/api/v1/strategies`),
+      const [modeRes, opsHealth, dataHealth, signalHealth, riskHealth, execHealth, strategiesRes] = await Promise.allSettled([
+        axios.get(`${API_BASE}:5100/api/v1/mode`, { timeout: 5000 }),
+        axios.get(`${API_BASE}:5100/health`, { timeout: 5000 }),
+        axios.get(`${API_BASE}:5101/health`, { timeout: 5000 }),
+        axios.get(`${API_BASE}:5102/health`, { timeout: 5000 }),
+        axios.get(`${API_BASE}:5103/health`, { timeout: 5000 }),
+        axios.get(`${API_BASE}:5104/health`, { timeout: 5000 }),
+        axios.get(`${API_BASE}:5102/api/v1/strategies`, { timeout: 5000 }),
       ])
 
-      setMode(modeRes.data)
+      // Process results with fallbacks
+      if (modeRes.status === 'fulfilled') {
+        setMode(modeRes.value.data)
+      }
+
       setHealth({
-        ops: opsHealth.data,
-        data: dataHealth.data,
-        signal: signalHealth.data,
-        risk: riskHealth.data,
-        execution: execHealth.data,
+        ops: opsHealth.status === 'fulfilled' ? opsHealth.value.data : { status: 'offline' },
+        data: dataHealth.status === 'fulfilled' ? dataHealth.value.data : { status: 'offline' },
+        signal: signalHealth.status === 'fulfilled' ? signalHealth.value.data : { status: 'offline' },
+        risk: riskHealth.status === 'fulfilled' ? riskHealth.value.data : { status: 'offline' },
+        execution: execHealth.status === 'fulfilled' ? execHealth.value.data : { status: 'offline' },
       })
-      setStrategies(strategiesRes.data)
+
+      if (strategiesRes.status === 'fulfilled') {
+        setStrategies(strategiesRes.value.data || [])
+      }
+
+      // Check if any requests failed
+      const failedRequests = [modeRes, opsHealth, dataHealth, signalHealth, riskHealth, execHealth, strategiesRes]
+        .filter(r => r.status === 'rejected')
+
+      if (failedRequests.length > 0) {
+        setError(`${failedRequests.length} service(s) unavailable`)
+      }
     } catch (err) {
-      setError(err.message)
-      toast.error('Failed to fetch data: ' + err.message)
+      setError(err.message || 'Failed to fetch data')
+      toast.error({
+        title: 'Connection Error',
+        description: 'Unable to connect to trading services. Please check if services are running.',
+      })
     }
+
     setLoading(false)
-  }
+  }, [])
 
   useEffect(() => {
     fetchData()
     const interval = setInterval(fetchData, 30000)
     return () => clearInterval(interval)
-  }, [])
+  }, [fetchData])
 
   const switchMode = async (newMode) => {
     if (newMode === 'LIVE') {
-      setConfirmDialog({
-        isOpen: true,
-        title: 'Enable LIVE Trading?',
-        message: 'WARNING: You are about to enable LIVE trading with REAL money. This action should only be taken after thorough testing in PAPER mode.',
-        confirmText: 'Enable LIVE',
-        cancelText: 'Cancel',
-        danger: true,
-        onConfirm: async () => {
-          try {
-            await axios.post(`${API_BASE}:5100/api/v1/mode/switch`, {
-              mode: newMode,
-              reason: 'Manual switch from dashboard',
-              confirmed: true
-            })
-            toast.success(`Switched to ${newMode} mode`)
-            fetchData()
-          } catch (err) {
-            toast.error(err.response?.data?.error || err.message)
-          }
-          setConfirmDialog({ isOpen: false })
-        },
-        onCancel: () => setConfirmDialog({ isOpen: false })
-      })
-      return
+      if (!confirm('WARNING: You are about to enable LIVE trading with REAL money. Continue?')) {
+        return
+      }
     }
 
     try {
       await axios.post(`${API_BASE}:5100/api/v1/mode/switch`, {
         mode: newMode,
-        reason: 'Manual switch from dashboard'
+        reason: 'Manual switch from dashboard',
+        confirmed: newMode === 'LIVE'
       })
-      toast.success(`Switched to ${newMode} mode`)
+      toast.success({ title: 'Mode Changed', description: `Switched to ${newMode} mode` })
       fetchData()
     } catch (err) {
-      toast.error(err.response?.data?.error || err.message)
+      toast.error({
+        title: 'Failed to switch mode',
+        description: err.response?.data?.error || err.message
+      })
     }
   }
 
   const toggleKillSwitch = async () => {
     if (!mode?.kill_switch_active) {
-      setConfirmDialog({
-        isOpen: true,
-        title: 'Activate Kill Switch?',
-        message: 'This will immediately halt ALL trading activities. Use this in emergencies only.',
-        confirmText: 'ACTIVATE',
-        cancelText: 'Cancel',
-        danger: true,
-        onConfirm: async () => {
-          try {
-            await axios.post(`${API_BASE}:5100/api/v1/mode/killswitch/activate`, {
-              reason: 'Manual activation from dashboard'
-            })
-            toast.warning('Kill switch ACTIVATED - Trading halted')
-            fetchData()
-          } catch (err) {
-            toast.error(err.response?.data?.error || err.message)
-          }
-          setConfirmDialog({ isOpen: false })
-        },
-        onCancel: () => setConfirmDialog({ isOpen: false })
-      })
-      return
+      if (!confirm('This will immediately halt ALL trading activities. Continue?')) {
+        return
+      }
     }
 
     try {
-      await axios.post(`${API_BASE}:5100/api/v1/mode/killswitch/deactivate`)
-      toast.success('Kill switch deactivated - Trading can resume')
+      if (mode?.kill_switch_active) {
+        await axios.post(`${API_BASE}:5100/api/v1/mode/killswitch/deactivate`)
+        toast.success({ title: 'Kill Switch Deactivated', description: 'Trading can resume' })
+      } else {
+        await axios.post(`${API_BASE}:5100/api/v1/mode/killswitch/activate`, {
+          reason: 'Manual activation from dashboard'
+        })
+        toast.warning({ title: 'Kill Switch Activated', description: 'All trading has been halted' })
+      }
       fetchData()
     } catch (err) {
-      toast.error(err.response?.data?.error || err.message)
+      toast.error({
+        title: 'Operation failed',
+        description: err.response?.data?.error || err.message
+      })
     }
   }
 
   const getModeColor = (m) => {
     switch(m) {
-      case 'BACKTEST': return '#3b82f6'
-      case 'PAPER': return '#f59e0b'
-      case 'LIVE': return '#ef4444'
-      default: return '#6b7280'
+      case 'BACKTEST': return 'bg-blue-500'
+      case 'PAPER': return 'bg-yellow-500'
+      case 'LIVE': return 'bg-red-500'
+      default: return 'bg-gray-500'
     }
   }
 
@@ -181,178 +204,263 @@ export default function Dashboard() {
 
   if (loading && !mode) {
     return (
-      <div className="loading-container">
-        <RefreshCw className="spin" size={48} />
-        <p>Loading Trading System...</p>
+      <div className="flex h-[50vh] items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="mx-auto h-12 w-12 animate-spin text-primary" />
+          <p className="mt-4 text-muted-foreground">Loading Trading System...</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="dashboard-page">
-      <div className="page-header">
-        <h1><TrendingUp size={28} /> Trading Dashboard</h1>
-        <button onClick={fetchData} className="refresh-btn">
-          <RefreshCw size={18} className={loading ? 'spin' : ''} /> Refresh
-        </button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <TrendingUp className="h-8 w-8 text-primary" />
+          <h1 className="text-2xl font-bold">Trading Dashboard</h1>
+        </div>
+        <Button
+          variant="outline"
+          onClick={fetchData}
+          disabled={loading}
+        >
+          <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
+          Refresh
+        </Button>
       </div>
 
+      {/* Error Alert */}
       {error && (
-        <div className="error-banner">
-          <AlertTriangle size={20} /> {error}
-        </div>
+        <Alert variant="destructive" onClose={() => setError(null)}>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Network Error</AlertTitle>
+          <AlertDescription>
+            {error}. Some data may be unavailable.
+            <Button variant="link" className="h-auto p-0 pl-1" onClick={fetchData}>
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Stats Row */}
-      <div className="stats-row">
-        <div className="stat-card">
-          <DollarSign size={24} />
-          <div className="stat-content">
-            <span className="stat-label">Portfolio Value</span>
-            <span className="stat-value">${currentValue.toLocaleString()}</span>
-          </div>
-        </div>
-        <div className="stat-card">
-          <BarChart3 size={24} />
-          <div className="stat-content">
-            <span className="stat-label">Total Return</span>
-            <span className={`stat-value ${parseFloat(totalReturn) >= 0 ? 'positive' : 'negative'}`}>
-              {totalReturn}%
-            </span>
-          </div>
-        </div>
-        <div className="stat-card">
-          <Activity size={24} />
-          <div className="stat-content">
-            <span className="stat-label">Active Strategies</span>
-            <span className="stat-value">{strategies.length}</span>
-          </div>
-        </div>
-        <div className="stat-card">
-          <Shield size={24} />
-          <div className="stat-content">
-            <span className="stat-label">Risk Status</span>
-            <span className={`stat-value ${mode?.kill_switch_active ? 'danger' : 'safe'}`}>
-              {mode?.kill_switch_active ? 'HALTED' : 'ACTIVE'}
-            </span>
-          </div>
-        </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          icon={DollarSign}
+          label="Portfolio Value"
+          value={`$${currentValue.toLocaleString()}`}
+        />
+        <StatCard
+          icon={BarChart3}
+          label="Total Return"
+          value={`${totalReturn}%`}
+          variant={parseFloat(totalReturn) >= 0 ? 'positive' : 'negative'}
+        />
+        <StatCard
+          icon={Activity}
+          label="Active Strategies"
+          value={strategies.length}
+        />
+        <StatCard
+          icon={Shield}
+          label="Risk Status"
+          value={mode?.kill_switch_active ? 'HALTED' : 'ACTIVE'}
+          variant={mode?.kill_switch_active ? 'danger' : 'safe'}
+        />
       </div>
 
       {/* Performance Chart */}
-      <div className="card chart-card">
-        <h2><BarChart3 size={20} /> Portfolio Performance</h2>
-        <div className="chart-container">
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={performanceData}>
-              <defs>
-                <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis dataKey="date" stroke="#888" fontSize={12} />
-              <YAxis stroke="#888" fontSize={12} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-              <Tooltip
-                contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #333' }}
-                formatter={(value) => [`$${value.toLocaleString()}`, 'Value']}
-              />
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke="#3b82f6"
-                fillOpacity={1}
-                fill="url(#colorValue)"
-              />
-              <Line
-                type="monotone"
-                dataKey="benchmark"
-                stroke="#666"
-                strokeDasharray="5 5"
-                dot={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="dashboard-grid">
-        {/* Trading Mode Card */}
-        <div className="card mode-card">
-          <h2><Activity size={20} /> Trading Mode</h2>
-          <div className="mode-display" style={{ borderColor: getModeColor(mode?.mode) }}>
-            <span className="mode-label" style={{ color: getModeColor(mode?.mode) }}>
-              {mode?.mode || 'UNKNOWN'}
-            </span>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            Portfolio Performance
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={performanceData}>
+                <defs>
+                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                  formatter={(value) => [`$${value.toLocaleString()}`, 'Value']}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="hsl(var(--primary))"
+                  fillOpacity={1}
+                  fill="url(#colorValue)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="benchmark"
+                  stroke="hsl(var(--muted-foreground))"
+                  strokeDasharray="5 5"
+                  dot={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
-          <div className="mode-buttons">
-            {['BACKTEST', 'PAPER', 'LIVE'].map(m => (
-              <button
-                key={m}
-                onClick={() => switchMode(m)}
-                className={mode?.mode === m ? 'active' : ''}
-                style={{ '--btn-color': getModeColor(m) }}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-          <p className="mode-info">
-            Last changed: {mode?.last_mode_change ? new Date(mode.last_mode_change).toLocaleString() : 'N/A'}
-          </p>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Kill Switch Card */}
-        <div className={`card kill-switch-card ${mode?.kill_switch_active ? 'active' : ''}`}>
-          <h2><Shield size={20} /> Kill Switch</h2>
-          <div className="kill-switch-status">
-            <span className={`status-indicator ${mode?.kill_switch_active ? 'danger' : 'safe'}`}>
-              {mode?.kill_switch_active ? 'ACTIVE - TRADING HALTED' : 'INACTIVE - TRADING ENABLED'}
-            </span>
-          </div>
-          <button
-            onClick={toggleKillSwitch}
-            className={`kill-switch-btn ${mode?.kill_switch_active ? 'deactivate' : 'activate'}`}
-          >
-            {mode?.kill_switch_active ? 'Deactivate Kill Switch' : 'Activate Kill Switch'}
-          </button>
-          {mode?.kill_switch_reason && (
-            <p className="kill-reason">Reason: {mode.kill_switch_reason}</p>
-          )}
-        </div>
+      {/* Grid */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Trading Mode */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Trading Mode
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-center rounded-lg border-2 border-dashed p-8">
+              <span className={cn(
+                "text-3xl font-bold",
+                mode?.mode === 'LIVE' && "text-red-500",
+                mode?.mode === 'PAPER' && "text-yellow-500",
+                mode?.mode === 'BACKTEST' && "text-blue-500",
+              )}>
+                {mode?.mode || 'UNKNOWN'}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              {['BACKTEST', 'PAPER', 'LIVE'].map(m => (
+                <Button
+                  key={m}
+                  variant={mode?.mode === m ? 'default' : 'outline'}
+                  className={cn(
+                    "flex-1",
+                    mode?.mode === m && getModeColor(m)
+                  )}
+                  onClick={() => switchMode(m)}
+                >
+                  {m}
+                </Button>
+              ))}
+            </div>
+            <p className="text-center text-sm text-muted-foreground">
+              Last changed: {mode?.last_mode_change ? new Date(mode.last_mode_change).toLocaleString() : 'N/A'}
+            </p>
+          </CardContent>
+        </Card>
 
-        {/* Services Health Card */}
-        <div className="card services-card">
-          <h2><Database size={20} /> Services Health</h2>
-          <div className="services-grid">
-            {Object.entries(health).map(([name, data]) => (
-              <div key={name} className={`service-item ${data?.status === 'healthy' ? 'healthy' : 'unhealthy'}`}>
-                <span className="service-name">{name}</span>
-                <span className="service-status">{data?.status || 'unknown'}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* Kill Switch */}
+        <Card className={cn(mode?.kill_switch_active && "border-red-500")}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Kill Switch
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className={cn(
+              "rounded-lg p-4 text-center",
+              mode?.kill_switch_active
+                ? "bg-red-500/10 text-red-500"
+                : "bg-green-500/10 text-green-500"
+            )}>
+              <span className="text-sm font-semibold">
+                {mode?.kill_switch_active ? 'ACTIVE - TRADING HALTED' : 'INACTIVE - TRADING ENABLED'}
+              </span>
+            </div>
+            <Button
+              variant={mode?.kill_switch_active ? 'outline' : 'destructive'}
+              className="w-full"
+              onClick={toggleKillSwitch}
+            >
+              {mode?.kill_switch_active ? 'Deactivate Kill Switch' : 'Activate Kill Switch'}
+            </Button>
+            {mode?.kill_switch_reason && (
+              <p className="text-sm text-muted-foreground">Reason: {mode.kill_switch_reason}</p>
+            )}
+          </CardContent>
+        </Card>
 
-        {/* Strategies Card */}
-        <div className="card strategies-card">
-          <h2><Zap size={20} /> Trading Strategies</h2>
-          <div className="strategies-list">
-            {strategies.map(strategy => (
-              <div key={strategy.id} className="strategy-item">
-                <div className="strategy-header">
-                  <h3>{strategy.name}</h3>
-                  <span className="strategy-type">{strategy.type}</span>
+        {/* Services Health */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              Services Health
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {Object.entries(health).map(([name, data]) => (
+                <div
+                  key={name}
+                  className="flex items-center justify-between rounded-lg border p-3"
+                >
+                  <span className="font-medium capitalize">{name}</span>
+                  <div className="flex items-center gap-2">
+                    {data?.status === 'healthy' ? (
+                      <>
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span className="text-sm text-green-500">Healthy</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-4 w-4 text-red-500" />
+                        <span className="text-sm text-red-500">Offline</span>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <p className="strategy-desc">{strategy.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
-      <ConfirmDialog {...confirmDialog} />
+        {/* Strategies */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              Trading Strategies
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {strategies.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                <Zap className="mx-auto h-8 w-8 opacity-50" />
+                <p className="mt-2">No strategies configured</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {strategies.map(strategy => (
+                  <div key={strategy.id} className="rounded-lg border p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{strategy.name}</span>
+                      <span className="rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">
+                        {strategy.type}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">{strategy.description}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
