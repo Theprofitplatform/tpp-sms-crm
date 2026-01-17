@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
-import { toast } from 'react-toastify'
+import { toast } from '@/hooks/use-toast'
+import { cn } from '@/lib/utils'
 import {
   Zap,
   RefreshCw,
@@ -10,8 +11,14 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Filter
+  AlertTriangle
 } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Select } from '@/components/ui/select'
+import { Progress } from '@/components/ui/progress'
 
 const API_BASE = window.location.hostname === 'localhost'
   ? 'http://localhost'
@@ -27,34 +34,70 @@ const mockSignals = [
   { id: 'SIG-006', symbol: 'META', strategy: 'Momentum', direction: 'BUY', strength: 0.78, price: 475.00, target: 510.00, stopLoss: 460.00, status: 'EXPIRED', reason: 'Strong uptrend continuation pattern', createdAt: '2024-01-14T15:00:00Z', expiredAt: '2024-01-15T09:30:00Z' },
 ]
 
+function StatCard({ icon: IconComponent, label, value, variant = 'default', active = false, onClick, className }) {
+  const variantStyles = {
+    default: '',
+    positive: 'text-green-500',
+    negative: 'text-red-500',
+  }
+
+  return (
+    <Card
+      className={cn(
+        className,
+        onClick && "cursor-pointer transition-colors hover:bg-muted/50",
+        active && "ring-2 ring-primary"
+      )}
+      onClick={onClick}
+    >
+      <CardContent className="flex items-center gap-4 p-6">
+        <div className="rounded-lg bg-primary/10 p-3">
+          <IconComponent className="h-6 w-6 text-primary" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+          <p className={cn("text-2xl font-bold font-mono", variantStyles[variant])}>
+            {value}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function SignalsPage() {
   const [signals, setSignals] = useState(mockSignals)
   const [strategies, setStrategies] = useState([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
   const [filter, setFilter] = useState('ALL')
 
-  const fetchSignals = async () => {
+  const fetchSignals = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
-      const [signalsRes, strategiesRes] = await Promise.all([
-        axios.get(`${API_BASE}:5102/api/v1/signals`),
-        axios.get(`${API_BASE}:5102/api/v1/strategies`)
+      const [signalsRes, strategiesRes] = await Promise.allSettled([
+        axios.get(`${API_BASE}:5102/api/v1/signals`, { timeout: 5000 }),
+        axios.get(`${API_BASE}:5102/api/v1/strategies`, { timeout: 5000 })
       ])
-      if (signalsRes.data && signalsRes.data.length > 0) {
-        setSignals(signalsRes.data)
+
+      if (signalsRes.status === 'fulfilled' && signalsRes.value.data?.length > 0) {
+        setSignals(signalsRes.value.data)
       }
-      setStrategies(strategiesRes.data || [])
+      if (strategiesRes.status === 'fulfilled') {
+        setStrategies(strategiesRes.value.data || [])
+      }
     } catch {
       console.log('Using mock signal data')
     }
     setLoading(false)
-  }
+  }, [])
 
   useEffect(() => {
     fetchSignals()
     const interval = setInterval(fetchSignals, 60000) // Refresh every minute
     return () => clearInterval(interval)
-  }, [])
+  }, [fetchSignals])
 
   const executeSignal = async (signal) => {
     try {
@@ -67,10 +110,13 @@ export default function SignalsPage() {
         signal_id: signal.id,
         reason: `Signal execution: ${signal.reason}`
       })
-      toast.success(`Order placed for ${signal.symbol}`)
+      toast.success({ title: 'Order Placed', description: `Order placed for ${signal.symbol}` })
       fetchSignals()
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to execute signal')
+      toast.error({
+        title: 'Failed to execute signal',
+        description: err.response?.data?.error || err.message
+      })
     }
   }
 
@@ -79,27 +125,30 @@ export default function SignalsPage() {
       await axios.post(`${API_BASE}:5102/api/v1/signals/${signal.id}/reject`, {
         reason: 'Manual rejection from dashboard'
       })
-      toast.info(`Signal ${signal.id} rejected`)
+      toast({ title: 'Signal Rejected', description: `Signal ${signal.id} rejected` })
       fetchSignals()
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to reject signal')
+      toast.error({
+        title: 'Failed to reject signal',
+        description: err.response?.data?.error || err.message
+      })
     }
   }
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'EXECUTED': return <CheckCircle size={16} className="status-icon executed" />
-      case 'PENDING': return <Clock size={16} className="status-icon pending" />
-      case 'REJECTED': return <XCircle size={16} className="status-icon rejected" />
-      case 'EXPIRED': return <Clock size={16} className="status-icon expired" />
-      default: return <Clock size={16} className="status-icon" />
+      case 'EXECUTED': return <CheckCircle className="h-4 w-4" />
+      case 'PENDING': return <Clock className="h-4 w-4" />
+      case 'REJECTED': return <XCircle className="h-4 w-4" />
+      case 'EXPIRED': return <Clock className="h-4 w-4" />
+      default: return <Clock className="h-4 w-4" />
     }
   }
 
   const getStrengthColor = (strength) => {
-    if (strength >= 0.8) return '#10b981'
-    if (strength >= 0.6) return '#f59e0b'
-    return '#ef4444'
+    if (strength >= 0.8) return 'bg-green-500'
+    if (strength >= 0.6) return 'bg-yellow-500'
+    return 'bg-red-500'
   }
 
   const filteredSignals = signals.filter(signal => {
@@ -116,146 +165,219 @@ export default function SignalsPage() {
   }
 
   return (
-    <div className="signals-page">
-      <div className="page-header">
-        <h1><Zap size={28} /> Trading Signals</h1>
-        <button onClick={fetchSignals} className="refresh-btn">
-          <RefreshCw size={18} className={loading ? 'spin' : ''} /> Refresh
-        </button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Zap className="h-8 w-8 text-primary" />
+          <h1 className="text-2xl font-bold">Trading Signals</h1>
+        </div>
+        <Button
+          variant="outline"
+          onClick={fetchSignals}
+          disabled={loading}
+        >
+          <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
+          Refresh
+        </Button>
       </div>
 
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive" onClose={() => setError(null)}>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>
+            {error}
+            <Button variant="link" className="h-auto p-0 pl-1" onClick={fetchSignals}>
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Stats Row */}
-      <div className="stats-row">
-        <div className={`stat-card clickable ${filter === 'ALL' ? 'active' : ''}`} onClick={() => setFilter('ALL')}>
-          <Zap size={24} />
-          <div className="stat-content">
-            <span className="stat-label">Total Signals</span>
-            <span className="stat-value">{signalStats.total}</span>
-          </div>
-        </div>
-        <div className={`stat-card clickable ${filter === 'PENDING' ? 'active' : ''}`} onClick={() => setFilter('PENDING')}>
-          <Clock size={24} />
-          <div className="stat-content">
-            <span className="stat-label">Pending</span>
-            <span className="stat-value">{signalStats.pending}</span>
-          </div>
-        </div>
-        <div className="stat-card">
-          <TrendingUp size={24} />
-          <div className="stat-content">
-            <span className="stat-label">Buy Signals</span>
-            <span className="stat-value positive">{signalStats.buySignals}</span>
-          </div>
-        </div>
-        <div className="stat-card">
-          <TrendingDown size={24} />
-          <div className="stat-content">
-            <span className="stat-label">Sell Signals</span>
-            <span className="stat-value negative">{signalStats.sellSignals}</span>
-          </div>
-        </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          icon={Zap}
+          label="Total Signals"
+          value={signalStats.total}
+          onClick={() => setFilter('ALL')}
+          active={filter === 'ALL'}
+        />
+        <StatCard
+          icon={Clock}
+          label="Pending"
+          value={signalStats.pending}
+          onClick={() => setFilter('PENDING')}
+          active={filter === 'PENDING'}
+        />
+        <StatCard
+          icon={TrendingUp}
+          label="Buy Signals"
+          value={signalStats.buySignals}
+          variant="positive"
+        />
+        <StatCard
+          icon={TrendingDown}
+          label="Sell Signals"
+          value={signalStats.sellSignals}
+          variant="negative"
+        />
       </div>
 
       {/* Active Strategies */}
-      <div className="card strategies-overview">
-        <h2>Active Strategies</h2>
-        <div className="strategies-chips">
-          {strategies.length > 0 ? strategies.map(s => (
-            <span key={s.id} className="strategy-chip">{s.name}</span>
-          )) : (
-            <>
-              <span className="strategy-chip">Momentum</span>
-              <span className="strategy-chip">Mean Reversion</span>
-              <span className="strategy-chip">Breakout</span>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Signals Table */}
-      <div className="card signals-table-card">
-        <div className="card-header">
-          <h2>Signal Queue</h2>
-          <div className="filter-group">
-            <Filter size={16} />
-            <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-              <option value="ALL">All Signals</option>
-              <option value="PENDING">Pending</option>
-              <option value="EXECUTED">Executed</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="EXPIRED">Expired</option>
-            </select>
+      <Card>
+        <CardHeader>
+          <CardTitle>Active Strategies</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {strategies.length > 0 ? strategies.map(s => (
+              <Badge key={s.id} variant="secondary" className="text-sm">
+                {s.name}
+              </Badge>
+            )) : (
+              <>
+                <Badge variant="secondary" className="text-sm">Momentum</Badge>
+                <Badge variant="secondary" className="text-sm">Mean Reversion</Badge>
+                <Badge variant="secondary" className="text-sm">Breakout</Badge>
+              </>
+            )}
           </div>
-        </div>
-        <div className="signals-list">
-          {filteredSignals.map(signal => (
-            <div key={signal.id} className={`signal-card ${signal.status.toLowerCase()}`}>
-              <div className="signal-header">
-                <div className="signal-symbol">
-                  <span className={`direction ${signal.direction.toLowerCase()}`}>
-                    {signal.direction === 'BUY' ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
-                  </span>
-                  <span className="symbol">{signal.symbol}</span>
-                  <span className="strategy-badge">{signal.strategy}</span>
-                </div>
-                <div className="signal-status">
-                  {getStatusIcon(signal.status)}
-                  <span>{signal.status}</span>
-                </div>
-              </div>
+        </CardContent>
+      </Card>
 
-              <div className="signal-body">
-                <div className="signal-prices">
-                  <div className="price-item">
-                    <span className="label">Entry</span>
-                    <span className="value">${signal.price.toFixed(2)}</span>
+      {/* Signals List */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="h-5 w-5" />
+            Signal Queue
+          </CardTitle>
+          <Select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="w-40"
+          >
+            <option value="ALL">All Signals</option>
+            <option value="PENDING">Pending</option>
+            <option value="EXECUTED">Executed</option>
+            <option value="REJECTED">Rejected</option>
+            <option value="EXPIRED">Expired</option>
+          </Select>
+        </CardHeader>
+        <CardContent>
+          {filteredSignals.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <Zap className="h-12 w-12 opacity-50 mb-4" />
+              <p className="text-lg font-medium">No signals found</p>
+              <p className="text-sm">Waiting for trading signals...</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredSignals.map(signal => (
+                <div
+                  key={signal.id}
+                  className={cn(
+                    "rounded-lg border p-4 transition-colors",
+                    signal.status === 'PENDING' && "border-yellow-500/50 bg-yellow-500/5",
+                    signal.status === 'EXECUTED' && "border-green-500/50 bg-green-500/5",
+                    signal.status === 'REJECTED' && "border-red-500/50 bg-red-500/5",
+                    signal.status === 'EXPIRED' && "border-muted"
+                  )}
+                >
+                  {/* Signal Header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "rounded-lg p-2",
+                        signal.direction === 'BUY' ? "bg-green-500/20 text-green-500" : "bg-red-500/20 text-red-500"
+                      )}>
+                        {signal.direction === 'BUY' ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-semibold">{signal.symbol}</span>
+                          <Badge variant="secondary">{signal.strategy}</Badge>
+                        </div>
+                        <span className="text-xs text-muted-foreground font-mono">{signal.id}</span>
+                      </div>
+                    </div>
+                    <Badge variant={signal.status === 'EXECUTED' ? 'executed' : signal.status === 'PENDING' ? 'pending' : signal.status === 'REJECTED' ? 'rejected' : 'expired'} className="gap-1">
+                      {getStatusIcon(signal.status)}
+                      {signal.status}
+                    </Badge>
                   </div>
-                  <ArrowRight size={16} className="arrow" />
-                  <div className="price-item">
-                    <span className="label">Target</span>
-                    <span className="value positive">${signal.target.toFixed(2)}</span>
-                  </div>
-                  <div className="price-item stop">
-                    <span className="label">Stop Loss</span>
-                    <span className="value negative">${signal.stopLoss.toFixed(2)}</span>
-                  </div>
-                </div>
 
-                <div className="signal-strength">
-                  <span className="label">Confidence</span>
-                  <div className="strength-bar">
-                    <div
-                      className="strength-fill"
-                      style={{
-                        width: `${signal.strength * 100}%`,
-                        backgroundColor: getStrengthColor(signal.strength)
-                      }}
+                  {/* Price Targets */}
+                  <div className="flex items-center gap-4 mb-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">Entry</span>
+                      <span className="font-mono font-semibold">${signal.price.toFixed(2)}</span>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">Target</span>
+                      <span className="font-mono font-semibold text-green-500">${signal.target.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 ml-auto">
+                      <span className="text-muted-foreground">Stop Loss</span>
+                      <span className="font-mono font-semibold text-red-500">${signal.stopLoss.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  {/* Confidence */}
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm text-muted-foreground">Confidence</span>
+                      <span className="text-sm font-mono font-semibold">{(signal.strength * 100).toFixed(0)}%</span>
+                    </div>
+                    <Progress
+                      value={signal.strength * 100}
+                      indicatorClassName={getStrengthColor(signal.strength)}
                     />
                   </div>
-                  <span className="strength-value">{(signal.strength * 100).toFixed(0)}%</span>
+
+                  {/* Reason */}
+                  <p className="text-sm text-muted-foreground mb-4">{signal.reason}</p>
+
+                  {/* Actions */}
+                  {signal.status === 'PENDING' && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="success"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => executeSignal(signal)}
+                      >
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Execute
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => rejectSignal(signal)}
+                      >
+                        <XCircle className="mr-2 h-4 w-4" />
+                        Reject
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Footer */}
+                  <div className="mt-4 pt-3 border-t">
+                    <span className="text-xs text-muted-foreground">
+                      Generated: {new Date(signal.createdAt).toLocaleString()}
+                    </span>
+                  </div>
                 </div>
-
-                <p className="signal-reason">{signal.reason}</p>
-              </div>
-
-              {signal.status === 'PENDING' && (
-                <div className="signal-actions">
-                  <button className="execute-btn" onClick={() => executeSignal(signal)}>
-                    <CheckCircle size={16} /> Execute
-                  </button>
-                  <button className="reject-btn" onClick={() => rejectSignal(signal)}>
-                    <XCircle size={16} /> Reject
-                  </button>
-                </div>
-              )}
-
-              <div className="signal-footer">
-                <span className="time">Generated: {new Date(signal.createdAt).toLocaleString()}</span>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

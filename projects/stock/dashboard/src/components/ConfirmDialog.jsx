@@ -1,5 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { AlertTriangle } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
 /**
  * ConfirmDialog - Accessible modal dialog with focus trap
@@ -90,158 +92,65 @@ export default function ConfirmDialog({
 
   return (
     <div
-      className="dialog-overlay"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in-0"
       onClick={onCancel}
       role="presentation"
       aria-hidden="true"
     >
       <div
         ref={dialogRef}
-        className="dialog"
+        className="relative w-[90%] max-w-md rounded-lg border bg-card p-6 shadow-lg animate-in zoom-in-95 fade-in-0 duration-200"
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
         aria-describedby="dialog-message"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className={`dialog-icon ${danger ? 'danger' : ''}`} aria-hidden="true">
-          <AlertTriangle size={32} />
+        <div
+          className={cn(
+            "mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full",
+            danger ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-warning"
+          )}
+          aria-hidden="true"
+        >
+          <AlertTriangle className="h-8 w-8" />
         </div>
 
-        <h2 id="dialog-title" className="dialog-title">
+        <h2
+          id="dialog-title"
+          className="mb-2 text-center text-xl font-semibold text-foreground"
+        >
           {title}
         </h2>
 
-        <p id="dialog-message" className="dialog-message">
+        <p
+          id="dialog-message"
+          className="mb-6 text-center text-muted-foreground"
+        >
           {message}
         </p>
 
-        <div className="dialog-buttons">
-          <button
+        <div className="flex gap-3">
+          <Button
             ref={cancelButtonRef}
-            className="btn-cancel"
+            variant="outline"
+            className="flex-1"
             onClick={onCancel}
             type="button"
           >
             {cancelText || 'Cancel'}
-          </button>
-          <button
+          </Button>
+          <Button
             ref={confirmButtonRef}
-            className={`btn-confirm ${danger ? 'danger' : ''}`}
+            variant={danger ? "destructive" : "default"}
+            className="flex-1"
             onClick={onConfirm}
             type="button"
           >
             {confirmText || 'Confirm'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
   )
 }
-
-// Dialog styles (included in components.css)
-export const dialogStyles = `
-/* Dialog Overlay */
-.dialog-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--bg-overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--z-modal);
-  animation: fadeIn var(--duration-fast) var(--ease-out);
-}
-
-/* Dialog Box */
-.dialog {
-  background: var(--bg-card);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-2xl);
-  padding: var(--space-8);
-  max-width: 400px;
-  width: 90%;
-  text-align: center;
-  animation: slideInUp var(--duration-normal) var(--ease-out);
-}
-
-.dialog-icon {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto var(--space-5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--status-warning-bg);
-  border-radius: var(--radius-full);
-  color: var(--color-yellow-500);
-}
-
-.dialog-icon.danger {
-  background: var(--status-error-bg);
-  color: var(--color-red-500);
-}
-
-.dialog-title {
-  font-size: var(--text-xl);
-  font-weight: var(--font-semibold);
-  margin: 0 0 var(--space-3);
-  color: var(--text-primary);
-}
-
-.dialog-message {
-  color: var(--text-secondary);
-  margin: 0 0 var(--space-6);
-  line-height: var(--leading-relaxed);
-}
-
-.dialog-buttons {
-  display: flex;
-  gap: var(--space-3);
-}
-
-.dialog-buttons button {
-  flex: 1;
-  padding: var(--space-3) var(--space-5);
-  border-radius: var(--radius-lg);
-  font-weight: var(--font-semibold);
-  cursor: pointer;
-  transition: var(--transition-all);
-}
-
-.btn-cancel {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-default);
-  color: var(--text-primary);
-}
-
-.btn-cancel:hover {
-  background: var(--bg-card-hover);
-}
-
-.btn-cancel:focus-visible {
-  box-shadow: var(--focus-ring);
-}
-
-.btn-confirm {
-  background: var(--color-blue-500);
-  border: none;
-  color: white;
-}
-
-.btn-confirm:hover {
-  background: var(--color-blue-600);
-}
-
-.btn-confirm:focus-visible {
-  box-shadow: var(--focus-ring);
-}
-
-.btn-confirm.danger {
-  background: var(--color-red-500);
-}
-
-.btn-confirm.danger:hover {
-  background: var(--color-red-600);
-}
-`
