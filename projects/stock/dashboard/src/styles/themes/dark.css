@@ -1,0 +1,33 @@
+/* ==========================================================================
+   Dark Theme - Trading Dashboard Design System
+   This is the default theme extracted from the original CSS
+   ========================================================================== */
+
+/* Theme-specific overrides go here */
+/* Currently the dark theme is applied via :root in colors.css */
+/* This file exists for future light theme toggle support */
+
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --text-primary: #ffffff;
+    --text-secondary: #cccccc;
+    --border-default: #4a4a6a;
+  }
+}
+
+/* Print styles */
+@media print {
+  :root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f5f5f5;
+    --bg-card: #ffffff;
+    --text-primary: #000000;
+    --text-secondary: #333333;
+    --border-default: #cccccc;
+  }
+}
