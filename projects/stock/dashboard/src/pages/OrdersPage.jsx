@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
+import { API } from '@/config/api'
 import {
   FileText,
   RefreshCw,
@@ -25,10 +26,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import ConfirmDialog from '../components/ConfirmDialog'
-
-const API_BASE = window.location.hostname === 'localhost'
-  ? 'http://localhost'
-  : `http://${window.location.hostname}`
 
 // Mock orders data
 const mockOrders = [
@@ -83,7 +80,7 @@ export default function OrdersPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await axios.get(`${API_BASE}:5104/api/v1/orders`, { timeout: 5000 })
+      const res = await axios.get(API.exec.orders(), { timeout: 5000 })
       if (res.data && res.data.length > 0) {
         setOrders(res.data)
       }
@@ -107,7 +104,7 @@ export default function OrdersPage() {
       danger: true,
       onConfirm: async () => {
         try {
-          await axios.delete(`${API_BASE}:5104/api/v1/orders/${order.id}`)
+          await axios.delete(API.exec.orderById(order.id))
           toast.success({ title: 'Order Cancelled', description: `Order ${order.id} cancelled` })
           fetchOrders()
         } catch (err) {

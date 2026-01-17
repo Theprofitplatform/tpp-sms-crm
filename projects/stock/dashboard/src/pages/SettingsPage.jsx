@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
+import { API, API_CONFIG } from '@/config/api'
 import {
   Settings,
   Save,
@@ -20,10 +21,6 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
-
-const API_BASE = window.location.hostname === 'localhost'
-  ? 'http://localhost'
-  : `http://${window.location.hostname}`
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(false)
@@ -58,7 +55,7 @@ export default function SettingsPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await axios.get(`${API_BASE}:5100/api/v1/settings`, { timeout: 5000 })
+      const res = await axios.get(API.ops.settings(), { timeout: 5000 })
       if (res.data) {
         setSettings(prev => ({ ...prev, ...res.data }))
       }
@@ -75,7 +72,7 @@ export default function SettingsPage() {
   const saveSettings = async () => {
     setSaving(true)
     try {
-      await axios.post(`${API_BASE}:5100/api/v1/settings`, settings)
+      await axios.post(API.ops.settings(), settings)
       toast.success({ title: 'Settings Saved', description: 'Your settings have been saved successfully' })
     } catch (err) {
       toast.error({
@@ -372,23 +369,23 @@ export default function SettingsPage() {
               <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between rounded-lg border p-3">
                   <span className="font-medium">Ops Service</span>
-                  <code className="text-xs text-muted-foreground">{API_BASE}:5100</code>
+                  <code className="text-xs text-muted-foreground">{API_CONFIG.ops}</code>
                 </div>
                 <div className="flex items-center justify-between rounded-lg border p-3">
                   <span className="font-medium">Data Service</span>
-                  <code className="text-xs text-muted-foreground">{API_BASE}:5101</code>
+                  <code className="text-xs text-muted-foreground">{API_CONFIG.data}</code>
                 </div>
                 <div className="flex items-center justify-between rounded-lg border p-3">
                   <span className="font-medium">Signal Engine</span>
-                  <code className="text-xs text-muted-foreground">{API_BASE}:5102</code>
+                  <code className="text-xs text-muted-foreground">{API_CONFIG.signal}</code>
                 </div>
                 <div className="flex items-center justify-between rounded-lg border p-3">
                   <span className="font-medium">Risk Engine</span>
-                  <code className="text-xs text-muted-foreground">{API_BASE}:5103</code>
+                  <code className="text-xs text-muted-foreground">{API_CONFIG.risk}</code>
                 </div>
                 <div className="flex items-center justify-between rounded-lg border p-3">
                   <span className="font-medium">Execution Service</span>
-                  <code className="text-xs text-muted-foreground">{API_BASE}:5104</code>
+                  <code className="text-xs text-muted-foreground">{API_CONFIG.exec}</code>
                 </div>
               </div>
             </div>

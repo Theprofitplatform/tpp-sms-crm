@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
+import { API } from '@/config/api'
 import {
   Briefcase,
   TrendingUp,
@@ -31,10 +32,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import ConfirmDialog from '../components/ConfirmDialog'
-
-const API_BASE = window.location.hostname === 'localhost'
-  ? 'http://localhost'
-  : `http://${window.location.hostname}`
 
 // Mock positions data
 const mockPositions = [
@@ -81,7 +78,7 @@ export default function PositionsPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await axios.get(`${API_BASE}:5104/api/v1/positions`, { timeout: 5000 })
+      const res = await axios.get(API.exec.positions(), { timeout: 5000 })
       if (res.data && res.data.length > 0) {
         setPositions(res.data)
       }
@@ -106,7 +103,7 @@ export default function PositionsPage() {
       danger: true,
       onConfirm: async () => {
         try {
-          await axios.post(`${API_BASE}:5104/api/v1/orders`, {
+          await axios.post(API.exec.orders(), {
             symbol: position.symbol,
             side: 'SELL',
             quantity: position.quantity,

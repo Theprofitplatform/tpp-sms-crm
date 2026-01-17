@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
+import { API } from '@/config/api'
 import {
   Activity,
   AlertTriangle,
@@ -29,10 +30,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
-const API_BASE = window.location.hostname === 'localhost'
-  ? 'http://localhost'
-  : `http://${window.location.hostname}`
-
 // Mock performance data for chart
 const generatePerformanceData = () => {
   const data = []
@@ -50,7 +47,7 @@ const generatePerformanceData = () => {
   return data
 }
 
-function StatCard({ icon: IconComponent, label, value, variant = 'default', className }) {
+function StatCard({ icon: Icon, label, value, variant = 'default', className }) {
   const variantStyles = {
     default: '',
     positive: 'text-green-500',
@@ -63,7 +60,7 @@ function StatCard({ icon: IconComponent, label, value, variant = 'default', clas
     <Card className={className}>
       <CardContent className="flex items-center gap-4 p-6">
         <div className="rounded-lg bg-primary/10 p-3">
-          <IconComponent className="h-6 w-6 text-primary" />
+          <Icon className="h-6 w-6 text-primary" />
         </div>
         <div>
           <p className="text-sm font-medium text-muted-foreground">{label}</p>
@@ -90,13 +87,13 @@ export default function Dashboard() {
 
     try {
       const [modeRes, opsHealth, dataHealth, signalHealth, riskHealth, execHealth, strategiesRes] = await Promise.allSettled([
-        axios.get(`${API_BASE}:5100/api/v1/mode`, { timeout: 5000 }),
-        axios.get(`${API_BASE}:5100/health`, { timeout: 5000 }),
-        axios.get(`${API_BASE}:5101/health`, { timeout: 5000 }),
-        axios.get(`${API_BASE}:5102/health`, { timeout: 5000 }),
-        axios.get(`${API_BASE}:5103/health`, { timeout: 5000 }),
-        axios.get(`${API_BASE}:5104/health`, { timeout: 5000 }),
-        axios.get(`${API_BASE}:5102/api/v1/strategies`, { timeout: 5000 }),
+        axios.get(API.ops.mode(), { timeout: 5000 }),
+        axios.get(API.ops.health(), { timeout: 5000 }),
+        axios.get(API.data.health(), { timeout: 5000 }),
+        axios.get(API.signal.health(), { timeout: 5000 }),
+        axios.get(API.risk.health(), { timeout: 5000 }),
+        axios.get(API.exec.health(), { timeout: 5000 }),
+        axios.get(API.signal.strategies(), { timeout: 5000 }),
       ])
 
       // Process results with fallbacks
@@ -148,7 +145,7 @@ export default function Dashboard() {
     }
 
     try {
-      await axios.post(`${API_BASE}:5100/api/v1/mode/switch`, {
+      await axios.post(API.ops.modeSwitch(), {
         mode: newMode,
         reason: 'Manual switch from dashboard',
         confirmed: newMode === 'LIVE'
@@ -172,10 +169,10 @@ export default function Dashboard() {
 
     try {
       if (mode?.kill_switch_active) {
-        await axios.post(`${API_BASE}:5100/api/v1/mode/killswitch/deactivate`)
+        await axios.post(API.ops.killswitchDeactivate())
         toast.success({ title: 'Kill Switch Deactivated', description: 'Trading can resume' })
       } else {
-        await axios.post(`${API_BASE}:5100/api/v1/mode/killswitch/activate`, {
+        await axios.post(API.ops.killswitchActivate(), {
           reason: 'Manual activation from dashboard'
         })
         toast.warning({ title: 'Kill Switch Activated', description: 'All trading has been halted' })

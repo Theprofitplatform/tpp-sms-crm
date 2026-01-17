@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
+import { API } from '@/config/api'
 import {
   Zap,
   RefreshCw,
@@ -19,10 +20,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
-
-const API_BASE = window.location.hostname === 'localhost'
-  ? 'http://localhost'
-  : `http://${window.location.hostname}`
 
 // Mock signals data
 const mockSignals = [
@@ -77,8 +74,8 @@ export default function SignalsPage() {
     setError(null)
     try {
       const [signalsRes, strategiesRes] = await Promise.allSettled([
-        axios.get(`${API_BASE}:5102/api/v1/signals`, { timeout: 5000 }),
-        axios.get(`${API_BASE}:5102/api/v1/strategies`, { timeout: 5000 })
+        axios.get(API.signal.signals(), { timeout: 5000 }),
+        axios.get(API.signal.strategies(), { timeout: 5000 })
       ])
 
       if (signalsRes.status === 'fulfilled' && signalsRes.value.data?.length > 0) {
@@ -101,7 +98,7 @@ export default function SignalsPage() {
 
   const executeSignal = async (signal) => {
     try {
-      await axios.post(`${API_BASE}:5104/api/v1/orders`, {
+      await axios.post(API.exec.orders(), {
         symbol: signal.symbol,
         side: signal.direction,
         quantity: 10, // Default quantity
@@ -122,7 +119,7 @@ export default function SignalsPage() {
 
   const rejectSignal = async (signal) => {
     try {
-      await axios.post(`${API_BASE}:5102/api/v1/signals/${signal.id}/reject`, {
+      await axios.post(API.signal.rejectSignal(signal.id), {
         reason: 'Manual rejection from dashboard'
       })
       toast({ title: 'Signal Rejected', description: `Signal ${signal.id} rejected` })
