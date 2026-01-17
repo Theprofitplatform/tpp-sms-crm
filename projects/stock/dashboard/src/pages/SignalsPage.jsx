@@ -81,13 +81,32 @@ export default function SignalsPage() {
       ])
 
       if (signalsRes.status === 'fulfilled' && signalsRes.value.data?.length > 0) {
-        setSignals(signalsRes.value.data)
+        // Map API response to UI format
+        const mappedSignals = signalsRes.value.data.map(s => ({
+          id: s.id,
+          symbol: s.symbol,
+          strategy: s.strategy_id === 'momentum' ? 'Momentum' :
+                   s.strategy_id === 'mean_reversion' ? 'Mean Reversion' : s.strategy_id,
+          direction: s.signal_type, // API uses signal_type, UI uses direction
+          strength: s.strength,
+          price: s.entry_price,
+          target: s.target_price,
+          stopLoss: s.stop_loss,
+          status: s.status,
+          reason: s.reasoning,
+          createdAt: s.time,
+          indicators: s.indicators,
+        }))
+        setSignals(mappedSignals)
+      } else if (signalsRes.status === 'fulfilled' && signalsRes.value.data?.length === 0) {
+        // API returned empty, keep mock data for demo
+        console.log('No signals from API, using mock data')
       }
       if (strategiesRes.status === 'fulfilled') {
         setStrategies(strategiesRes.value.data || [])
       }
-    } catch {
-      console.log('Using mock signal data')
+    } catch (err) {
+      console.log('Error fetching signals, using mock data:', err.message)
     }
     setLoading(false)
   }, [])
