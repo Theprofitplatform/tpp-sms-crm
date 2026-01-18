@@ -32,26 +32,18 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import ConfirmDialog from '../components/ConfirmDialog'
-import StatCard from '@/components/data-display/StatCard'
-import PriceDisplay, { PercentDisplay } from '@/components/data-display/PriceDisplay'
-import { EmptyPositions } from '@/components/feedback/EmptyState'
-import { SkeletonStatCard, SkeletonTable, SkeletonChart } from '@/components/ui/Skeleton'
+import { StatCard } from '@/components/data-display/StatCard'
+import { DataTable } from '@/components/data-display/DataTable'
+import { PriceDisplay, PercentDisplay } from '@/components/data-display/PriceDisplay'
+import { EmptyState, EmptyPositions } from '@/components/feedback/EmptyState'
+import { SkeletonCard, SkeletonStatCard, SkeletonTable, SkeletonChart } from '@/components/ui/Skeleton'
 import { formatCurrency, formatPercent, getValueVariant } from '@/utils/formatters'
-
-// Mock positions data
-const mockPositions = [
-  { id: 1, symbol: 'AAPL', name: 'Apple Inc.', quantity: 50, avgPrice: 178.50, currentPrice: 185.20, side: 'LONG' },
-  { id: 2, symbol: 'GOOGL', name: 'Alphabet Inc.', quantity: 20, avgPrice: 140.00, currentPrice: 142.50, side: 'LONG' },
-  { id: 3, symbol: 'MSFT', name: 'Microsoft Corp.', quantity: 30, avgPrice: 378.00, currentPrice: 385.60, side: 'LONG' },
-  { id: 4, symbol: 'TSLA', name: 'Tesla Inc.', quantity: 15, avgPrice: 245.00, currentPrice: 238.40, side: 'LONG' },
-  { id: 5, symbol: 'NVDA', name: 'NVIDIA Corp.', quantity: 25, avgPrice: 485.00, currentPrice: 512.30, side: 'LONG' },
-]
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--warning))', 'hsl(var(--destructive))', '#8b5cf6']
 
 export default function PositionsPage() {
-  const [positions, setPositions] = useState(mockPositions)
-  const [loading, setLoading] = useState(false)
+  const [positions, setPositions] = useState([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false })
 
@@ -60,12 +52,10 @@ export default function PositionsPage() {
     setError(null)
     try {
       const res = await axios.get(API.exec.positions(), { timeout: 5000 })
-      if (res.data && res.data.length > 0) {
-        setPositions(res.data)
-      }
-    } catch {
-      // Use mock data if API fails - not a critical error for display
-      console.log('Using mock position data')
+      setPositions(res.data || [])
+    } catch (err) {
+      console.error('Error fetching positions:', err.message)
+      setError('Failed to fetch positions')
     }
     setLoading(false)
   }, [])
@@ -195,9 +185,9 @@ export default function PositionsPage() {
             <StatCard
               icon={totalPnL >= 0 ? <TrendingUp className="h-6 w-6" /> : <TrendingDown className="h-6 w-6" />}
               label="Return %"
-              value={formatPercent((totalPnL / totalCost) * 100)}
+              value={formatPercent(totalCost > 0 ? (totalPnL / totalCost) * 100 : 0)}
               variant={getValueVariant(totalPnL)}
-              ariaLabel={`Return percentage: ${formatPercent((totalPnL / totalCost) * 100)}`}
+              ariaLabel={`Return percentage: ${formatPercent(totalCost > 0 ? (totalPnL / totalCost) * 100 : 0)}`}
             />
           </>
         )}
@@ -258,7 +248,7 @@ export default function PositionsPage() {
                             size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-destructive"
                             onClick={() => closePosition(pos)}
-                            aria-label={`Close position for ${pos.symbol}`}
+                            aria-label={`Close ${pos.symbol} position`}
                           >
                             <X className="h-4 w-4" />
                           </Button>
