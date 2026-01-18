@@ -7,18 +7,49 @@ import {
   Zap,
   Settings,
   TrendingUp,
-  Activity,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Shield,
+  RefreshCw,
+  BarChart3,
+  Bell,
+  Database,
+  LineChart,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard', shortcut: 'g d' },
-  { to: '/positions', icon: Briefcase, label: 'Positions', shortcut: 'g p' },
-  { to: '/orders', icon: FileText, label: 'Orders', shortcut: 'g o' },
-  { to: '/signals', icon: Zap, label: 'Signals', shortcut: 'g s' },
-  { to: '/settings', icon: Settings, label: 'Settings', shortcut: 'g ,' },
+const navSections = [
+  {
+    title: 'Trading',
+    items: [
+      { to: '/', icon: LayoutDashboard, label: 'Dashboard', shortcut: 'g d' },
+      { to: '/performance', icon: LineChart, label: 'Performance', shortcut: 'g f' },
+      { to: '/positions', icon: Briefcase, label: 'Positions', shortcut: 'g p' },
+      { to: '/orders', icon: FileText, label: 'Orders', shortcut: 'g o' },
+      { to: '/signals', icon: Zap, label: 'Signals', shortcut: 'g s' },
+    ]
+  },
+  {
+    title: 'Risk & Safety',
+    items: [
+      { to: '/risk', icon: Shield, label: 'Risk', shortcut: 'g r' },
+      { to: '/reconciliation', icon: RefreshCw, label: 'Reconciliation', shortcut: 'g c' },
+    ]
+  },
+  {
+    title: 'Monitoring',
+    items: [
+      { to: '/reports', icon: BarChart3, label: 'Reports', shortcut: 'g e' },
+      { to: '/alerts', icon: Bell, label: 'Alerts', shortcut: 'g a' },
+      { to: '/data-quality', icon: Database, label: 'Data Quality', shortcut: 'g q' },
+    ]
+  },
+  {
+    title: 'System',
+    items: [
+      { to: '/settings', icon: Settings, label: 'Settings', shortcut: 'g ,' },
+    ]
+  }
 ]
 
 export default function Sidebar({ collapsed = false, onCollapsedChange }) {
@@ -72,42 +103,56 @@ export default function Sidebar({ collapsed = false, onCollapsedChange }) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-2 py-4" aria-label="Primary">
-        {navItems.map((item) => {
-          const IconComponent = item.icon
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/'}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  "hover:bg-accent hover:text-accent-foreground",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  isActive
-                    ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
-                    : "text-muted-foreground",
-                  collapsed && "justify-center px-2"
+      <nav className="flex-1 space-y-1 px-2 py-4 overflow-y-auto max-h-[calc(100vh-8rem)]" aria-label="Primary">
+        {navSections.map((section) => (
+          <div key={section.title} className="mb-4">
+            {!collapsed && (
+              <h3 className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {section.title}
+              </h3>
+            )}
+            {collapsed && section.title !== 'Trading' && (
+              <div className="my-2 mx-2 border-t border-border" />
+            )}
+            <div className="space-y-1">
+              {section.items.map((item) => {
+                const IconComponent = item.icon
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.to === '/'}
+                    className={({ isActive }) =>
+                      cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                        "hover:bg-accent hover:text-accent-foreground",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        isActive
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                          : "text-muted-foreground",
+                        collapsed && "justify-center px-2"
+                      )
+                    }
+                    title={collapsed ? `${item.label} (${item.shortcut})` : undefined}
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <IconComponent className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+                        {!collapsed && <span>{item.label}</span>}
+                        {!collapsed && (
+                          <span className="ml-auto text-xs text-muted-foreground/60">
+                            {item.shortcut}
+                          </span>
+                        )}
+                        {isActive && <span className="sr-only">(current page)</span>}
+                      </>
+                    )}
+                  </NavLink>
                 )
-              }
-              title={collapsed ? `${item.label} (${item.shortcut})` : undefined}
-            >
-              {({ isActive }) => (
-                <>
-                  <IconComponent className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
-                  {!collapsed && <span>{item.label}</span>}
-                  {!collapsed && (
-                    <span className="ml-auto text-xs text-muted-foreground/60">
-                      {item.shortcut}
-                    </span>
-                  )}
-                  {isActive && <span className="sr-only">(current page)</span>}
-                </>
-              )}
-            </NavLink>
-          )
-        })}
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Footer */}

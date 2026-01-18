@@ -40,6 +40,8 @@ from indicators.technical import TechnicalIndicators
 from strategies.technical.momentum import MomentumStrategy
 from strategies.technical.mean_reversion import MeanReversionStrategy
 from strategies.technical.breakout import BreakoutStrategy
+from strategies.technical.macd_crossover import MACDCrossoverStrategy
+from strategies.technical.rsi_divergence import RSIDivergenceStrategy
 from models import Signal as SignalModel, SignalFeatures, SignalSide, EntryType, TimeInForce
 from confidence import ConfidenceScorer
 from confidence.invalidation import validate_signal_against_market, InvalidationRule
@@ -74,6 +76,8 @@ STRATEGIES = {
     'momentum': MomentumStrategy,
     'mean_reversion': MeanReversionStrategy,
     'breakout': BreakoutStrategy,
+    'macd_crossover': MACDCrossoverStrategy,
+    'rsi_divergence': RSIDivergenceStrategy,
 }
 
 # In-memory signal storage (in production, use a database)
