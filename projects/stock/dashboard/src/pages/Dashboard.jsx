@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import axios from 'axios'
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
@@ -7,6 +7,7 @@ import { useWebSocket } from '@/hooks/useWebSocket'
 import {
   Activity,
   TrendingUp,
+  TrendingDown,
   Shield,
   Zap,
   Database,
@@ -16,7 +17,9 @@ import {
   CheckCircle,
   XCircle,
   Wifi,
-  WifiOff
+  WifiOff,
+  Briefcase,
+  ChevronRight
 } from 'lucide-react'
 import {
   AreaChart,
@@ -26,13 +29,15 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Line
+  Line,
+  ReferenceLine
 } from 'recharts'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import StatCard from '@/components/data-display/StatCard'
 import ErrorState, { ErrorBanner } from '@/components/feedback/ErrorState'
 import { SkeletonStatCard, SkeletonChart, SkeletonCard } from '@/components/ui/Skeleton'
+import { PositionCard } from '@/components/trading/PositionCard'
 import { formatCurrency, formatPercent } from '@/utils/formatters'
 
 export default function Dashboard() {
@@ -41,6 +46,7 @@ export default function Dashboard() {
   const [strategies, setStrategies] = useState([])
   const [account, setAccount] = useState(null)
   const [trades, setTrades] = useState([])
+  const [positions, setPositions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -94,7 +100,7 @@ export default function Dashboard() {
     setError(null)
 
     try {
-      const [modeRes, opsHealth, dataHealth, signalHealth, riskHealth, execHealth, strategiesRes, accountRes, tradesRes] = await Promise.allSettled([
+      const [modeRes, opsHealth, dataHealth, signalHealth, riskHealth, execHealth, strategiesRes, accountRes, tradesRes, positionsRes] = await Promise.allSettled([
         axios.get(API.ops.mode(), { timeout: 5000 }),
         axios.get(API.ops.health(), { timeout: 5000 }),
         axios.get(API.data.health(), { timeout: 5000 }),
@@ -104,6 +110,7 @@ export default function Dashboard() {
         axios.get(API.signal.strategies(), { timeout: 5000 }),
         axios.get(API.exec.account(), { timeout: 5000 }),
         axios.get(API.exec.trades(), { timeout: 5000 }),
+        axios.get(API.exec.positions(), { timeout: 5000 }),
       ])
 
       // Process results with fallbacks
@@ -129,6 +136,10 @@ export default function Dashboard() {
 
       if (tradesRes.status === 'fulfilled') {
         setTrades(tradesRes.value.data || [])
+      }
+
+      if (positionsRes.status === 'fulfilled') {
+        setPositions(positionsRes.value.data || [])
       }
 
       // Check if any requests failed
@@ -219,6 +230,68 @@ export default function Dashboard() {
   const startValue = 100000 // Initial portfolio value
   const totalReturn = account ? ((currentValue - startValue) / startValue * 100).toFixed(2) : '0.00'
   const totalPnL = account ? (account.unrealized_pnl + account.realized_pnl) : 0
+
+  // Compute positions summary
+  const positionsSummary = useMemo(() => {
+    if (!positions || positions.length === 0) {
+      return { totalValue: 0, totalPnl: 0, winners: 0, losers: 0 }
+    }
+    let totalValue = 0
+    let totalPnl = 0
+    let winners = 0
+    let losers = 0
+
+    positions.forEach(pos => {
+      const value = (pos.quantity || 0) * (pos.current_price || pos.average_entry_price || 0)
+      const pnl = pos.unrealized_pnl ?? (
+        pos.side === 'LONG'
+          ? (pos.current_price - pos.average_entry_price) * pos.quantity
+          : (pos.average_entry_price - pos.current_price) * pos.quantity
+      )
+      totalValue += value
+      totalPnl += pnl
+      if (pnl >= 0) winners++
+      else losers++
+    })
+
+    return { totalValue, totalPnl, winners, losers }
+  }, [positions])
+
+  // Generate equity curve data from trades
+  const equityChartData = useMemo(() => {
+    if (!trades || trades.length === 0) {
+      // Return placeholder data if no trades
+      return [
+        { time: 'Start', equity: startValue, pnl: 0 }
+      ]
+    }
+
+    // Sort trades by timestamp ascending
+    const sortedTrades = [...trades].sort((a, b) =>
+      new Date(a.timestamp) - new Date(b.timestamp)
+    )
+
+    let runningEquity = startValue
+    const data = [{ time: 'Start', equity: startValue, pnl: 0 }]
+
+    sortedTrades.forEach((trade, i) => {
+      const pnl = trade.net_pnl || trade.gross_pnl || 0
+      runningEquity += pnl
+
+      const date = new Date(trade.timestamp)
+      const timeLabel = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+      data.push({
+        time: timeLabel,
+        equity: Math.round(runningEquity * 100) / 100,
+        pnl: Math.round(pnl * 100) / 100,
+        trade: trade.symbol,
+        side: trade.side
+      })
+    })
+
+    return data
+  }, [trades, startValue])
 
   if (loading && !mode) {
     return (
@@ -327,33 +400,154 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Performance Chart */}
+      {/* Equity Chart and Positions Row */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Equity Curve Chart */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Portfolio Equity
+            </CardTitle>
+            <CardDescription>
+              {trades.length > 0
+                ? `${trades.length} trades executed`
+                : 'Execute trades to see equity curve'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={equityChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis
+                    dataKey="time"
+                    tick={{ fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={false}
+                    className="text-muted-foreground"
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => formatCurrency(v, { compact: true })}
+                    className="text-muted-foreground"
+                    domain={['dataMin - 1000', 'dataMax + 1000']}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                      fontSize: '12px'
+                    }}
+                    formatter={(value, name) => [
+                      formatCurrency(value),
+                      name === 'equity' ? 'Equity' : 'P&L'
+                    ]}
+                    labelFormatter={(label) => label}
+                  />
+                  <ReferenceLine y={startValue} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                  <Area
+                    type="monotone"
+                    dataKey="equity"
+                    stroke="hsl(var(--primary))"
+                    fill="url(#equityGradient)"
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Open Positions Widget */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Briefcase className="h-5 w-5" />
+                Open Positions
+              </CardTitle>
+              <span className="text-sm text-muted-foreground">
+                {positions.length} position{positions.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            {positions.length > 0 && (
+              <div className={cn(
+                "text-xl font-bold",
+                positionsSummary.totalPnl >= 0 ? "text-green-500" : "text-red-500"
+              )}>
+                {positionsSummary.totalPnl >= 0 ? '+' : ''}{formatCurrency(positionsSummary.totalPnl)}
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  unrealized
+                </span>
+              </div>
+            )}
+          </CardHeader>
+          <CardContent className="pt-0">
+            {positions.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                <Briefcase className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">No open positions</p>
+                <p className="text-xs mt-1">Generate signals to open positions</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[240px] overflow-y-auto">
+                {positions.slice(0, 5).map((position) => (
+                  <PositionCard
+                    key={`${position.symbol}-${position.market}`}
+                    position={position}
+                    compact
+                  />
+                ))}
+                {positions.length > 5 && (
+                  <Button variant="ghost" className="w-full text-sm" asChild>
+                    <a href="/positions">
+                      View all {positions.length} positions
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </a>
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Trades Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
+            <Activity className="h-5 w-5" />
             Recent Trades
           </CardTitle>
         </CardHeader>
         <CardContent>
           {trades.length === 0 ? (
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-              <div className="text-center">
-                <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No trades yet</p>
-                <p className="text-sm">Execute signals to see trade history</p>
-              </div>
+            <div className="py-8 text-center text-muted-foreground">
+              <Activity className="h-10 w-10 mx-auto mb-3 opacity-50" />
+              <p>No trades yet</p>
+              <p className="text-sm mt-1">Execute signals to see trade history</p>
             </div>
           ) : (
-            <div className="h-[300px] overflow-auto">
+            <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-card">
+                <thead>
                   <tr className="border-b">
                     <th className="text-left py-2 font-medium">Time</th>
                     <th className="text-left py-2 font-medium">Symbol</th>
                     <th className="text-left py-2 font-medium">Side</th>
                     <th className="text-right py-2 font-medium">Qty</th>
                     <th className="text-right py-2 font-medium">Price</th>
+                    <th className="text-right py-2 font-medium">P&L</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -368,6 +562,14 @@ export default function Dashboard() {
                       </td>
                       <td className="py-2 text-right">{trade.quantity}</td>
                       <td className="py-2 text-right">{formatCurrency(trade.price)}</td>
+                      <td className={cn(
+                        "py-2 text-right font-medium",
+                        (trade.net_pnl || 0) >= 0 ? "text-green-500" : "text-red-500"
+                      )}>
+                        {trade.net_pnl !== null && trade.net_pnl !== undefined
+                          ? `${trade.net_pnl >= 0 ? '+' : ''}${formatCurrency(trade.net_pnl)}`
+                          : '-'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
