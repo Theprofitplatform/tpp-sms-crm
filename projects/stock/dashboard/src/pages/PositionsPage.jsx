@@ -11,7 +11,11 @@ import {
   X,
   DollarSign,
   Percent,
-  AlertTriangle
+  AlertTriangle,
+  LayoutGrid,
+  List,
+  Target,
+  Shield
 } from 'lucide-react'
 import {
   PieChart,
@@ -31,6 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Progress } from '@/components/ui/progress'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { StatCard } from '@/components/data-display/StatCard'
 import { DataTable } from '@/components/data-display/DataTable'
@@ -38,21 +43,44 @@ import { PriceDisplay, PercentDisplay } from '@/components/data-display/PriceDis
 import { EmptyState, EmptyPositions } from '@/components/feedback/EmptyState'
 import { SkeletonCard, SkeletonStatCard, SkeletonTable, SkeletonChart } from '@/components/ui/Skeleton'
 import { formatCurrency, formatPercent, getValueVariant } from '@/utils/formatters'
+import { PositionCard } from '@/components/trading/PositionCard'
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--warning))', 'hsl(var(--destructive))', '#8b5cf6']
+
+// Transform API response to normalized position format
+function normalizePosition(pos) {
+  return {
+    id: pos.id,
+    symbol: pos.symbol,
+    name: pos.name || pos.symbol,
+    market: pos.market || 'US',
+    side: pos.side || 'LONG',
+    quantity: pos.quantity,
+    // Handle both camelCase and snake_case field names
+    avgPrice: pos.avgPrice || pos.average_entry_price || 0,
+    average_entry_price: pos.average_entry_price || pos.avgPrice || 0,
+    currentPrice: pos.currentPrice || pos.current_price || 0,
+    current_price: pos.current_price || pos.currentPrice || 0,
+    stop_loss: pos.stop_loss || pos.stopLoss || null,
+    take_profit: pos.take_profit || pos.takeProfit || null,
+    unrealized_pnl: pos.unrealized_pnl || pos.unrealizedPnl || null,
+  }
+}
 
 export default function PositionsPage() {
   const [positions, setPositions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false })
+  const [viewMode, setViewMode] = useState('table') // 'table' or 'cards'
 
   const fetchPositions = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const res = await axios.get(API.exec.positions(), { timeout: 5000 })
-      setPositions(res.data || [])
+      const normalizedPositions = (res.data || []).map(normalizePosition)
+      setPositions(normalizedPositions)
     } catch (err) {
       console.error('Error fetching positions:', err.message)
       setError('Failed to fetch positions')
@@ -122,15 +150,38 @@ export default function PositionsPage() {
           <Briefcase className="h-8 w-8 text-primary" />
           <h1 className="text-2xl font-bold">Positions</h1>
         </div>
-        <Button
-          variant="outline"
-          onClick={fetchPositions}
-          disabled={loading}
-          aria-label="Refresh positions data"
-        >
-          <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} aria-hidden="true" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* View Mode Toggle */}
+          <div className="flex items-center border rounded-lg p-1 bg-muted/50">
+            <Button
+              variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+              className="h-8 px-3"
+              aria-label="Table view"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('cards')}
+              className="h-8 px-3"
+              aria-label="Card view"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button
+            variant="outline"
+            onClick={fetchPositions}
+            disabled={loading}
+            aria-label="Refresh positions data"
+          >
+            <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} aria-hidden="true" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Error Alert */}
@@ -194,73 +245,138 @@ export default function PositionsPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Positions Table */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Briefcase className="h-5 w-5" />
-              Open Positions
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <SkeletonTable rows={5} columns={6} />
-            ) : positions.length === 0 ? (
-              <EmptyPositions />
-            ) : (
-              <Table aria-label="Open positions table">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Symbol</TableHead>
-                    <TableHead className="hidden md:table-cell">Name</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right hidden sm:table-cell">Avg Price</TableHead>
-                    <TableHead className="text-right hidden sm:table-cell">Current</TableHead>
-                    <TableHead className="text-right">P&L</TableHead>
-                    <TableHead className="text-right">P&L %</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {positions.map(pos => {
-                    const pnl = calculatePnL(pos)
-                    const pnlPercent = parseFloat(calculatePnLPercent(pos))
-                    return (
-                      <TableRow key={pos.id}>
-                        <TableCell className="font-semibold">{pos.symbol}</TableCell>
-                        <TableCell className="text-muted-foreground hidden md:table-cell">{pos.name}</TableCell>
-                        <TableCell className="text-right font-mono">{pos.quantity}</TableCell>
-                        <TableCell className="text-right hidden sm:table-cell">
-                          <PriceDisplay value={pos.avgPrice} />
-                        </TableCell>
-                        <TableCell className="text-right hidden sm:table-cell">
-                          <PriceDisplay value={pos.currentPrice} />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <PriceDisplay value={pnl} showTrend showSign />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <PercentDisplay value={pnlPercent} />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={() => closePosition(pos)}
-                            aria-label={`Close ${pos.symbol} position`}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
+        {/* Positions Display - Table or Cards */}
+        <div className="lg:col-span-2">
+          {viewMode === 'cards' ? (
+            // Card View
+            <>
+              {loading ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <SkeletonCard />
+                  <SkeletonCard />
+                </div>
+              ) : positions.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12">
+                    <EmptyPositions />
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {positions.map(pos => (
+                    <PositionCard
+                      key={pos.id || pos.symbol}
+                      position={pos}
+                      onClose={closePosition}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            // Table View
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Briefcase className="h-5 w-5" />
+                  Open Positions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <SkeletonTable rows={5} columns={8} />
+                ) : positions.length === 0 ? (
+                  <EmptyPositions />
+                ) : (
+                  <Table aria-label="Open positions table">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Symbol</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
+                        <TableHead className="text-right hidden sm:table-cell">Entry</TableHead>
+                        <TableHead className="text-right hidden sm:table-cell">Current</TableHead>
+                        <TableHead className="text-right">P&L</TableHead>
+                        <TableHead className="text-right hidden md:table-cell">SL</TableHead>
+                        <TableHead className="text-right hidden md:table-cell">TP</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {positions.map(pos => {
+                        const pnl = calculatePnL(pos)
+                        const pnlPercent = parseFloat(calculatePnLPercent(pos))
+                        return (
+                          <TableRow key={pos.id || pos.symbol}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">{pos.symbol}</span>
+                                <span className={cn(
+                                  "text-xs px-1.5 py-0.5 rounded",
+                                  pos.side === 'LONG' ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
+                                )}>
+                                  {pos.side}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-mono">{pos.quantity}</TableCell>
+                            <TableCell className="text-right hidden sm:table-cell">
+                              <PriceDisplay value={pos.avgPrice} />
+                            </TableCell>
+                            <TableCell className="text-right hidden sm:table-cell">
+                              <PriceDisplay value={pos.currentPrice} />
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex flex-col items-end">
+                                <PriceDisplay value={pnl} showTrend showSign />
+                                <span className={cn(
+                                  "text-xs",
+                                  pnlPercent >= 0 ? "text-green-500" : "text-red-500"
+                                )}>
+                                  {pnlPercent >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right hidden md:table-cell">
+                              {pos.stop_loss ? (
+                                <div className="flex items-center justify-end gap-1 text-red-500">
+                                  <Shield className="h-3 w-3" />
+                                  <PriceDisplay value={pos.stop_loss} />
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right hidden md:table-cell">
+                              {pos.take_profit ? (
+                                <div className="flex items-center justify-end gap-1 text-green-500">
+                                  <Target className="h-3 w-3" />
+                                  <PriceDisplay value={pos.take_profit} />
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={() => closePosition(pos)}
+                                aria-label={`Close ${pos.symbol} position`}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
         {/* Allocation Chart */}
         <Card>

@@ -115,6 +115,11 @@ export const API = {
     generateSignals: () => `${API_CONFIG.signal}/api/v1/signals/generate`,
     generateDemo: () => `${API_CONFIG.signal}/api/v1/signals/demo`,
     rejectSignal: (id) => `${API_CONFIG.signal}/api/v1/signals/${id}/reject`,
+    // Intelligence endpoints (strategy performance tracking)
+    intelligence: {
+      weights: () => `${API_CONFIG.signal}/api/v1/intelligence/weights`,
+      recordPerformance: () => `${API_CONFIG.signal}/api/v1/intelligence/performance/record`,
+    },
   },
 
   // Risk Service endpoints

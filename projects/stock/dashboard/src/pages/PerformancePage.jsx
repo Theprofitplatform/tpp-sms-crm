@@ -13,7 +13,8 @@ import {
   Award,
   AlertTriangle,
   BarChart3,
-  PieChart
+  PieChart as PieChartIcon,
+  Activity
 } from 'lucide-react'
 import {
   AreaChart,
@@ -22,6 +23,8 @@ import {
   Bar,
   LineChart as RechartsLineChart,
   Line,
+  PieChart,
+  Pie,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -328,6 +331,63 @@ function calculateStrategyPerformance(trades) {
 }
 
 /**
+ * Calculate daily P&L from trades
+ * @param {Array} trades - Array of trade objects
+ * @returns {Array} - Daily P&L data points
+ */
+function calculateDailyPnL(trades) {
+  if (!trades || trades.length === 0) {
+    return []
+  }
+
+  // Group trades by date
+  const dailyData = {}
+
+  trades.forEach(trade => {
+    if (!trade.timestamp) return
+
+    const date = safeParseDate(trade.timestamp)
+    if (!date) return
+
+    const dateKey = date.toISOString().split('T')[0]
+
+    if (!dailyData[dateKey]) {
+      dailyData[dateKey] = { date: dateKey, pnl: 0, trades: 0, wins: 0, losses: 0 }
+    }
+
+    dailyData[dateKey].pnl += (trade.pnl || 0)
+    dailyData[dateKey].trades += 1
+    if ((trade.pnl || 0) > 0) dailyData[dateKey].wins += 1
+    else if ((trade.pnl || 0) < 0) dailyData[dateKey].losses += 1
+  })
+
+  // Sort by date and return last 30 days
+  return Object.values(dailyData)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-30)
+}
+
+/**
+ * Build strategy weight pie chart data from intelligence data
+ * @param {Object} strategyIntelligence - Strategy intelligence data from Signal service
+ * @returns {Array} - Pie chart data
+ */
+function buildStrategyWeightPieData(strategyIntelligence) {
+  if (!strategyIntelligence || !strategyIntelligence.strategies) {
+    return []
+  }
+
+  const PIE_COLORS = ['#3b82f6', '#22c55e', '#f97316', '#8b5cf6', '#ef4444', '#06b6d4', '#eab308', '#ec4899']
+
+  return Object.entries(strategyIntelligence.strategies).map(([name, data], index) => ({
+    name,
+    value: (data.weight || 0) * 100,
+    weight: data.weight || 0,
+    fill: PIE_COLORS[index % PIE_COLORS.length]
+  })).filter(d => d.value > 0)
+}
+
+/**
  * Custom tooltip for charts
  */
 function CustomTooltip({ active, payload, label, valueFormatter = formatCurrency }) {
@@ -400,6 +460,7 @@ function MonthlyReturnsHeatmap({ data }) {
 export default function PerformancePage() {
   const [trades, setTrades] = useState([])
   const [account, setAccount] = useState(null)
+  const [strategyIntelligence, setStrategyIntelligence] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -414,9 +475,10 @@ export default function PerformancePage() {
       }
 
       try {
-        const [tradesRes, accountRes] = await Promise.allSettled([
+        const [tradesRes, accountRes, intelligenceRes] = await Promise.allSettled([
           axios.get(API.exec.trades(), { timeout: 5000 }),
-          axios.get(API.exec.account(), { timeout: 5000 })
+          axios.get(API.exec.account(), { timeout: 5000 }),
+          axios.get(API.signal.intelligence.weights(), { timeout: 5000 })
         ])
 
         if (!mounted) return
@@ -429,9 +491,13 @@ export default function PerformancePage() {
           setAccount(accountRes.value.data)
         }
 
-        // Check for failures
-        const failures = [tradesRes, accountRes].filter(r => r.status === 'rejected')
-        if (failures.length > 0) {
+        if (intelligenceRes.status === 'fulfilled') {
+          setStrategyIntelligence(intelligenceRes.value.data)
+        }
+
+        // Check for failures (trades and account are critical, intelligence is optional)
+        const criticalFailures = [tradesRes, accountRes].filter(r => r.status === 'rejected')
+        if (criticalFailures.length > 0) {
           setError('Some data could not be loaded')
         }
       } catch (err) {
@@ -464,6 +530,8 @@ export default function PerformancePage() {
   const monthlyReturns = useMemo(() => calculateMonthlyReturns(trades), [trades])
   const pnlDistribution = useMemo(() => buildPnLDistribution(trades), [trades])
   const strategyPerformance = useMemo(() => calculateStrategyPerformance(trades), [trades])
+  const dailyPnL = useMemo(() => calculateDailyPnL(trades), [trades])
+  const strategyWeightPieData = useMemo(() => buildStrategyWeightPieData(strategyIntelligence), [strategyIntelligence])
 
   // Loading state
   if (loading && trades.length === 0) {
@@ -595,7 +663,7 @@ export default function PerformancePage() {
           ariaLabel={`Average Loss: ${formatCurrency(metrics.avgLoss)}`}
         />
         <StatCard
-          icon={<PieChart className="h-6 w-6" />}
+          icon={<PieChartIcon className="h-6 w-6" />}
           label="Total Trades"
           value={`${metrics.winningTrades}W / ${metrics.losingTrades}L`}
           ariaLabel={`Total Trades: ${metrics.winningTrades} wins, ${metrics.losingTrades} losses`}
@@ -720,7 +788,134 @@ export default function PerformancePage() {
         </CardContent>
       </Card>
 
-      {/* Charts Row 2: P&L Distribution & Strategy Comparison */}
+      {/* Charts Row 2: Daily P&L & Strategy Weight Distribution */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Daily P&L Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Daily P&L (Last 30 Days)
+            </CardTitle>
+            <CardDescription>Daily profit/loss breakdown</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {dailyPnL.length === 0 ? (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No daily data available</p>
+                </div>
+              </div>
+            ) : (
+              <div className="h-[300px]" role="img" aria-label="Daily P&L bar chart">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dailyPnL}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 10 }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={60}
+                      tickFormatter={(value) => value.slice(5)} // Show MM-DD only
+                      className="text-muted-foreground"
+                    />
+                    <YAxis
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(value) => formatCurrency(value, { compact: true })}
+                      className="text-muted-foreground"
+                    />
+                    <Tooltip
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload || !payload.length) return null
+                        const data = payload[0].payload
+                        return (
+                          <div className="rounded-lg border bg-card p-3 shadow-lg">
+                            <p className="font-medium text-sm mb-2">{label}</p>
+                            <p className="text-sm">P&L: {formatCurrency(data.pnl)}</p>
+                            <p className="text-sm">Trades: {data.trades}</p>
+                            <p className="text-sm text-green-500">Wins: {data.wins}</p>
+                            <p className="text-sm text-red-500">Losses: {data.losses}</p>
+                          </div>
+                        )
+                      }}
+                    />
+                    <ReferenceLine y={0} stroke={COLORS.neutral} strokeDasharray="3 3" />
+                    <Bar dataKey="pnl" name="P&L">
+                      {dailyPnL.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.pnl >= 0 ? COLORS.positive : COLORS.negative}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Strategy Weight Distribution Pie Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PieChartIcon className="h-5 w-5" />
+              Strategy Weight Distribution
+            </CardTitle>
+            <CardDescription>Allocation weights from AI intelligence</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {strategyWeightPieData.length === 0 ? (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <PieChartIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No strategy weight data available</p>
+                  <p className="text-sm">Weights are calculated by the Signal service</p>
+                </div>
+              </div>
+            ) : (
+              <div className="h-[300px]" role="img" aria-label="Strategy weight distribution pie chart">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={strategyWeightPieData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={100}
+                      innerRadius={40}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, value }) => `${name}: ${value.toFixed(0)}%`}
+                    >
+                      {strategyWeightPieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload || !payload.length) return null
+                        const data = payload[0].payload
+                        return (
+                          <div className="rounded-lg border bg-card p-3 shadow-lg">
+                            <p className="font-medium text-sm mb-1">{data.name}</p>
+                            <p className="text-sm">Weight: {(data.weight * 100).toFixed(1)}%</p>
+                          </div>
+                        )
+                      }}
+                    />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts Row 3: P&L Distribution & Strategy Comparison */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* P&L Distribution */}
         <Card>
@@ -796,7 +991,7 @@ export default function PerformancePage() {
             {strategyPerformance.length === 0 ? (
               <div className="h-[300px] flex items-center justify-center text-muted-foreground">
                 <div className="text-center">
-                  <PieChart className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <PieChartIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>No strategy data available</p>
                 </div>
               </div>
@@ -890,6 +1085,129 @@ export default function PerformancePage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Advanced Strategy Intelligence Metrics */}
+      {strategyIntelligence && strategyIntelligence.strategies && Object.keys(strategyIntelligence.strategies).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Advanced Strategy Metrics
+            </CardTitle>
+            <CardDescription>
+              Signal service intelligence metrics with weighted performance scoring
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4 font-medium">Strategy</th>
+                    <th className="text-right py-3 px-4 font-medium">Weight</th>
+                    <th className="text-right py-3 px-4 font-medium">Sharpe</th>
+                    <th className="text-right py-3 px-4 font-medium">Profit Factor</th>
+                    <th className="text-right py-3 px-4 font-medium">Win Rate</th>
+                    <th className="text-right py-3 px-4 font-medium">Expectancy</th>
+                    <th className="text-right py-3 px-4 font-medium">Max DD</th>
+                    <th className="text-right py-3 px-4 font-medium">Signals</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(strategyIntelligence.strategies).map(([name, data]) => {
+                    const metrics = data.metrics || {}
+                    return (
+                      <tr key={name} className="border-b border-border/50 hover:bg-muted/50">
+                        <td className="py-3 px-4 font-medium">{name}</td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <div className="w-16 bg-muted rounded-full h-2">
+                              <div
+                                className="bg-primary h-2 rounded-full"
+                                style={{ width: `${(data.weight || 0) * 100}%` }}
+                              />
+                            </div>
+                            <span className="w-12 text-right">{((data.weight || 0) * 100).toFixed(0)}%</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className={cn(
+                            (metrics.sharpe_ratio || 0) >= 1 ? 'text-green-500' :
+                            (metrics.sharpe_ratio || 0) >= 0 ? 'text-yellow-500' : 'text-red-500'
+                          )}>
+                            {(metrics.sharpe_ratio || 0).toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className={cn(
+                            (metrics.profit_factor || 0) >= 1.5 ? 'text-green-500' :
+                            (metrics.profit_factor || 0) >= 1 ? 'text-yellow-500' : 'text-red-500'
+                          )}>
+                            {(metrics.profit_factor || 0).toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className={cn(
+                            (metrics.win_rate || 0) >= 0.5 ? 'text-green-500' : 'text-red-500'
+                          )}>
+                            {formatPercent((metrics.win_rate || 0) * 100)}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className={cn(
+                            (metrics.expectancy || 0) > 0 ? 'text-green-500' : 'text-red-500'
+                          )}>
+                            {formatCurrency(metrics.expectancy || 0)}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className="text-red-500">
+                            {formatPercent((metrics.max_drawdown || 0) * 100)}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          {metrics.total_signals || 0}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Strategy Intelligence Summary */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Total Strategies</p>
+                <p className="text-2xl font-bold">{Object.keys(strategyIntelligence.strategies).length}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Avg Sharpe</p>
+                <p className="text-2xl font-bold">
+                  {(Object.values(strategyIntelligence.strategies).reduce((sum, s) =>
+                    sum + (s.metrics?.sharpe_ratio || 0), 0) /
+                    Object.keys(strategyIntelligence.strategies).length).toFixed(2)}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Avg Win Rate</p>
+                <p className="text-2xl font-bold">
+                  {formatPercent(Object.values(strategyIntelligence.strategies).reduce((sum, s) =>
+                    sum + (s.metrics?.win_rate || 0), 0) /
+                    Object.keys(strategyIntelligence.strategies).length * 100)}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Total Signals</p>
+                <p className="text-2xl font-bold">
+                  {Object.values(strategyIntelligence.strategies).reduce((sum, s) =>
+                    sum + (s.metrics?.total_signals || 0), 0)}
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
