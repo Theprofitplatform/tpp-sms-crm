@@ -110,6 +110,8 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
     ports:
       - "${SIGNAL_SERVICE_PORT:-5102}:5102"
+    volumes:
+      - ./models:/app/ml_models:ro
     depends_on:
       data-service:
         condition: service_healthy

@@ -1,0 +1,53 @@
+{
+  "feature_names": [
+    "rsi",
+    "macd",
+    "macd_signal",
+    "macd_histogram",
+    "bb_position",
+    "bb_width",
+    "atr",
+    "stoch_k",
+    "stoch_d",
+    "return_5d",
+    "return_10d",
+    "return_20d",
+    "volatility_20d",
+    "volume_ratio",
+    "price_to_sma_20",
+    "price_to_sma_50"
+  ],
+  "symbols_trained": [
+    "AAPL",
+    "MSFT",
+    "GOOGL",
+    "AMZN",
+    "NVDA",
+    "META",
+    "AMD",
+    "INTC",
+    "JPM",
+    "BAC",
+    "GS",
+    "MS",
+    "XOM",
+    "CVX",
+    "WMT",
+    "HD",
+    "NKE",
+    "DIS",
+    "TSLA",
+    "NFLX"
+  ],
+  "training_period": {
+    "start": "2024-01-20",
+    "end": "2026-01-19"
+  },
+  "forward_days": 5,
+  "return_threshold": 0.02,
+  "model_type": "RandomForestClassifier",
+  "classes": [
+    "SELL",
+    "BUY"
+  ]
+}

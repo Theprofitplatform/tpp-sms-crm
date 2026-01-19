@@ -42,6 +42,10 @@ from strategies.technical.mean_reversion import MeanReversionStrategy
 from strategies.technical.breakout import BreakoutStrategy
 from strategies.technical.macd_crossover import MACDCrossoverStrategy
 from strategies.technical.rsi_divergence import RSIDivergenceStrategy
+from strategies.technical.pairs_trading import PairsTradingStrategy
+from strategies.technical.volatility_event import VolatilityEventStrategy
+from strategies.technical.volume_profile import VolumeProfileStrategy
+from strategies.technical.ml_signals import MLSignalStrategy
 from models import Signal as SignalModel, SignalFeatures, SignalSide, EntryType, TimeInForce
 from confidence import ConfidenceScorer
 from confidence.invalidation import validate_signal_against_market, InvalidationRule
@@ -78,6 +82,10 @@ STRATEGIES = {
     'breakout': BreakoutStrategy,
     'macd_crossover': MACDCrossoverStrategy,
     'rsi_divergence': RSIDivergenceStrategy,
+    'pairs_trading': PairsTradingStrategy,
+    'volatility_event': VolatilityEventStrategy,
+    'volume_profile': VolumeProfileStrategy,
+    'ml_signals': MLSignalStrategy,
 }
 
 # In-memory signal storage (in production, use a database)

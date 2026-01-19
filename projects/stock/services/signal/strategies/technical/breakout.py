@@ -65,15 +65,15 @@ class BreakoutStrategy:
     DEFAULT_CONFIG = {
         "breakout_period": 20,  # Look for breakout from N-period high/low
         "adx_period": 14,
-        "adx_threshold": 25,  # Minimum ADX for trending market
-        "volume_threshold": 1.5,  # Volume must be 1.5x average
+        "adx_threshold": 20,  # Minimum ADX for trending market (tuned from 25)
+        "volume_threshold": 1.2,  # Volume must be 1.2x average (tuned from 1.5)
         "atr_period": 14,
-        "atr_multiplier_stop": 1.0,  # Stop loss = 1 ATR from breakout level
-        "risk_reward_ratio": 2.0,  # Target = 2x risk (2:1 R:R)
+        "atr_multiplier_stop": 1.5,  # Stop loss = 1.5 ATR from breakout level (tuned from 1.0)
+        "risk_reward_ratio": 2.5,  # Target = 2.5x risk (tuned from 2.0)
         "min_data_bars": 50,  # Minimum bars needed for analysis
-        "require_di_alignment": True,  # Require +DI/-DI alignment with direction
+        "require_di_alignment": False,  # DI alignment optional (tuned from True)
         "limit_order_offset_pct": 0.001,  # 0.1% offset for limit orders
-        "breakout_buffer_pct": 0.001,  # 0.1% buffer above/below breakout level
+        "breakout_buffer_pct": 0.002,  # 0.2% buffer above/below breakout level (tuned from 0.1%)
     }
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
