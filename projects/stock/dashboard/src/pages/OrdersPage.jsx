@@ -27,29 +27,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import ConfirmDialog from '../components/ConfirmDialog'
+import ConfirmDialog from '@/components/ConfirmDialog'
 
 // Reusable components
-import StatCard from '../components/data-display/StatCard'
-import StatusBadge from '../components/data-display/StatusBadge'
-import PriceDisplay from '../components/data-display/PriceDisplay'
-import EmptyState from '../components/feedback/EmptyState'
-import { SkeletonStatCard, SkeletonTable } from '../components/ui/Skeleton'
-
-// Mock orders data
-const mockOrders = [
-  { id: 'ORD-001', symbol: 'AAPL', side: 'BUY', type: 'LIMIT', quantity: 10, price: 180.00, status: 'FILLED', filledQty: 10, filledPrice: 179.85, createdAt: '2024-01-15T10:30:00Z', filledAt: '2024-01-15T10:30:05Z' },
-  { id: 'ORD-002', symbol: 'GOOGL', side: 'BUY', type: 'MARKET', quantity: 5, price: null, status: 'FILLED', filledQty: 5, filledPrice: 142.50, createdAt: '2024-01-15T11:00:00Z', filledAt: '2024-01-15T11:00:02Z' },
-  { id: 'ORD-003', symbol: 'TSLA', side: 'SELL', type: 'LIMIT', quantity: 10, price: 250.00, status: 'PENDING', filledQty: 0, filledPrice: null, createdAt: '2024-01-15T14:00:00Z', filledAt: null },
-  { id: 'ORD-004', symbol: 'MSFT', side: 'BUY', type: 'LIMIT', quantity: 15, price: 370.00, status: 'CANCELLED', filledQty: 0, filledPrice: null, createdAt: '2024-01-14T09:00:00Z', cancelledAt: '2024-01-14T16:00:00Z' },
-  { id: 'ORD-005', symbol: 'NVDA', side: 'BUY', type: 'MARKET', quantity: 8, price: null, status: 'FILLED', filledQty: 8, filledPrice: 510.20, createdAt: '2024-01-14T10:15:00Z', filledAt: '2024-01-14T10:15:03Z' },
-  { id: 'ORD-006', symbol: 'AMZN', side: 'SELL', type: 'STOP', quantity: 20, price: 150.00, status: 'PENDING', filledQty: 0, filledPrice: null, createdAt: '2024-01-15T15:30:00Z', filledAt: null },
-  { id: 'ORD-007', symbol: 'META', side: 'BUY', type: 'LIMIT', quantity: 12, price: 480.00, status: 'REJECTED', filledQty: 0, filledPrice: null, createdAt: '2024-01-13T11:45:00Z', rejectedAt: '2024-01-13T11:45:01Z', rejectReason: 'Insufficient buying power' },
-]
+import StatCard from '@/components/data-display/StatCard'
+import StatusBadge from '@/components/data-display/StatusBadge'
+import PriceDisplay from '@/components/data-display/PriceDisplay'
+import EmptyState from '@/components/feedback/EmptyState'
+import { SkeletonStatCard, SkeletonTable } from '@/components/ui/Skeleton'
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState(mockOrders)
-  const [loading, setLoading] = useState(false)
+  const [orders, setOrders] = useState([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('ALL')
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false })
@@ -68,11 +57,10 @@ export default function OrdersPage() {
     setError(null)
     try {
       const res = await axios.get(API.exec.orders(), { timeout: 5000 })
-      if (res.data && res.data.length > 0) {
-        setOrders(res.data)
-      }
-    } catch {
-      console.log('Using mock order data')
+      setOrders(res.data || [])
+    } catch (err) {
+      console.error('Error fetching orders:', err.message)
+      setError('Failed to fetch orders')
     }
     setLoading(false)
   }, [])

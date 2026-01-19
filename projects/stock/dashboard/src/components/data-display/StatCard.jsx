@@ -13,7 +13,7 @@ import { SkeletonStatCard } from '../ui/Skeleton'
  * />
  */
 
-export default function StatCard({
+export function StatCard({
   icon,
   label,
   value,
@@ -192,3 +192,6 @@ export const statCardStyles = `
 .stat-card-danger .stat-icon { color: var(--color-red-500); }
 .stat-card-safe .stat-icon { color: var(--color-green-500); }
 `
+
+// Default export for backward compatibility
+export default StatCard

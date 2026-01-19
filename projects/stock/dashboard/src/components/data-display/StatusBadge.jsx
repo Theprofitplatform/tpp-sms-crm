@@ -135,7 +135,7 @@ const sizeClasses = {
   lg: 'status-badge-lg',
 }
 
-export default function StatusBadge({
+export function StatusBadge({
   status,
   showLabel = true,
   showIcon = true,
@@ -327,3 +327,6 @@ export const statusBadgeStyles = `
 .status-dot.status-badge-gray { background: var(--text-muted); }
 .status-dot.status-badge-blue { background: var(--color-blue-500); }
 `
+
+// Default export for backward compatibility
+export default StatusBadge

@@ -79,6 +79,14 @@ from portfolio import (
     CircuitBreaker,
     CircuitBreakerType,
     check_circuit_breakers,
+    # FX Exposure
+    FXExposureAnalyzer,
+    FXExposureReport,
+    FXExposureConfig,
+    CurrencyExposure,
+    ExposureLevel,
+    initialize_fx_exposure_analyzer,
+    get_fx_exposure_analyzer,
 )
 from portfolio.exposure import Position
 from portfolio.volatility import VolatilityRegime
@@ -162,6 +170,7 @@ exposure_analyzer: Optional[ExposureAnalyzer] = None
 correlation_analyzer: Optional[CorrelationAnalyzer] = None
 volatility_scaler: Optional[VolatilityScaler] = None
 circuit_breaker: Optional[CircuitBreaker] = None
+fx_exposure_analyzer: Optional[FXExposureAnalyzer] = None
 
 # Distributed kill switch (initialized in lifespan)
 distributed_kill_switch: Optional[DistributedKillSwitch] = None
@@ -171,7 +180,7 @@ distributed_kill_switch: Optional[DistributedKillSwitch] = None
 async def lifespan(app: FastAPI):
     """Application lifespan - startup and shutdown."""
     global exposure_analyzer, correlation_analyzer, volatility_scaler, circuit_breaker
-    global distributed_kill_switch
+    global distributed_kill_switch, fx_exposure_analyzer
 
     logger.info(
         "Starting Risk Service...",
@@ -225,8 +234,20 @@ async def lifespan(app: FastAPI):
     config_path = os.getenv("CIRCUIT_BREAKER_CONFIG", "config/risk_portfolio.json")
     circuit_breaker = CircuitBreaker(config_path=config_path if os.path.exists(config_path) else None)
 
+    # Initialize FX exposure analyzer
+    execution_service_url = os.getenv("EXECUTION_SERVICE_URL", "http://localhost:5104")
+    fx_exposure_analyzer = await initialize_fx_exposure_analyzer(
+        execution_service_url=execution_service_url,
+        base_currency=os.getenv("BASE_CURRENCY", "AUD"),
+    )
+    logger.info("FX exposure analyzer initialized", execution_url=execution_service_url)
+
     logger.info("Risk Service started successfully")
     yield
+
+    # Cleanup FX exposure analyzer
+    if fx_exposure_analyzer:
+        await fx_exposure_analyzer.close()
 
     # Cleanup distributed kill switch
     if distributed_kill_switch:
@@ -838,6 +859,79 @@ async def validate_order(
     if not check_audit.passed:
         all_passed = False
 
+    # =========================================================================
+    # CHECK 9: FX Exposure Limit
+    # =========================================================================
+    fx_check_passed = True
+    fx_check_message = "FX exposure within limits"
+    fx_check_value = None
+    fx_check_limit = None
+
+    if fx_exposure_analyzer:
+        # Determine trade currency from market
+        market_currencies = {
+            "US": "USD",
+            "ASX": "AUD",
+            "CRYPTO": "USD",
+            "LSE": "GBP",
+            "TSX": "CAD",
+            "FOREX": "USD",
+        }
+        trade_currency = market_currencies.get(request.market.upper(), "USD")
+        base_currency = fx_exposure_analyzer.config.base_currency
+
+        # Only check if trading in foreign currency
+        if trade_currency != base_currency:
+            try:
+                fx_result = await fx_exposure_analyzer.check_order_fx_impact(
+                    symbol=request.symbol,
+                    trade_currency=trade_currency,
+                    order_value_base=order_value,
+                )
+
+                fx_check_value = fx_result["projected_exposure_pct"]
+                fx_check_limit = fx_result["limits"]["critical"]
+
+                # Check exposure level
+                level = fx_result["level"]
+                if level == "CRITICAL":
+                    fx_check_passed = False
+                    fx_check_message = f"FX CRITICAL: {trade_currency} would be {fx_check_value:.1f}% (limit: {fx_check_limit}%)"
+                    # Optionally trigger kill switch on critical FX exposure
+                    if fx_exposure_analyzer.config.kill_switch_on_critical:
+                        reason = f"Critical FX exposure: {trade_currency} at {fx_check_value:.1f}%"
+                        if distributed_kill_switch:
+                            await distributed_kill_switch.trigger(
+                                reason=reason,
+                                triggered_by="risk-service:fx-exposure",
+                                details={"currency": trade_currency, "exposure_pct": fx_check_value},
+                            )
+                        logger.critical("KILL SWITCH TRIGGERED", reason=reason)
+                elif level == "HIGH":
+                    # Allow but warn
+                    fx_check_message = f"FX HIGH: {trade_currency} at {fx_check_value:.1f}% (approaching limit)"
+                elif level == "ELEVATED":
+                    fx_check_message = f"FX elevated: {trade_currency} at {fx_check_value:.1f}%"
+                else:
+                    fx_check_message = f"FX OK: {trade_currency} at {fx_check_value:.1f}%"
+
+            except Exception as e:
+                logger.warning("FX exposure check failed", error=str(e))
+                fx_check_message = f"FX check skipped: {str(e)}"
+    else:
+        fx_check_message = "FX exposure analyzer not available"
+
+    check_fx_exposure = RiskCheckResult(
+        check_name="fx_exposure_limit",
+        passed=fx_check_passed,
+        value=fx_check_value,
+        limit=fx_check_limit,
+        message=fx_check_message,
+    )
+    checks.append(check_fx_exposure)
+    if not check_fx_exposure.passed:
+        all_passed = False
+
     # Determine rejection reason
     rejection_reason = None
     if not all_passed:
@@ -1248,6 +1342,197 @@ async def get_portfolio_exposure():
         market_warnings=report.market_warnings,
         timestamp=report.timestamp,
     )
+
+
+# =============================================================================
+# FX Exposure Endpoints
+# =============================================================================
+
+
+class FXExposureResponse(BaseModel):
+    """Response model for FX exposure analysis."""
+    base_currency: str
+    total_portfolio_value: float
+    currency_exposures: Dict[str, Any]
+    largest_currency: str
+    largest_percentage: float
+    warnings: List[str]
+    critical_exposures: List[str]
+    has_critical: bool
+    timestamp: str
+
+
+class FXOrderCheckRequest(BaseModel):
+    """Request to check FX impact of an order."""
+    symbol: str
+    trade_currency: str
+    order_value_base: float
+
+
+class FXOrderCheckResponse(BaseModel):
+    """Response for FX order impact check."""
+    allowed: bool
+    warnings: List[str]
+    level: str
+    current_exposure_pct: float
+    projected_exposure_pct: float
+    limits: Dict[str, float]
+
+
+class FXLimitUpdateRequest(BaseModel):
+    """Request to update FX exposure limits."""
+    currency: str
+    warning: float = Field(ge=0, le=100)
+    high: float = Field(ge=0, le=100)
+    critical: float = Field(ge=0, le=100)
+
+
+@app.get("/api/v1/portfolio/fx-exposure", response_model=FXExposureResponse)
+async def get_fx_exposure():
+    """
+    Get portfolio FX/currency exposure analysis.
+
+    Returns breakdown of portfolio by currency with:
+    - Exposure value and percentage for each currency
+    - Risk level (NORMAL, ELEVATED, HIGH, CRITICAL)
+    - Warnings when limits are approached or exceeded
+    - Critical exposures that may require immediate action
+
+    **Example response:**
+    ```json
+    {
+        "base_currency": "AUD",
+        "total_portfolio_value": 100000.00,
+        "currency_exposures": {
+            "USD": {
+                "currency": "USD",
+                "value_base": 75000.00,
+                "percentage": 75.0,
+                "level": "HIGH",
+                "limits": {"warning": 60, "high": 75, "critical": 90}
+            }
+        },
+        "largest_currency": "USD",
+        "largest_percentage": 75.0,
+        "warnings": ["HIGH: USD exposure at 75.0% (limit: 75%)"],
+        "critical_exposures": [],
+        "has_critical": false
+    }
+    ```
+    """
+    if fx_exposure_analyzer is None:
+        raise HTTPException(status_code=503, detail="FX exposure analyzer not initialized")
+
+    report = await fx_exposure_analyzer.analyze()
+
+    return FXExposureResponse(
+        base_currency=report.base_currency,
+        total_portfolio_value=report.total_portfolio_value,
+        currency_exposures={k: v.to_dict() for k, v in report.currency_exposures.items()},
+        largest_currency=report.largest_currency,
+        largest_percentage=report.largest_percentage,
+        warnings=report.warnings,
+        critical_exposures=report.critical_exposures,
+        has_critical=len(report.critical_exposures) > 0,
+        timestamp=report.timestamp.isoformat(),
+    )
+
+
+@app.post("/api/v1/portfolio/fx-exposure/check-order", response_model=FXOrderCheckResponse)
+async def check_order_fx_impact(request: FXOrderCheckRequest):
+    """
+    Check if an order would cause FX exposure to exceed limits.
+
+    Use this BEFORE submitting an order to check if it would
+    push currency exposure beyond acceptable levels.
+
+    Returns:
+    - **allowed**: Whether the order is within limits
+    - **level**: Projected exposure level after order
+    - **warnings**: Any warnings about exposure limits
+    - **current_exposure_pct**: Current exposure percentage
+    - **projected_exposure_pct**: Projected exposure after order
+    """
+    if fx_exposure_analyzer is None:
+        raise HTTPException(status_code=503, detail="FX exposure analyzer not initialized")
+
+    result = await fx_exposure_analyzer.check_order_fx_impact(
+        symbol=request.symbol,
+        trade_currency=request.trade_currency,
+        order_value_base=request.order_value_base,
+    )
+
+    return FXOrderCheckResponse(
+        allowed=result["allowed"],
+        warnings=result["warnings"],
+        level=result["level"],
+        current_exposure_pct=result["current_exposure_pct"],
+        projected_exposure_pct=result["projected_exposure_pct"],
+        limits=result["limits"],
+    )
+
+
+@app.put("/api/v1/portfolio/fx-exposure/limits")
+async def update_fx_exposure_limits(request: FXLimitUpdateRequest):
+    """
+    Update FX exposure limits for a currency.
+
+    Limits must be in order: warning <= high <= critical
+
+    **Example:**
+    ```json
+    {
+        "currency": "EUR",
+        "warning": 35.0,
+        "high": 50.0,
+        "critical": 65.0
+    }
+    ```
+    """
+    if fx_exposure_analyzer is None:
+        raise HTTPException(status_code=503, detail="FX exposure analyzer not initialized")
+
+    if not (request.warning <= request.high <= request.critical):
+        raise HTTPException(
+            status_code=400,
+            detail="Limits must be in order: warning <= high <= critical"
+        )
+
+    fx_exposure_analyzer.update_limits(
+        currency=request.currency.upper(),
+        limits={
+            "warning": request.warning,
+            "high": request.high,
+            "critical": request.critical,
+        }
+    )
+
+    return {
+        "status": "updated",
+        "currency": request.currency.upper(),
+        "limits": {
+            "warning": request.warning,
+            "high": request.high,
+            "critical": request.critical,
+        }
+    }
+
+
+@app.get("/api/v1/portfolio/fx-exposure/limits")
+async def get_fx_exposure_limits():
+    """
+    Get current FX exposure limits for all currencies.
+
+    Returns the configured warning/high/critical thresholds
+    for each currency.
+    """
+    if fx_exposure_analyzer is None:
+        raise HTTPException(status_code=503, detail="FX exposure analyzer not initialized")
+
+    return {
+        "base_currency": fx_exposure_analyzer.config.base_currency,
+        "limits": fx_exposure_analyzer.config.limits,
+    }
 
 
 @app.get("/api/v1/portfolio/correlations", response_model=CorrelationResponse)

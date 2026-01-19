@@ -18,7 +18,7 @@ import EmptyState from '../feedback/EmptyState'
  * />
  */
 
-export default function DataTable({
+export function DataTable({
   columns,
   data,
   keyField = 'id',
@@ -356,3 +356,6 @@ export const dataTableStyles = `
   }
 }
 `
+
+// Default export for backward compatibility
+export default DataTable

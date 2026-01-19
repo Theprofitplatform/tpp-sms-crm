@@ -28,41 +28,25 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import StatCard from '@/components/data-display/StatCard'
-import { ErrorBanner } from '@/components/feedback/ErrorState'
-import { SkeletonStatCard, SkeletonChart } from '@/components/ui/Skeleton'
+import ErrorState, { ErrorBanner } from '@/components/feedback/ErrorState'
+import { SkeletonStatCard, SkeletonChart, SkeletonCard } from '@/components/ui/Skeleton'
 import { formatCurrency, formatPercent } from '@/utils/formatters'
-
-// Mock performance data for chart
-const generatePerformanceData = () => {
-  const data = []
-  let value = 100000
-  for (let i = 30; i >= 0; i--) {
-    const date = new Date()
-    date.setDate(date.getDate() - i)
-    value = value * (1 + (Math.random() - 0.48) * 0.02)
-    data.push({
-      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      value: Math.round(value),
-      benchmark: 100000 * (1 + (30 - i) * 0.001)
-    })
-  }
-  return data
-}
 
 export default function Dashboard() {
   const [mode, setMode] = useState(null)
   const [health, setHealth] = useState({})
   const [strategies, setStrategies] = useState([])
+  const [account, setAccount] = useState(null)
+  const [trades, setTrades] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [performanceData] = useState(generatePerformanceData)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
     setError(null)
 
     try {
-      const [modeRes, opsHealth, dataHealth, signalHealth, riskHealth, execHealth, strategiesRes] = await Promise.allSettled([
+      const [modeRes, opsHealth, dataHealth, signalHealth, riskHealth, execHealth, strategiesRes, accountRes, tradesRes] = await Promise.allSettled([
         axios.get(API.ops.mode(), { timeout: 5000 }),
         axios.get(API.ops.health(), { timeout: 5000 }),
         axios.get(API.data.health(), { timeout: 5000 }),
@@ -70,6 +54,8 @@ export default function Dashboard() {
         axios.get(API.risk.health(), { timeout: 5000 }),
         axios.get(API.exec.health(), { timeout: 5000 }),
         axios.get(API.signal.strategies(), { timeout: 5000 }),
+        axios.get(API.exec.account(), { timeout: 5000 }),
+        axios.get(API.exec.trades(), { timeout: 5000 }),
       ])
 
       // Process results with fallbacks
@@ -87,6 +73,14 @@ export default function Dashboard() {
 
       if (strategiesRes.status === 'fulfilled') {
         setStrategies(strategiesRes.value.data || [])
+      }
+
+      if (accountRes.status === 'fulfilled') {
+        setAccount(accountRes.value.data)
+      }
+
+      if (tradesRes.status === 'fulfilled') {
+        setTrades(tradesRes.value.data || [])
       }
 
       // Check if any requests failed
@@ -171,9 +165,11 @@ export default function Dashboard() {
     }
   }
 
-  const currentValue = performanceData[performanceData.length - 1]?.value || 0
-  const startValue = performanceData[0]?.value || 100000
-  const totalReturn = ((currentValue - startValue) / startValue * 100).toFixed(2)
+  // Use real account data
+  const currentValue = account?.equity || 0
+  const startValue = 100000 // Initial portfolio value
+  const totalReturn = account ? ((currentValue - startValue) / startValue * 100).toFixed(2) : '0.00'
+  const totalPnL = account ? (account.unrealized_pnl + account.realized_pnl) : 0
 
   if (loading && !mode) {
     return (
@@ -188,10 +184,7 @@ export default function Dashboard() {
 
         {/* Stats Row skeleton */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <SkeletonStatCard />
-          <SkeletonStatCard />
-          <SkeletonStatCard />
-          <SkeletonStatCard />
+          {[1, 2, 3, 4].map(i => <SkeletonStatCard key={i} />)}
         </div>
 
         {/* Chart skeleton */}
@@ -273,47 +266,48 @@ export default function Dashboard() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />
-            Portfolio Performance
+            Recent Trades
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={performanceData}>
-                <defs>
-                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value) => [formatCurrency(value), 'Value']}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke="hsl(var(--primary))"
-                  fillOpacity={1}
-                  fill="url(#colorValue)"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="benchmark"
-                  stroke="hsl(var(--muted-foreground))"
-                  strokeDasharray="5 5"
-                  dot={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          {trades.length === 0 ? (
+            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+              <div className="text-center">
+                <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No trades yet</p>
+                <p className="text-sm">Execute signals to see trade history</p>
+              </div>
+            </div>
+          ) : (
+            <div className="h-[300px] overflow-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-card">
+                  <tr className="border-b">
+                    <th className="text-left py-2 font-medium">Time</th>
+                    <th className="text-left py-2 font-medium">Symbol</th>
+                    <th className="text-left py-2 font-medium">Side</th>
+                    <th className="text-right py-2 font-medium">Qty</th>
+                    <th className="text-right py-2 font-medium">Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trades.slice(0, 10).map((trade) => (
+                    <tr key={trade.id} className="border-b border-border/50 hover:bg-muted/50">
+                      <td className="py-2 text-muted-foreground">
+                        {new Date(trade.timestamp).toLocaleString()}
+                      </td>
+                      <td className="py-2 font-medium">{trade.symbol}</td>
+                      <td className={`py-2 ${trade.side === 'BUY' ? 'text-green-500' : 'text-red-500'}`}>
+                        {trade.side}
+                      </td>
+                      <td className="py-2 text-right">{trade.quantity}</td>
+                      <td className="py-2 text-right">{formatCurrency(trade.price)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
 

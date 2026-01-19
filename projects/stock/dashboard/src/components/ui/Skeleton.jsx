@@ -8,7 +8,7 @@
  */
 
 // Base skeleton element
-export default function Skeleton({
+export function Skeleton({
   width,
   height = '1rem',
   rounded = 'md',
@@ -213,3 +213,6 @@ export const skeletonStyles = `
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
 }
 `
+
+// Default export for backward compatibility
+export default Skeleton

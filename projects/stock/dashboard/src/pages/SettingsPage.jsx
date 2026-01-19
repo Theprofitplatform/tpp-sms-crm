@@ -301,11 +301,13 @@ export default function SettingsPage() {
           onClick={saveSettings}
           disabled={saving || hasValidationErrors}
           title={hasValidationErrors ? 'Fix validation errors before saving' : undefined}
+          aria-label={saving ? 'Saving settings' : 'Save settings'}
+          aria-disabled={saving || hasValidationErrors}
         >
           {saving ? (
-            <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+            <RefreshCw className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
           ) : (
-            <Save className="mr-2 h-4 w-4" />
+            <Save className="mr-2 h-4 w-4" aria-hidden="true" />
           )}
           {saving ? 'Saving...' : 'Save Settings'}
         </Button>
@@ -499,12 +501,14 @@ export default function SettingsPage() {
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>After-Hours Trading</Label>
-                <p className="text-xs text-muted-foreground">Enable trading outside market hours</p>
+                <Label id="afterHours-label">After-Hours Trading</Label>
+                <p id="afterHours-desc" className="text-xs text-muted-foreground">Enable trading outside market hours</p>
               </div>
               <Switch
                 checked={settings.enableAfterHours}
                 onCheckedChange={(checked) => handleChange('enableAfterHours', checked)}
+                aria-labelledby="afterHours-label"
+                aria-describedby="afterHours-desc"
               />
             </div>
           </CardContent>
@@ -521,23 +525,27 @@ export default function SettingsPage() {
           <CardContent className="space-y-6">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>Email Notifications</Label>
-                <p className="text-xs text-muted-foreground">Receive alerts via email</p>
+                <Label id="emailNotif-label">Email Notifications</Label>
+                <p id="emailNotif-desc" className="text-xs text-muted-foreground">Receive alerts via email</p>
               </div>
               <Switch
                 checked={settings.emailNotifications}
                 onCheckedChange={(checked) => handleChange('emailNotifications', checked)}
+                aria-labelledby="emailNotif-label"
+                aria-describedby="emailNotif-desc"
               />
             </div>
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>Discord Notifications</Label>
-                <p className="text-xs text-muted-foreground">Receive alerts via Discord</p>
+                <Label id="discordNotif-label">Discord Notifications</Label>
+                <p id="discordNotif-desc" className="text-xs text-muted-foreground">Receive alerts via Discord</p>
               </div>
               <Switch
                 checked={settings.discordNotifications}
                 onCheckedChange={(checked) => handleChange('discordNotifications', checked)}
+                aria-labelledby="discordNotif-label"
+                aria-describedby="discordNotif-desc"
               />
             </div>
 
@@ -545,34 +553,40 @@ export default function SettingsPage() {
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>Trade Execution</Label>
-                <p className="text-xs text-muted-foreground">Notify when trades are executed</p>
+                <Label id="tradeNotif-label">Trade Execution</Label>
+                <p id="tradeNotif-desc" className="text-xs text-muted-foreground">Notify when trades are executed</p>
               </div>
               <Switch
                 checked={settings.notifyOnTrade}
                 onCheckedChange={(checked) => handleChange('notifyOnTrade', checked)}
+                aria-labelledby="tradeNotif-label"
+                aria-describedby="tradeNotif-desc"
               />
             </div>
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>New Signals</Label>
-                <p className="text-xs text-muted-foreground">Notify when new signals are generated</p>
+                <Label id="signalNotif-label">New Signals</Label>
+                <p id="signalNotif-desc" className="text-xs text-muted-foreground">Notify when new signals are generated</p>
               </div>
               <Switch
                 checked={settings.notifyOnSignal}
                 onCheckedChange={(checked) => handleChange('notifyOnSignal', checked)}
+                aria-labelledby="signalNotif-label"
+                aria-describedby="signalNotif-desc"
               />
             </div>
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>Risk Alerts</Label>
-                <p className="text-xs text-muted-foreground">Notify on risk threshold breaches</p>
+                <Label id="riskNotif-label">Risk Alerts</Label>
+                <p id="riskNotif-desc" className="text-xs text-muted-foreground">Notify on risk threshold breaches</p>
               </div>
               <Switch
                 checked={settings.notifyOnRiskAlert}
                 onCheckedChange={(checked) => handleChange('notifyOnRiskAlert', checked)}
+                aria-labelledby="riskNotif-label"
+                aria-describedby="riskNotif-desc"
               />
             </div>
           </CardContent>
@@ -613,12 +627,14 @@ export default function SettingsPage() {
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>Dark Mode</Label>
-                <p className="text-xs text-muted-foreground">Use dark theme</p>
+                <Label id="darkMode-label">Dark Mode</Label>
+                <p id="darkMode-desc" className="text-xs text-muted-foreground">Use dark theme</p>
               </div>
               <Switch
                 checked={settings.darkMode}
                 onCheckedChange={(checked) => handleChange('darkMode', checked)}
+                aria-labelledby="darkMode-label"
+                aria-describedby="darkMode-desc"
               />
             </div>
 

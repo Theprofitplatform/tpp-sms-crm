@@ -10,7 +10,7 @@ import { TrendingUp, TrendingDown } from 'lucide-react'
  * <PriceDisplay value={5.25} suffix="%" />
  */
 
-export default function PriceDisplay({
+export function PriceDisplay({
   value,
   currency = 'USD',
   decimals = 2,
@@ -163,3 +163,6 @@ td .price-display {
   justify-content: flex-end;
 }
 `
+
+// Default export for backward compatibility
+export default PriceDisplay

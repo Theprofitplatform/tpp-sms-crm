@@ -53,6 +53,7 @@ export default function useKeyboardShortcuts(handlers = {}) {
     if (pendingPrefix === 'g') {
       setPendingPrefix(null)
       switch (key) {
+        // Trading
         case 'd':
           navigate('/')
           return
@@ -65,6 +66,24 @@ export default function useKeyboardShortcuts(handlers = {}) {
         case 's':
           navigate('/signals')
           return
+        // Risk & Safety
+        case 'r':
+          navigate('/risk')
+          return
+        case 'c':
+          navigate('/reconciliation')
+          return
+        // Monitoring
+        case 'e':
+          navigate('/reports')
+          return
+        case 'a':
+          navigate('/alerts')
+          return
+        case 'q':
+          navigate('/data-quality')
+          return
+        // System
         case ',':
           navigate('/settings')
           return
@@ -124,11 +143,21 @@ export default function useKeyboardShortcuts(handlers = {}) {
 
 // Keyboard shortcut help data
 export const KEYBOARD_SHORTCUTS = [
+  // Trading
   { keys: ['g', 'd'], description: 'Go to Dashboard' },
   { keys: ['g', 'p'], description: 'Go to Positions' },
   { keys: ['g', 'o'], description: 'Go to Orders' },
   { keys: ['g', 's'], description: 'Go to Signals' },
+  // Risk & Safety
+  { keys: ['g', 'r'], description: 'Go to Risk' },
+  { keys: ['g', 'c'], description: 'Go to Reconciliation' },
+  // Monitoring
+  { keys: ['g', 'e'], description: 'Go to Reports' },
+  { keys: ['g', 'a'], description: 'Go to Alerts' },
+  { keys: ['g', 'q'], description: 'Go to Data Quality' },
+  // System
   { keys: ['g', ','], description: 'Go to Settings' },
+  // Actions
   { keys: ['r'], description: 'Refresh data' },
   { keys: ['?'], description: 'Toggle help' },
   { keys: ['Esc'], description: 'Close dialogs' },

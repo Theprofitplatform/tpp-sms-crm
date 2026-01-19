@@ -19,7 +19,7 @@ const defaultIcons = {
   error: AlertCircle,
 }
 
-export default function EmptyState({
+export function EmptyState({
   title = 'No data available',
   description,
   icon,
@@ -190,3 +190,6 @@ export const emptyStateStyles = `
   justify-content: center;
 }
 `
+
+// Default export for backward compatibility
+export default EmptyState

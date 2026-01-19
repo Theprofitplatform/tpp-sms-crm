@@ -14,7 +14,8 @@ import {
   Clock,
   AlertTriangle,
   Play,
-  Sparkles
+  Sparkles,
+  Activity
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -24,26 +25,16 @@ import { Select } from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
 
 // Reusable components
-import StatCard from '@/components/data-display/StatCard'
-import StatusBadge from '@/components/data-display/StatusBadge'
-import PriceDisplay from '@/components/data-display/PriceDisplay'
-import EmptyState, { EmptySignals } from '@/components/feedback/EmptyState'
-import Skeleton, { SkeletonStatCard, SkeletonCard } from '@/components/ui/Skeleton'
-
-// Mock signals data
-const mockSignals = [
-  { id: 'SIG-001', symbol: 'AAPL', strategy: 'Momentum', direction: 'BUY', strength: 0.85, price: 184.50, target: 195.00, stopLoss: 178.00, status: 'PENDING', reason: 'RSI oversold bounce + MACD bullish crossover', createdAt: '2024-01-15T14:30:00Z' },
-  { id: 'SIG-002', symbol: 'GOOGL', strategy: 'Mean Reversion', direction: 'BUY', strength: 0.72, price: 141.80, target: 148.00, stopLoss: 138.00, status: 'EXECUTED', reason: 'Price below 20-day Bollinger Band lower', createdAt: '2024-01-15T13:45:00Z', executedAt: '2024-01-15T13:46:00Z' },
-  { id: 'SIG-003', symbol: 'TSLA', strategy: 'Momentum', direction: 'SELL', strength: 0.68, price: 242.00, target: 225.00, stopLoss: 252.00, status: 'PENDING', reason: 'Bearish divergence on RSI, resistance rejection', createdAt: '2024-01-15T12:00:00Z' },
-  { id: 'SIG-004', symbol: 'NVDA', strategy: 'Breakout', direction: 'BUY', strength: 0.91, price: 508.00, target: 550.00, stopLoss: 490.00, status: 'EXECUTED', reason: 'Breaking above consolidation with volume', createdAt: '2024-01-15T10:15:00Z', executedAt: '2024-01-15T10:16:00Z' },
-  { id: 'SIG-005', symbol: 'MSFT', strategy: 'Mean Reversion', direction: 'SELL', strength: 0.65, price: 388.00, target: 375.00, stopLoss: 395.00, status: 'REJECTED', reason: 'Overbought RSI + resistance level', createdAt: '2024-01-15T09:30:00Z', rejectedReason: 'Risk limit exceeded' },
-  { id: 'SIG-006', symbol: 'META', strategy: 'Momentum', direction: 'BUY', strength: 0.78, price: 475.00, target: 510.00, stopLoss: 460.00, status: 'EXPIRED', reason: 'Strong uptrend continuation pattern', createdAt: '2024-01-14T15:00:00Z', expiredAt: '2024-01-15T09:30:00Z' },
-]
+import { StatCard } from '@/components/data-display/StatCard'
+import { StatusBadge } from '@/components/data-display/StatusBadge'
+import { PriceDisplay } from '@/components/data-display/PriceDisplay'
+import { EmptyState } from '@/components/feedback/EmptyState'
+import { SkeletonCard, SkeletonStatCard } from '@/components/ui/Skeleton'
 
 export default function SignalsPage() {
-  const [signals, setSignals] = useState(mockSignals)
+  const [signals, setSignals] = useState([])
   const [strategies, setStrategies] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true) // Start with loading state
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('ALL')
   const [executingSignal, setExecutingSignal] = useState(null)
@@ -59,33 +50,35 @@ export default function SignalsPage() {
         axios.get(API.signal.strategies(), { timeout: 5000 })
       ])
 
-      if (signalsRes.status === 'fulfilled' && signalsRes.value.data?.length > 0) {
+      if (signalsRes.status === 'fulfilled') {
         // Map API response to UI format
-        const mappedSignals = signalsRes.value.data.map(s => ({
+        const apiSignals = signalsRes.value.data || []
+        const mappedSignals = apiSignals.map(s => ({
           id: s.id,
           symbol: s.symbol,
           strategy: s.strategy_id === 'momentum' ? 'Momentum' :
-                   s.strategy_id === 'mean_reversion' ? 'Mean Reversion' : s.strategy_id,
+                   s.strategy_id === 'mean_reversion' ? 'Mean Reversion' :
+                   s.strategy_id || 'Unknown',
           direction: s.signal_type, // API uses signal_type, UI uses direction
           strength: s.strength,
           price: s.entry_price,
           target: s.target_price,
           stopLoss: s.stop_loss,
-          status: s.status,
+          status: s.status || 'PENDING',
           reason: s.reasoning,
           createdAt: s.time,
           indicators: s.indicators,
         }))
         setSignals(mappedSignals)
-      } else if (signalsRes.status === 'fulfilled' && signalsRes.value.data?.length === 0) {
-        // API returned empty, keep mock data for demo
-        console.log('No signals from API, using mock data')
+      } else {
+        setError('Failed to fetch signals')
       }
       if (strategiesRes.status === 'fulfilled') {
         setStrategies(strategiesRes.value.data || [])
       }
     } catch (err) {
-      console.log('Error fetching signals, using mock data:', err.message)
+      console.error('Error fetching signals:', err.message)
+      setError('Failed to connect to signal service')
     }
     setLoading(false)
   }, [])
@@ -99,22 +92,55 @@ export default function SignalsPage() {
   const executeSignal = async (signal) => {
     setExecutingSignal(signal.id)
     try {
-      await axios.post(API.exec.orders(), {
+      // Generate audit trail fields (required by execution service)
+      const timestamp = Date.now()
+      const dataSnapshot = JSON.stringify({
         symbol: signal.symbol,
-        side: signal.direction,
+        price: signal.price,
+        timestamp,
+        signal_id: signal.id
+      })
+      const dataSnapshotHash = btoa(dataSnapshot).slice(0, 32) // Simple hash for audit
+      const strategySlug = signal.strategy.toLowerCase().replace(/\s+/g, '_')
+
+      const orderPayload = {
+        symbol: signal.symbol,
+        market: 'US',
+        side: signal.direction.toUpperCase(), // Ensure uppercase BUY/SELL
         quantity: 10, // Default quantity
-        type: 'LIMIT',
+        order_type: 'LIMIT',
         price: signal.price,
         signal_id: signal.id,
-        reason: `Signal execution: ${signal.reason}`
-      }, { timeout: 10000 })
+        reason: `Signal execution: ${signal.reason}`,
+        // Audit trail fields (REQUIRED)
+        data_snapshot_hash: dataSnapshotHash,
+        rule_version_id: `signal-${strategySlug}-v1`
+      }
+
+      console.log('Submitting order:', orderPayload)
+
+      await axios.post(API.exec.orders(), orderPayload, { timeout: 10000 })
       toast.success({ title: 'Order Placed', description: `Order placed for ${signal.symbol}` })
       fetchSignals()
     } catch (err) {
-      console.error('Execute signal error:', err)
+      console.error('Execute signal error:', err.response?.data || err)
+      // Parse FastAPI validation errors (422 response has detail array)
+      let errorMsg = 'Network error'
+      if (err.response?.data?.detail) {
+        if (Array.isArray(err.response.data.detail)) {
+          // FastAPI validation error format: [{loc: [...], msg: '...', type: '...'}]
+          errorMsg = err.response.data.detail.map(e => `${e.loc?.join('.')}: ${e.msg}`).join(', ')
+        } else {
+          errorMsg = err.response.data.detail
+        }
+      } else if (err.response?.data?.error) {
+        errorMsg = err.response.data.error
+      } else if (err.message) {
+        errorMsg = err.message
+      }
       toast.error({
         title: 'Failed to execute signal',
-        description: err.response?.data?.error || err.message || 'Network error'
+        description: errorMsg
       })
     } finally {
       setExecutingSignal(null)
@@ -380,7 +406,11 @@ export default function SignalsPage() {
               <SkeletonCard contentRows={4} />
             </div>
           ) : filteredSignals.length === 0 ? (
-            <EmptySignals />
+            <EmptyState
+              title="No signals yet"
+              description="Signals will appear here when strategies generate them"
+              icon={Activity}
+            />
           ) : (
             <div className="space-y-4">
               {filteredSignals.map(signal => (
@@ -461,7 +491,7 @@ export default function SignalsPage() {
                         onClick={() => executeSignal(signal)}
                         loading={executingSignal === signal.id}
                         disabled={executingSignal !== null || rejectingSignal !== null}
-                        aria-label={`Execute ${signal.direction} order for ${signal.symbol} at $${signal.price.toFixed(2)}`}
+                        aria-label={`Execute ${signal.symbol} signal`}
                       >
                         {executingSignal !== signal.id && <CheckCircle className="mr-2 h-4 w-4" aria-hidden="true" />}
                         {executingSignal === signal.id ? 'Executing...' : 'Execute'}
@@ -473,7 +503,7 @@ export default function SignalsPage() {
                         onClick={() => rejectSignal(signal)}
                         loading={rejectingSignal === signal.id}
                         disabled={executingSignal !== null || rejectingSignal !== null}
-                        aria-label={`Reject ${signal.direction} signal for ${signal.symbol}`}
+                        aria-label={`Reject ${signal.symbol} signal`}
                       >
                         {rejectingSignal !== signal.id && <XCircle className="mr-2 h-4 w-4" aria-hidden="true" />}
                         {rejectingSignal === signal.id ? 'Rejecting...' : 'Reject'}

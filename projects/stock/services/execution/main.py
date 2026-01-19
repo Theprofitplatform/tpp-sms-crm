@@ -48,6 +48,17 @@ from pydantic import BaseModel, Field
 
 from brokers.paper import PaperBroker
 from fx import FXRateService, initialize_fx_service
+from fx.accounting import (
+    FXAccountingLedger,
+    FXTransaction,
+    FXTransactionType,
+    FXGainType,
+    CurrencyPosition,
+    FXPnLSummary,
+    PositionFXAttribution,
+    get_fx_ledger,
+    set_fx_ledger,
+)
 from idempotency import (
     check_idempotency,
     store_idempotency,
@@ -102,6 +113,7 @@ BASE_CURRENCY = os.getenv('BASE_CURRENCY', 'AUD')
 # Global instances
 broker: Optional[PaperBroker] = None
 fx_service: Optional[FXRateService] = None
+fx_ledger: Optional[FXAccountingLedger] = None
 position_reconciler: Optional[PositionReconciler] = None
 order_reconciler: Optional[OrderReconciler] = None
 pg_pool = None  # PostgreSQL connection pool for reconciliation
@@ -162,7 +174,7 @@ class OrderStatus(str, Enum):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan - startup and shutdown."""
-    global broker, fx_service, MARKETS_CONFIG, position_reconciler, order_reconciler, pg_pool
+    global broker, fx_service, fx_ledger, MARKETS_CONFIG, position_reconciler, order_reconciler, pg_pool
     global distributed_kill_switch
 
     logger.info(
@@ -188,14 +200,20 @@ async def lifespan(app: FastAPI):
     fx_service = await initialize_fx_service(cache_ttl_seconds=300)
     logger.info("FX service initialized")
 
+    # Initialize FX accounting ledger
+    fx_ledger = FXAccountingLedger(base_currency=BASE_CURRENCY, fx_service=fx_service)
+    set_fx_ledger(fx_ledger)
+    logger.info("FX accounting ledger initialized", base_currency=BASE_CURRENCY)
+
     # Initialize broker based on mode
     if TRADING_MODE in ['BACKTEST', 'PAPER']:
         broker = PaperBroker(
             initial_balance=100000.0,
             base_currency=BASE_CURRENCY,
             fx_service=fx_service,
+            fx_ledger=fx_ledger,
         )
-        logger.info("Paper broker initialized", balance=100000.0, base_currency=BASE_CURRENCY)
+        logger.info("Paper broker initialized", balance=100000.0, base_currency=BASE_CURRENCY, fx_ledger_enabled=True)
     else:
         if not LIVE_TRADING_ENABLED:
             raise RuntimeError("LIVE mode requires LIVE_TRADING_ENABLED=true")
@@ -204,6 +222,7 @@ async def lifespan(app: FastAPI):
             initial_balance=100000.0,
             base_currency=BASE_CURRENCY,
             fx_service=fx_service,
+            fx_ledger=fx_ledger,
         )
         logger.warning("Live broker not implemented, using paper broker")
 
@@ -1030,6 +1049,417 @@ async def get_markets():
     return {
         "base_currency": MARKETS_CONFIG.get("base_currency", BASE_CURRENCY),
         "markets": MARKETS_CONFIG.get("markets", {}),
+    }
+
+
+# =============================================================================
+# FX Accounting Endpoints
+# =============================================================================
+
+
+class FXPnLRequest(BaseModel):
+    """Request for FX P&L calculation with optional date range."""
+    start_date: Optional[str] = Field(None, description="Start date ISO format")
+    end_date: Optional[str] = Field(None, description="End date ISO format")
+
+
+class FXRevalueRequest(BaseModel):
+    """Request to revalue positions at current FX rates."""
+    force: bool = Field(False, description="Force revaluation even if recently done")
+
+
+class FXTransactionFilter(BaseModel):
+    """Filter criteria for FX transactions."""
+    transaction_type: Optional[str] = None
+    currency: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    limit: int = Field(100, ge=1, le=1000)
+
+
+class FXAttributionRequest(BaseModel):
+    """Request for position FX attribution."""
+    position_id: str
+    current_value_trade: float
+    current_fx_rate: float
+
+
+@app.get("/api/v1/fx/accounting/pnl")
+async def get_fx_pnl(
+    start_date: Optional[str] = Query(None, description="Start date (ISO format)"),
+    end_date: Optional[str] = Query(None, description="End date (ISO format)"),
+):
+    """
+    Get FX P&L summary with realized and unrealized breakdown.
+
+    Returns comprehensive FX impact analysis including:
+    - Realized FX gains/losses (closed positions)
+    - Unrealized FX gains/losses (open positions)
+    - Total FX impact
+    - Breakdown by currency
+
+    **Example response:**
+    ```json
+    {
+        "base_currency": "AUD",
+        "realized": {"gain": 150.25, "loss": 45.10, "net": 105.15},
+        "unrealized": {"gain": 200.00, "loss": 75.50, "net": 124.50},
+        "total_fx_impact": 229.65,
+        "by_currency": {"USD": 229.65}
+    }
+    ```
+    """
+    if not fx_ledger:
+        raise HTTPException(status_code=503, detail="FX accounting not initialized")
+
+    # Parse dates if provided
+    start_dt = None
+    end_dt = None
+
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid start_date format: {start_date}")
+
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid end_date format: {end_date}")
+
+    summary = fx_ledger.get_fx_pnl_summary(start_date=start_dt, end_date=end_dt)
+    return summary.to_dict()
+
+
+@app.get("/api/v1/fx/accounting/exposure")
+async def get_fx_exposure():
+    """
+    Get current currency exposure breakdown.
+
+    Returns exposure for each currency including:
+    - Gross long and short positions
+    - Net exposure
+    - Number of positions
+    - Average entry FX rate
+    - Current FX rate
+    - Unrealized FX P&L
+
+    This is essential for understanding portfolio FX risk.
+    """
+    if not fx_ledger:
+        raise HTTPException(status_code=503, detail="FX accounting not initialized")
+
+    exposure = fx_ledger.get_exposure_summary()
+    return exposure
+
+
+@app.get("/api/v1/fx/accounting/currencies")
+async def get_currency_positions():
+    """
+    Get detailed currency position data.
+
+    Returns per-currency position information for risk analysis
+    and hedging decisions.
+    """
+    if not fx_ledger:
+        raise HTTPException(status_code=503, detail="FX accounting not initialized")
+
+    positions = fx_ledger.get_currency_exposure()
+    return {
+        "base_currency": BASE_CURRENCY,
+        "positions": {ccy: pos.to_dict() for ccy, pos in positions.items()},
+        "position_count": len(positions),
+    }
+
+
+@app.get("/api/v1/fx/accounting/transactions")
+async def get_fx_transactions(
+    transaction_type: Optional[str] = Query(None, description="Filter by type"),
+    currency: Optional[str] = Query(None, description="Filter by currency"),
+    start_date: Optional[str] = Query(None, description="Start date (ISO)"),
+    end_date: Optional[str] = Query(None, description="End date (ISO)"),
+    limit: int = Query(100, ge=1, le=1000, description="Max transactions"),
+):
+    """
+    Get FX transaction ledger with optional filtering.
+
+    Returns a list of all FX transactions including:
+    - Trade opens/closes with FX rates
+    - Dividends received in foreign currencies
+    - Mark-to-market revaluations
+    - FX conversions
+
+    **Transaction types:** TRADE_OPEN, TRADE_CLOSE, DIVIDEND, FX_CONVERSION, REVALUATION
+    """
+    if not fx_ledger:
+        raise HTTPException(status_code=503, detail="FX accounting not initialized")
+
+    # Parse dates
+    start_dt = None
+    end_dt = None
+
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid start_date format")
+
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid end_date format")
+
+    # Parse transaction type if provided
+    txn_type = None
+    if transaction_type:
+        try:
+            txn_type = FXTransactionType(transaction_type.upper())
+        except ValueError:
+            valid_types = [t.value for t in FXTransactionType]
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid transaction_type. Valid types: {valid_types}"
+            )
+
+    transactions = fx_ledger.get_transactions(
+        start_date=start_dt,
+        end_date=end_dt,
+        transaction_type=txn_type,
+        currency=currency.upper() if currency else None,
+        limit=limit,
+    )
+
+    return {
+        "transactions": [txn.to_dict() for txn in transactions],
+        "count": len(transactions),
+        "filters": {
+            "transaction_type": transaction_type,
+            "currency": currency,
+            "start_date": start_date,
+            "end_date": end_date,
+            "limit": limit,
+        },
+    }
+
+
+@app.post("/api/v1/fx/accounting/revalue")
+async def revalue_positions(request: FXRevalueRequest = FXRevalueRequest()):
+    """
+    Trigger mark-to-market revaluation of all open positions.
+
+    Recalculates unrealized FX gains/losses for all positions
+    using current FX rates.
+
+    Returns:
+    - Total unrealized FX P&L after revaluation
+    - Number of positions revalued
+    - Revaluation timestamp
+    """
+    if not fx_ledger or not fx_service:
+        raise HTTPException(status_code=503, detail="FX accounting not initialized")
+
+    if not broker:
+        raise HTTPException(status_code=503, detail="Broker not initialized")
+
+    # Get current positions
+    positions = broker.get_positions()
+
+    if not positions:
+        return {
+            "status": "no_positions",
+            "message": "No open positions to revalue",
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    # Get current FX rates
+    current_rates = {}
+    for pos in positions:
+        trade_ccy = pos.get("trade_currency", "USD")
+        if trade_ccy != BASE_CURRENCY:
+            pair = f"{BASE_CURRENCY}{trade_ccy}"
+            if pair not in current_rates:
+                try:
+                    rate = await fx_service.get_rate(BASE_CURRENCY, trade_ccy)
+                    current_rates[pair] = rate
+                except Exception as e:
+                    logger.warning(f"Could not get rate for {pair}: {e}")
+
+    # Perform revaluation
+    total_unrealized, revaluation_txns = fx_ledger.revalue_positions(
+        positions=positions,
+        current_rates=current_rates,
+    )
+
+    logger.info(
+        "Positions revalued",
+        position_count=len(positions),
+        unrealized_fx_pnl=total_unrealized,
+    )
+
+    return {
+        "status": "revalued",
+        "positions_revalued": len(positions),
+        "total_unrealized_fx_pnl": round(total_unrealized, 2),
+        "rates_used": {k: round(v, 6) for k, v in current_rates.items()},
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+@app.post("/api/v1/fx/accounting/attribution")
+async def get_position_fx_attribution(request: FXAttributionRequest):
+    """
+    Get FX attribution breakdown for a specific position.
+
+    Separates the position P&L into:
+    - **Trading P&L**: Profit/loss from price movement in trade currency
+    - **FX Impact**: Profit/loss from exchange rate movement
+
+    This allows accurate performance attribution:
+    - Was the profit from good trade selection?
+    - Or from favorable FX movements?
+    """
+    if not fx_ledger:
+        raise HTTPException(status_code=503, detail="FX accounting not initialized")
+
+    attribution = fx_ledger.get_position_fx_attribution(
+        position_id=request.position_id,
+        current_value_trade=request.current_value_trade,
+        current_fx_rate=request.current_fx_rate,
+    )
+
+    if not attribution:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Position {request.position_id} not found in FX ledger"
+        )
+
+    return attribution.to_dict()
+
+
+@app.get("/api/v1/fx/accounting/attribution/{position_id}")
+async def get_position_fx_attribution_by_id(
+    position_id: str,
+    current_value: Optional[float] = Query(None, description="Current value in trade currency"),
+):
+    """
+    Get FX attribution for a position by ID.
+
+    If current_value is not provided, attempts to get it from the broker.
+    """
+    if not fx_ledger or not broker:
+        raise HTTPException(status_code=503, detail="FX accounting not initialized")
+
+    # Try to get position from broker
+    positions = broker.get_positions()
+    position = next(
+        (p for p in positions if p.get("id") == position_id or p.get("symbol") == position_id),
+        None
+    )
+
+    if not position and current_value is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Position {position_id} not found. Provide current_value parameter."
+        )
+
+    # Get current value
+    if current_value is not None:
+        curr_value = current_value
+    else:
+        quantity = position.get("quantity", 0)
+        current_price = position.get("current_price", position.get("average_entry_price", 0))
+        curr_value = quantity * current_price
+
+    # Get current FX rate
+    trade_ccy = position.get("trade_currency", "USD") if position else "USD"
+    try:
+        current_fx_rate = await fx_service.get_rate(BASE_CURRENCY, trade_ccy) if fx_service else 1.0
+    except Exception:
+        current_fx_rate = 1.0
+
+    attribution = fx_ledger.get_position_fx_attribution(
+        position_id=position_id,
+        current_value_trade=curr_value,
+        current_fx_rate=current_fx_rate,
+    )
+
+    if not attribution:
+        # Return what we can calculate without ledger entry
+        return {
+            "position_id": position_id,
+            "message": "Position not tracked in FX ledger yet",
+            "current_value_trade": curr_value,
+            "current_fx_rate": current_fx_rate,
+        }
+
+    return attribution.to_dict()
+
+
+@app.post("/api/v1/fx/accounting/reset")
+async def reset_fx_accounting():
+    """
+    Reset FX accounting ledger.
+
+    **CAUTION:** This clears all FX transaction history and P&L tracking.
+    Use only for testing or when starting fresh.
+
+    Requires confirmation via query parameter.
+    """
+    if not fx_ledger:
+        raise HTTPException(status_code=503, detail="FX accounting not initialized")
+
+    fx_ledger.reset()
+    logger.warning("FX accounting ledger reset")
+
+    return {
+        "status": "reset",
+        "message": "FX accounting ledger has been reset",
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+@app.get("/api/v1/fx/accounting/stats")
+async def get_fx_accounting_stats():
+    """
+    Get FX accounting statistics and status.
+
+    Returns:
+    - Transaction count by type
+    - Currency exposure summary
+    - Realized and unrealized totals
+    - Last revaluation time
+    """
+    if not fx_ledger:
+        return {
+            "status": "not_initialized",
+            "base_currency": BASE_CURRENCY,
+        }
+
+    # Get transaction counts by type
+    all_txns = fx_ledger.get_transactions(limit=10000)
+    txn_counts = {}
+    for txn in all_txns:
+        txn_type = txn.transaction_type.value
+        txn_counts[txn_type] = txn_counts.get(txn_type, 0) + 1
+
+    # Get P&L summary
+    pnl = fx_ledger.get_fx_pnl_summary()
+
+    # Get exposure
+    exposure = fx_ledger.get_exposure_summary()
+
+    return {
+        "status": "active",
+        "base_currency": BASE_CURRENCY,
+        "transaction_count": len(all_txns),
+        "transactions_by_type": txn_counts,
+        "realized_fx_pnl": round(pnl.realized_fx_net, 2),
+        "unrealized_fx_pnl": round(pnl.unrealized_fx_net, 2),
+        "total_fx_impact": round(pnl.total_fx_impact, 2),
+        "currency_count": exposure.get("currency_count", 0),
+        "total_exposure_base": exposure.get("total_exposure_base", 0),
     }
 
 

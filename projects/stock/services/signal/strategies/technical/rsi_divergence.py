@@ -49,6 +49,78 @@ from confidence.invalidation import InvalidationRule
 
 logger = structlog.get_logger(__name__)
 
+# Required keys for OHLCV bar data
+REQUIRED_OHLCV_KEYS = {'open', 'high', 'low', 'close', 'volume'}
+
+
+def validate_ohlcv_data(ohlcv_data: List[Dict[str, Any]], symbol: str = "") -> bool:
+    """
+    Validate OHLCV data has required keys and numeric values.
+
+    Args:
+        ohlcv_data: List of OHLCV bar dictionaries
+        symbol: Symbol name for logging
+
+    Returns:
+        True if valid, False otherwise
+    """
+    if not ohlcv_data:
+        return False
+
+    for i, bar in enumerate(ohlcv_data):
+        # Check required keys exist
+        missing_keys = REQUIRED_OHLCV_KEYS - set(bar.keys())
+        if missing_keys:
+            logger.warning(
+                "OHLCV bar missing required keys",
+                symbol=symbol,
+                bar_index=i,
+                missing_keys=list(missing_keys),
+            )
+            return False
+
+        # Validate values are numeric and not None
+        for key in REQUIRED_OHLCV_KEYS:
+            value = bar.get(key)
+            if value is None:
+                logger.warning(
+                    "OHLCV bar has None value",
+                    symbol=symbol,
+                    bar_index=i,
+                    key=key,
+                )
+                return False
+            if not isinstance(value, (int, float)):
+                logger.warning(
+                    "OHLCV bar has non-numeric value",
+                    symbol=symbol,
+                    bar_index=i,
+                    key=key,
+                    value_type=type(value).__name__,
+                )
+                return False
+            # Check for reasonable price values (not negative, not zero for prices)
+            if key in ('open', 'high', 'low', 'close') and value <= 0:
+                logger.warning(
+                    "OHLCV bar has invalid price value",
+                    symbol=symbol,
+                    bar_index=i,
+                    key=key,
+                    value=value,
+                )
+                return False
+            # Volume can be zero but not negative
+            if key == 'volume' and value < 0:
+                logger.warning(
+                    "OHLCV bar has negative volume",
+                    symbol=symbol,
+                    bar_index=i,
+                    value=value,
+                )
+                return False
+
+    return True
+
 
 class RSIDivergenceStrategy:
     """
