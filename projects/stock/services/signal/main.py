@@ -47,6 +47,15 @@ from strategies.technical.volatility_event import VolatilityEventStrategy
 from strategies.technical.volume_profile import VolumeProfileStrategy
 from strategies.technical.ml_signals import MLSignalStrategy
 from models import Signal as SignalModel, SignalFeatures, SignalSide, EntryType, TimeInForce
+
+# Intelligence module imports
+from intelligence import (
+    MarketRegimeDetector,
+    StrategyPerformanceTracker,
+    StrategyEnsemble,
+    AdaptivePositionSizer,
+    RegimeType,
+)
 from confidence import ConfidenceScorer
 from confidence.invalidation import validate_signal_against_market, InvalidationRule
 from events.consumer import EventConsumer, get_event_consumer, with_deduplication
@@ -95,11 +104,18 @@ MAX_SIGNALS = 100  # Keep last 100 signals
 # Distributed kill switch (initialized in lifespan)
 distributed_kill_switch: Optional[DistributedKillSwitch] = None
 
+# Intelligence components (initialized in lifespan)
+regime_detector: Optional[MarketRegimeDetector] = None
+performance_tracker: Optional[StrategyPerformanceTracker] = None
+strategy_ensemble: Optional[StrategyEnsemble] = None
+position_sizer: Optional[AdaptivePositionSizer] = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan - startup and shutdown."""
     global distributed_kill_switch
+    global regime_detector, performance_tracker, strategy_ensemble, position_sizer
 
     logger.info("Starting Signal Service...")
 
@@ -115,6 +131,36 @@ async def lifespan(app: FastAPI):
     event_consumer = get_event_consumer()
     await event_consumer.initialize()
     logger.info("Event consumer initialized")
+
+    # Initialize intelligence components
+    data_dir = os.getenv("DATA_DIR", "/app/data")
+    regime_detector = MarketRegimeDetector()
+    performance_tracker = StrategyPerformanceTracker(config={"data_dir": data_dir})
+
+    # Initialize all strategy instances for ensemble
+    strategy_instances = {
+        strategy_id: strategy_class(strategy_class.DEFAULT_CONFIG)
+        for strategy_id, strategy_class in STRATEGIES.items()
+    }
+
+    # Create ensemble with all strategies
+    strategy_ensemble = StrategyEnsemble(
+        strategies=strategy_instances,
+        regime_detector=regime_detector,
+        performance_tracker=performance_tracker,
+    )
+
+    # Initialize position sizer
+    position_sizer = AdaptivePositionSizer(
+        equity=100000,  # Will be updated from actual portfolio
+        performance_tracker=performance_tracker,
+    )
+
+    logger.info(
+        "Intelligence components initialized",
+        strategies=list(STRATEGIES.keys()),
+        ensemble_strategies=len(strategy_instances),
+    )
 
     logger.info("Signal Service started", strategies=list(STRATEGIES.keys()))
     yield
@@ -1254,6 +1300,291 @@ async def cleanup_old_events(retention_days: int = 7):
         "deleted_count": deleted,
         "retention_days": retention_days,
         "service": "signal",
+    }
+
+
+# =============================================================================
+# Intelligence Endpoints
+# =============================================================================
+
+@app.get("/api/v1/intelligence/regime/{symbol}")
+async def get_market_regime(symbol: str, market: str = "US", lookback_days: int = 100):
+    """
+    Detect current market regime for a symbol.
+
+    Returns regime classification (TRENDING_UP, TRENDING_DOWN, RANGING,
+    HIGH_VOLATILITY, LOW_VOLATILITY) with recommended strategies.
+    """
+    if not regime_detector:
+        raise HTTPException(status_code=503, detail="Regime detector not initialized")
+
+    # Fetch market data
+    data = await fetch_ohlcv(symbol.upper(), market, lookback_days)
+
+    if not data or not data.get("data"):
+        raise HTTPException(status_code=404, detail=f"No data for {symbol}")
+
+    regime = regime_detector.detect(data["data"])
+
+    return {
+        "symbol": symbol.upper(),
+        "market": market,
+        "regime": {
+            "type": regime.regime_type.value,
+            "confidence": regime.confidence,
+            "trend_strength": regime.trend_strength,
+            "volatility_percentile": regime.volatility_percentile,
+            "adx": regime.adx_value,
+            "duration_days": regime.regime_duration_days,
+        },
+        "recommendations": {
+            "strategies": regime.recommended_strategies,
+            "strategy_weights": regime.strategy_weights,
+            "position_size_multiplier": regime.position_size_multiplier,
+            "stop_loss_multiplier": regime.stop_loss_multiplier,
+        },
+        "metrics": regime.metrics,
+        "summary": regime_detector.get_regime_summary(regime),
+    }
+
+
+@app.post("/api/v1/intelligence/ensemble/generate")
+async def generate_ensemble_signal(
+    symbols: List[str],
+    market: str = "US",
+    lookback_days: int = 100,
+):
+    """
+    Generate signals using the intelligent ensemble strategy.
+
+    Combines signals from all strategies with regime-aware weighting
+    and requires consensus for high-confidence signals.
+    """
+    if not strategy_ensemble:
+        raise HTTPException(status_code=503, detail="Ensemble not initialized")
+
+    results = []
+
+    for symbol in symbols:
+        # Fetch market data
+        data = await fetch_ohlcv(symbol.upper(), market, lookback_days)
+
+        if not data or not data.get("data"):
+            results.append({
+                "symbol": symbol.upper(),
+                "signal": None,
+                "error": "No data available",
+            })
+            continue
+
+        try:
+            ensemble_result = strategy_ensemble.analyze_full(
+                symbol=symbol.upper(),
+                market=market,
+                ohlcv_data=data["data"],
+                data_hash=data.get("data_hash", ""),
+            )
+
+            signal_dict = None
+            if ensemble_result.signal:
+                signal_dict = ensemble_result.signal.to_dict()
+                # Store in signal store
+                SIGNAL_STORE[ensemble_result.signal.id] = signal_dict
+
+            results.append({
+                "symbol": symbol.upper(),
+                "signal": signal_dict,
+                "consensus_strength": ensemble_result.consensus_strength,
+                "participating_strategies": ensemble_result.participating_strategies,
+                "agreeing_strategies": ensemble_result.agreeing_strategies,
+                "regime": {
+                    "type": ensemble_result.regime.regime_type.value,
+                    "confidence": ensemble_result.regime.confidence,
+                },
+                "votes": [
+                    {
+                        "strategy_id": v.strategy_id,
+                        "side": v.side.value,
+                        "confidence": v.confidence,
+                        "weight": v.weight,
+                    }
+                    for v in ensemble_result.votes
+                ],
+            })
+
+        except Exception as e:
+            logger.error("Ensemble analysis error", symbol=symbol, error=str(e))
+            results.append({
+                "symbol": symbol.upper(),
+                "signal": None,
+                "error": str(e),
+            })
+
+    signals_generated = sum(1 for r in results if r.get("signal"))
+
+    return {
+        "results": results,
+        "symbols_analyzed": len(symbols),
+        "signals_generated": signals_generated,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+@app.get("/api/v1/intelligence/strategies/weights")
+async def get_strategy_weights():
+    """
+    Get current performance-based strategy weights.
+
+    Weights are calculated from historical performance metrics
+    (Sharpe ratio, win rate, recent performance).
+    """
+    if not performance_tracker:
+        raise HTTPException(status_code=503, detail="Performance tracker not initialized")
+
+    strategy_ids = list(STRATEGIES.keys())
+    weights = performance_tracker.get_strategy_weights(strategy_ids)
+    metrics = performance_tracker.get_all_metrics()
+
+    return {
+        "weights": weights,
+        "metrics": {
+            strategy_id: m.to_dict() if m else None
+            for strategy_id, m in metrics.items()
+        },
+        "total_strategies": len(strategy_ids),
+        "strategies_with_data": len(metrics),
+    }
+
+
+@app.post("/api/v1/intelligence/performance/record")
+async def record_signal_outcome(
+    signal_id: str,
+    strategy_id: str,
+    symbol: str,
+    side: str,
+    entry_price: float,
+    exit_price: float,
+    pnl_dollars: float,
+    holding_period_hours: float,
+    regime: Optional[str] = None,
+    confidence: float = 0.5,
+):
+    """
+    Record a signal outcome for performance tracking.
+
+    Used to update strategy weights based on actual results.
+    """
+    if not performance_tracker:
+        raise HTTPException(status_code=503, detail="Performance tracker not initialized")
+
+    performance_tracker.record_signal_outcome(
+        signal_id=signal_id,
+        strategy_id=strategy_id,
+        symbol=symbol,
+        side=side,
+        entry_price=entry_price,
+        exit_price=exit_price,
+        pnl_dollars=pnl_dollars,
+        holding_period_hours=holding_period_hours,
+        regime=regime,
+        confidence=confidence,
+    )
+
+    return {"status": "recorded", "signal_id": signal_id}
+
+
+@app.post("/api/v1/intelligence/position-size")
+async def calculate_position_size(
+    symbol: str,
+    entry_price: float,
+    stop_loss: float,
+    confidence: float = 0.5,
+    market: str = "US",
+    equity: Optional[float] = None,
+    current_drawdown_pct: float = 0.0,
+):
+    """
+    Calculate optimal position size using Kelly criterion and adaptive adjustments.
+
+    Takes into account:
+    - Kelly criterion based on strategy performance
+    - Signal confidence level
+    - Market regime
+    - Current portfolio drawdown
+    """
+    if not position_sizer or not regime_detector:
+        raise HTTPException(status_code=503, detail="Position sizer not initialized")
+
+    # Update equity if provided
+    if equity:
+        position_sizer.update_equity(equity)
+
+    # Get regime for the symbol
+    data = await fetch_ohlcv(symbol.upper(), market, 100)
+    regime_type = "UNKNOWN"
+
+    if data and data.get("data"):
+        regime = regime_detector.detect(data["data"])
+        regime_type = regime.regime_type.value
+
+    # Calculate position size
+    result = position_sizer.calculate_position_size(
+        symbol=symbol.upper(),
+        entry_price=entry_price,
+        stop_loss=stop_loss,
+        confidence=confidence,
+        regime_type=regime_type,
+        current_drawdown_pct=current_drawdown_pct,
+    )
+
+    return {
+        "symbol": symbol.upper(),
+        "shares": result.shares,
+        "dollar_amount": result.dollar_amount,
+        "position_pct": result.position_pct,
+        "risk": {
+            "per_share": result.risk_per_share,
+            "total": result.total_risk,
+            "pct_of_equity": result.risk_pct,
+        },
+        "adjustments": {
+            "base_size_pct": result.base_size_pct,
+            "kelly_factor": result.kelly_factor,
+            "confidence": result.confidence_adjustment,
+            "regime": result.regime_adjustment,
+            "drawdown": result.drawdown_adjustment,
+            "correlation": result.correlation_adjustment,
+            "final": result.final_adjustment,
+        },
+        "regime_type": regime_type,
+        "reasoning": result.sizing_reason,
+    }
+
+
+@app.get("/api/v1/intelligence/summary")
+async def get_intelligence_summary():
+    """
+    Get summary of all intelligence components.
+
+    Provides overview of regime detection, strategy weights,
+    and position sizing configuration.
+    """
+    return {
+        "ensemble": {
+            "strategies": list(STRATEGIES.keys()),
+            "total_strategies": len(STRATEGIES),
+            "config": strategy_ensemble.config if strategy_ensemble else {},
+        },
+        "regime_detector": {
+            "config": regime_detector.config if regime_detector else {},
+            "regime_types": [r.value for r in RegimeType],
+        },
+        "performance_tracker": {
+            "tracked_strategies": list(performance_tracker.outcomes.keys()) if performance_tracker else [],
+            "total_outcomes": sum(len(v) for v in performance_tracker.outcomes.values()) if performance_tracker else 0,
+        },
+        "position_sizer": position_sizer.get_sizing_summary() if position_sizer else {},
+        "status": "operational",
     }
 
 
