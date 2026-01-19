@@ -29,6 +29,7 @@
  */
 
 import axios from 'axios';
+import { EventTypes } from '../outbox/events.js';
 
 /**
  * US Market configuration for determining market hours
@@ -46,6 +47,7 @@ const US_MARKET_CONFIG = {
 export class SignalGenerationJob {
   constructor(options = {}) {
     this.logger = options.logger || console;
+    this.outboxPublisher = options.outboxPublisher || null;
     this.config = {
       signalServiceUrl: options.signalServiceUrl ||
         process.env.SIGNAL_SERVICE_URL || 'http://localhost:5102',
@@ -68,6 +70,9 @@ export class SignalGenerationJob {
       timeout: options.timeout || 60000, // 60 seconds for signal generation
       notifyOnSignals: options.notifyOnSignals ?? true,
       minConfidenceForNotify: options.minConfidenceForNotify || 0.7,
+      // Auto-execute signals through the outbox pattern
+      autoExecuteSignals: options.autoExecuteSignals ??
+        (process.env.SIGNAL_AUTO_EXECUTE === 'true'),
     };
 
     this.isRunning = false;
@@ -289,7 +294,84 @@ export class SignalGenerationJob {
     result.duration_ms = Date.now() - startTime;
     this.totalSignalsGenerated += result.total_signals;
 
+    // Publish high-confidence signals to outbox for execution (if enabled)
+    if (this.config.autoExecuteSignals && result.high_confidence_signals.length > 0) {
+      const publishResults = await this._publishSignalsToOutbox(result.high_confidence_signals);
+      result.signals_published = publishResults.published;
+      result.publish_errors = publishResults.errors;
+    }
+
     return result;
+  }
+
+  /**
+   * Set the outbox publisher (can be set after construction)
+   * @param {OutboxPublisher} publisher - The outbox publisher instance
+   */
+  setOutboxPublisher(publisher) {
+    this.outboxPublisher = publisher;
+    this.logger.info('Outbox publisher set for signal generation job');
+  }
+
+  /**
+   * Publish signals to the outbox for execution
+   * @param {Array} signals - Array of signals to publish
+   * @returns {Object} Results of publishing
+   */
+  async _publishSignalsToOutbox(signals) {
+    const results = { published: 0, errors: [] };
+
+    if (!this.outboxPublisher) {
+      this.logger.warn('Outbox publisher not configured, skipping signal publishing');
+      return results;
+    }
+
+    for (const signal of signals) {
+      try {
+        // Transform signal to outbox event payload
+        const payload = {
+          signal_id: signal.id,
+          symbol: signal.symbol,
+          direction: signal.side, // BUY or SELL
+          strategy_id: signal.strategy_id,
+          confidence: signal.confidence_score,
+          entry_price: signal.entry_price,
+          target_price: signal.target_price,
+          stop_loss: signal.stop_loss,
+          metadata: {
+            strategy_version: signal.strategy_version,
+            features: signal.features,
+            invalidation_rules: signal.invalidation_rules,
+            reason: signal.reason,
+            market: signal.market,
+            time_in_force: signal.time_in_force,
+            data_snapshot_hash: signal.data_snapshot_hash,
+            rule_version_id: signal.rule_version_id,
+          },
+        };
+
+        await this.outboxPublisher.publish(EventTypes.SIGNAL_GENERATED, payload);
+        results.published++;
+
+        this.logger.info('Signal published to outbox', {
+          signalId: signal.id,
+          symbol: signal.symbol,
+          direction: signal.side,
+          confidence: signal.confidence_score,
+        });
+      } catch (error) {
+        this.logger.error('Failed to publish signal to outbox', {
+          signalId: signal.id,
+          error: error.message,
+        });
+        results.errors.push({
+          signalId: signal.id,
+          error: error.message,
+        });
+      }
+    }
+
+    return results;
   }
 
   /**

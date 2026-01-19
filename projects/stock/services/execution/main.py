@@ -317,6 +317,27 @@ class OrderRequest(BaseModel):
     rule_version_id: str
 
 
+class SignalProposeRequest(BaseModel):
+    """Request to propose an order from a signal (via outbox pattern)."""
+    signal_id: str
+    symbol: str
+    direction: str  # BUY or SELL
+    strategy_id: str
+    confidence: float
+    entry_price: Optional[float] = None
+    target_price: Optional[float] = None
+    stop_loss: Optional[float] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class SignalProposeResponse(BaseModel):
+    """Response from signal propose endpoint."""
+    success: bool
+    order_id: Optional[str] = None
+    message: str
+    signal_id: str
+
+
 class Order(BaseModel):
     """Order details."""
     id: str
@@ -852,6 +873,116 @@ async def submit_order(
     except Exception as e:
         logger.error("Order execution failed", error=str(e))
         raise HTTPException(status_code=500, detail=f"Order execution failed: {str(e)}")
+
+
+@app.post("/api/v1/orders/propose", response_model=SignalProposeResponse)
+async def propose_order_from_signal(
+    request: SignalProposeRequest,
+    x_idempotency_key: Optional[str] = Header(None, alias="X-Idempotency-Key"),
+):
+    """
+    Propose an order based on a signal (via outbox pattern).
+
+    This endpoint receives signals from the outbox dispatcher and converts them
+    to orders. The order then goes through normal risk validation and execution.
+
+    Flow:
+        Signal Service → Outbox → This endpoint → Risk Validation → Execution
+
+    The signal must include sufficient audit trail information for compliance.
+    """
+    logger.info(
+        "Signal propose request received",
+        signal_id=request.signal_id,
+        symbol=request.symbol,
+        direction=request.direction,
+        confidence=request.confidence,
+    )
+
+    # Validate direction
+    if request.direction.upper() not in ["BUY", "SELL"]:
+        return SignalProposeResponse(
+            success=False,
+            message=f"Invalid direction: {request.direction}. Must be BUY or SELL.",
+            signal_id=request.signal_id,
+        )
+
+    # Check confidence threshold (configurable via env)
+    min_confidence = float(os.getenv("MIN_SIGNAL_CONFIDENCE", "0.6"))
+    if request.confidence < min_confidence:
+        return SignalProposeResponse(
+            success=False,
+            message=f"Signal confidence {request.confidence} below threshold {min_confidence}",
+            signal_id=request.signal_id,
+        )
+
+    # Extract metadata
+    metadata = request.metadata or {}
+
+    # Calculate position size based on confidence and risk limits
+    # Default: 100 shares, but could be adjusted based on strategy
+    base_quantity = float(os.getenv("DEFAULT_ORDER_QUANTITY", "100"))
+    quantity = base_quantity
+
+    # Build order request
+    try:
+        order_request = OrderRequest(
+            symbol=request.symbol,
+            market=metadata.get("market", "US"),
+            side=OrderSide(request.direction.upper()),
+            quantity=quantity,
+            order_type=OrderType.MARKET,
+            price=request.entry_price,
+            stop_price=request.stop_loss,
+            time_in_force=metadata.get("time_in_force", "DAY"),
+            signal_id=request.signal_id,
+            reason=metadata.get("reason", f"Signal from {request.strategy_id} (confidence: {request.confidence:.1%})"),
+            data_snapshot_hash=metadata.get("data_snapshot_hash", ""),
+            rule_version_id=metadata.get("rule_version_id", f"{request.strategy_id}_1.0.0"),
+        )
+
+        # Submit through normal order flow (with idempotency)
+        idempotency_key = x_idempotency_key or f"signal_{request.signal_id}"
+
+        # Call the order submission directly
+        order = await submit_order(order_request, idempotency_key)
+
+        logger.info(
+            "Order proposed from signal",
+            signal_id=request.signal_id,
+            order_id=order.id,
+            symbol=request.symbol,
+        )
+
+        return SignalProposeResponse(
+            success=True,
+            order_id=order.id,
+            message=f"Order created from signal {request.signal_id}",
+            signal_id=request.signal_id,
+        )
+
+    except HTTPException as e:
+        logger.warning(
+            "Order proposal rejected",
+            signal_id=request.signal_id,
+            reason=e.detail,
+        )
+        return SignalProposeResponse(
+            success=False,
+            message=str(e.detail),
+            signal_id=request.signal_id,
+        )
+    except Exception as e:
+        logger.error(
+            "Order proposal failed",
+            signal_id=request.signal_id,
+            error=str(e),
+        )
+        return SignalProposeResponse(
+            success=False,
+            message=f"Order proposal failed: {str(e)}",
+            signal_id=request.signal_id,
+        )
 
 
 @app.get("/api/v1/orders", response_model=List[Order])

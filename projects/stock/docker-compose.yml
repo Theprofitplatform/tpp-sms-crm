@@ -1,0 +1,352 @@
+# =============================================================================
+# Stock Trading Automation System - Docker Compose
+# =============================================================================
+# Usage:
+#   docker compose up -d          # Start all services
+#   docker compose down           # Stop all services
+#   docker compose logs -f        # View logs
+#   docker compose ps             # Check service status
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Database Services
+  # ---------------------------------------------------------------------------
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: stock-timescaledb
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-stock_trading}
+      POSTGRES_USER: ${POSTGRES_USER:-stock_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+      - ./scripts/setup/init-timescaledb.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stock_user} -d ${POSTGRES_DB:-stock_trading}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stock-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: stock-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stock-network
+
+  # ---------------------------------------------------------------------------
+  # Trading Services
+  # ---------------------------------------------------------------------------
+
+  data-service:
+    build:
+      context: ./services/data
+      dockerfile: Dockerfile
+    container_name: stock-data-service
+    restart: unless-stopped
+    environment:
+      - POSTGRES_HOST=timescaledb
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-stock_trading}
+      - POSTGRES_USER=${POSTGRES_USER:-stock_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+      - TIMESCALEDB_URL=postgresql://${POSTGRES_USER:-stock_user}:${POSTGRES_PASSWORD:-changeme}@timescaledb:5432/${POSTGRES_DB:-stock_trading}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - POLYGON_API_KEY=${POLYGON_API_KEY:-}
+      - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+    ports:
+      - "${DATA_SERVICE_PORT:-5101}:5101"
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5101/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - stock-network
+
+  signal-service:
+    build:
+      context: ./services/signal
+      dockerfile: Dockerfile
+    container_name: stock-signal-service
+    restart: unless-stopped
+    environment:
+      - DATA_SERVICE_URL=http://data-service:5101
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_HOST=timescaledb
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-stock_trading}
+      - POSTGRES_USER=${POSTGRES_USER:-stock_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+      - TIMESCALEDB_URL=postgresql://${POSTGRES_USER:-stock_user}:${POSTGRES_PASSWORD:-changeme}@timescaledb:5432/${POSTGRES_DB:-stock_trading}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+    ports:
+      - "${SIGNAL_SERVICE_PORT:-5102}:5102"
+    depends_on:
+      data-service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5102/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - stock-network
+
+  risk-service:
+    build:
+      context: ./services/risk
+      dockerfile: Dockerfile
+    container_name: stock-risk-service
+    restart: unless-stopped
+    environment:
+      - SIGNAL_SERVICE_URL=http://signal-service:5102
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_HOST=timescaledb
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-stock_trading}
+      - POSTGRES_USER=${POSTGRES_USER:-stock_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+      - TIMESCALEDB_URL=postgresql://${POSTGRES_USER:-stock_user}:${POSTGRES_PASSWORD:-changeme}@timescaledb:5432/${POSTGRES_DB:-stock_trading}
+      - TRADING_MODE=${TRADING_MODE:-BACKTEST}
+      - KILL_SWITCH_ENABLED=${KILL_SWITCH_ENABLED:-true}
+      - MAX_ORDERS_PER_DAY=${MAX_ORDERS_PER_DAY:-20}
+      - MAX_DAILY_LOSS_PCT=${MAX_DAILY_LOSS_PCT:-2.0}
+      - MAX_WEEKLY_LOSS_PCT=${MAX_WEEKLY_LOSS_PCT:-5.0}
+      - MAX_POSITION_SIZE_PCT=${MAX_POSITION_SIZE_PCT:-10.0}
+      - MAX_DRAWDOWN_PCT=${MAX_DRAWDOWN_PCT:-15.0}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+    ports:
+      - "${RISK_SERVICE_PORT:-5103}:5103"
+    depends_on:
+      signal-service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5103/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - stock-network
+
+  execution-service:
+    build:
+      context: ./services/execution
+      dockerfile: Dockerfile
+    container_name: stock-execution-service
+    restart: unless-stopped
+    environment:
+      - RISK_SERVICE_URL=http://risk-service:5103
+      - DATA_SERVICE_URL=http://data-service:5101
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_HOST=timescaledb
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-stock_trading}
+      - POSTGRES_USER=${POSTGRES_USER:-stock_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+      - TIMESCALEDB_URL=postgresql://${POSTGRES_USER:-stock_user}:${POSTGRES_PASSWORD:-changeme}@timescaledb:5432/${POSTGRES_DB:-stock_trading}
+      - TRADING_MODE=${TRADING_MODE:-BACKTEST}
+      - LIVE_TRADING_ENABLED=${LIVE_TRADING_ENABLED:-false}
+      - ALPACA_API_KEY=${ALPACA_API_KEY:-}
+      - ALPACA_SECRET_KEY=${ALPACA_SECRET_KEY:-}
+      - ALPACA_BASE_URL=${ALPACA_BASE_URL:-https://paper-api.alpaca.markets}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+    ports:
+      - "${EXECUTION_SERVICE_PORT:-5104}:5104"
+    depends_on:
+      risk-service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5104/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - stock-network
+
+  ops-service:
+    build:
+      context: ./services/ops
+      dockerfile: Dockerfile
+    container_name: stock-ops-service
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=${ENVIRONMENT:-development}
+      - PORT=${OPS_SERVICE_PORT:-5100}
+      - DATA_SERVICE_URL=http://data-service:5101
+      - SIGNAL_SERVICE_URL=http://signal-service:5102
+      - RISK_SERVICE_URL=http://risk-service:5103
+      - EXECUTION_SERVICE_URL=http://execution-service:5104
+      - SQLITE_DB_PATH=/app/data/stock.db
+      # PostgreSQL/TimescaleDB connection (for outbox system)
+      - POSTGRES_HOST=timescaledb
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-stock_trading}
+      - POSTGRES_USER=${POSTGRES_USER:-stock_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+      - TIMESCALEDB_URL=postgresql://${POSTGRES_USER:-stock_user}:${POSTGRES_PASSWORD:-changeme}@timescaledb:5432/${POSTGRES_DB:-stock_trading}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - PROMETHEUS_ENABLED=${PROMETHEUS_ENABLED:-true}
+      # Signal generation job configuration
+      - SIGNAL_GENERATION_ENABLED=${SIGNAL_GENERATION_ENABLED:-true}
+      - SIGNAL_GENERATION_INTERVAL_MINUTES=${SIGNAL_GENERATION_INTERVAL_MINUTES:-15}
+      - SIGNAL_GENERATION_SYMBOLS=${SIGNAL_GENERATION_SYMBOLS:-AAPL,MSFT,GOOGL,AMZN,TSLA,NVDA,META}
+      - SIGNAL_GENERATION_STRATEGIES=${SIGNAL_GENERATION_STRATEGIES:-momentum,mean_reversion}
+      - SIGNAL_AUTO_EXECUTE=${SIGNAL_AUTO_EXECUTE:-false}
+    ports:
+      - "${OPS_SERVICE_PORT:-5100}:5100"
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      data-service:
+        condition: service_healthy
+      signal-service:
+        condition: service_healthy
+      risk-service:
+        condition: service_healthy
+      execution-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5100/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - stock-network
+
+  # ---------------------------------------------------------------------------
+  # Monitoring Services
+  # ---------------------------------------------------------------------------
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: stock-prometheus
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    networks:
+      - stock-network
+    profiles:
+      - monitoring
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: stock-alertmanager
+    restart: unless-stopped
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - ./config/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./config/alertmanager/templates:/etc/alertmanager/templates:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    environment:
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - SMTP_TO=${SMTP_TO:-}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+    networks:
+      - stock-network
+    profiles:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: stock-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    ports:
+      - "${GRAFANA_PORT:-3010}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    networks:
+      - stock-network
+    profiles:
+      - monitoring
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  timescaledb_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  alertmanager_data:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  stock-network:
+    driver: bridge

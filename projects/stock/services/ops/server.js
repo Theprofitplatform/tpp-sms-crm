@@ -473,6 +473,9 @@ async function initializeServices() {
         : ['momentum', 'mean_reversion'],
       market: process.env.SIGNAL_GENERATION_MARKET || 'US',
       minConfidenceForNotify: parseFloat(process.env.SIGNAL_GENERATION_MIN_CONFIDENCE || '0.7'),
+      // Auto-execute signals through outbox pattern
+      outboxPublisher: outboxPublisher || null,
+      autoExecuteSignals: process.env.SIGNAL_AUTO_EXECUTE === 'true',
     });
     app.locals.signalGenerationJob = signalGenerationJob;
 
