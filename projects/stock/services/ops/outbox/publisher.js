@@ -209,7 +209,10 @@ export class OutboxPublisher {
 
       return {
         ...publishedEvent,
-        payload: JSON.parse(publishedEvent.payload),
+        // Handle both cases: payload as string (needs parsing) or already parsed object
+        payload: typeof publishedEvent.payload === 'string'
+          ? JSON.parse(publishedEvent.payload)
+          : publishedEvent.payload,
       };
     } catch (error) {
       eventsPublishFailed.inc({ event_type: eventType, reason: 'db_error' });
