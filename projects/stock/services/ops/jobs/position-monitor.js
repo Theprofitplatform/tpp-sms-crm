@@ -343,8 +343,8 @@ export class PositionMonitorJob {
       strategy_id: 'position_monitor',
       confidence: 1.0, // Exit signals are high confidence
       entry_price: currentPrice,
-      quantity: position.quantity,
       metadata: {
+        quantity: position.quantity, // Quantity to close (full position)
         exit_type: exitType,
         trigger_price: triggerPrice,
         entry_price: position.average_entry_price,

@@ -401,6 +401,8 @@ class Position(BaseModel):
     current_price: Optional[float] = None
     unrealized_pnl: Optional[float] = None
     realized_pnl: float = 0
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
 
 
 class Account(BaseModel):
@@ -1042,44 +1044,81 @@ async def propose_order_from_signal(
     # Extract metadata
     metadata = request.metadata or {}
 
-    # Calculate position size based on risk limits
-    # Use max 5% of portfolio per position to stay within 10% limit
-    max_position_pct = float(os.getenv("MAX_SIGNAL_POSITION_PCT", "0.05"))  # 5% default
-    portfolio_value = 100000.0  # Default, could fetch from broker
-
-    if broker:
-        try:
-            account = broker.get_account()
-            portfolio_value = account.get("equity", 100000.0)
-        except Exception:
-            pass
-
-    # Calculate max position value and shares
-    max_position_value = portfolio_value * max_position_pct
+    # Determine quantity based on direction
     entry_price = request.entry_price or 100.0  # Fallback price
 
-    # Calculate quantity, minimum 1 share
-    quantity = max(1, int(max_position_value / entry_price))
+    if request.direction.upper() == "SELL":
+        # For SELL orders (closing positions):
+        # 1. Use quantity from signal if provided (e.g., from position monitor)
+        # 2. Otherwise, look up existing position quantity
+        quantity = metadata.get("quantity")
 
-    # Optional: Scale by confidence (higher confidence = more shares)
-    if request.confidence >= 0.9:
-        quantity = int(quantity * 1.0)  # Full position for very high confidence
-    elif request.confidence >= 0.8:
-        quantity = int(quantity * 0.75)  # 75% for high confidence
+        if not quantity:
+            # Try to get position quantity from broker
+            if broker:
+                try:
+                    positions = broker.get_positions()
+                    for pos in positions:
+                        if pos.get("symbol") == request.symbol:
+                            quantity = pos.get("quantity", 0)
+                            break
+                except Exception as e:
+                    logger.warning("Failed to fetch position for SELL quantity", error=str(e))
+
+        if not quantity or quantity <= 0:
+            return SignalProposeResponse(
+                success=False,
+                message=f"No position found to sell for {request.symbol}",
+                signal_id=request.signal_id,
+            )
+
+        quantity = float(quantity)  # Ensure numeric
+
+        logger.info(
+            "SELL order - using position quantity",
+            symbol=request.symbol,
+            quantity=quantity,
+            exit_type=metadata.get("exit_type", "signal"),
+        )
+
     else:
-        quantity = int(quantity * 0.5)  # 50% for medium confidence
+        # For BUY orders: Calculate position size based on risk limits
+        # Use max 5% of portfolio per position to stay within 10% limit
+        max_position_pct = float(os.getenv("MAX_SIGNAL_POSITION_PCT", "0.05"))  # 5% default
+        portfolio_value = 100000.0  # Default, could fetch from broker
 
-    quantity = max(1, quantity)  # Ensure at least 1 share
+        if broker:
+            try:
+                account = broker.get_account()
+                portfolio_value = account.get("equity", 100000.0)
+            except Exception:
+                pass
 
-    logger.info(
-        "Calculated position size",
-        symbol=request.symbol,
-        entry_price=entry_price,
-        portfolio_value=portfolio_value,
-        max_position_value=max_position_value,
-        quantity=quantity,
-        confidence=request.confidence,
-    )
+        # Calculate max position value and shares
+        max_position_value = portfolio_value * max_position_pct
+
+        # Calculate quantity, minimum 1 share
+        quantity = max(1, int(max_position_value / entry_price))
+
+        # Optional: Scale by confidence (higher confidence = more shares)
+        if request.confidence >= 0.9:
+            quantity = int(quantity * 1.0)  # Full position for very high confidence
+        elif request.confidence >= 0.8:
+            quantity = int(quantity * 0.75)  # 75% for high confidence
+        else:
+            quantity = int(quantity * 0.5)  # 50% for medium confidence
+
+        quantity = max(1, quantity)  # Ensure at least 1 share
+
+        logger.info(
+            "BUY order - calculated position size",
+            symbol=request.symbol,
+            entry_price=entry_price,
+            portfolio_value=portfolio_value,
+            max_position_value=max_position_value,
+            quantity=quantity,
+            confidence=request.confidence,
+        )
 
     # Build order request
     try:
@@ -1184,12 +1223,64 @@ async def cancel_order(order_id: str):
 
 @app.get("/api/v1/positions", response_model=List[Position])
 async def list_positions():
-    """List current positions."""
-    if not broker:
-        raise HTTPException(status_code=503, detail="Broker not initialized")
+    """
+    List current open positions.
 
-    positions = broker.get_positions()
-    return [Position(**p) for p in positions]
+    Fetches positions from the database (persistent) and merges with
+    in-memory broker positions to ensure durability across restarts.
+    """
+    positions = []
+
+    # First, try to get positions from database (persistent storage)
+    if pg_pool:
+        try:
+            async with pg_pool.acquire() as conn:
+                rows = await conn.fetch(
+                    """
+                    SELECT
+                        symbol,
+                        market,
+                        side,
+                        quantity,
+                        average_entry_price,
+                        current_price,
+                        unrealized_pnl,
+                        realized_pnl,
+                        stop_loss,
+                        take_profit,
+                        status,
+                        opened_at
+                    FROM positions
+                    WHERE status = 'OPEN'
+                    ORDER BY opened_at DESC
+                    """
+                )
+
+                for row in rows:
+                    positions.append(Position(
+                        symbol=row["symbol"],
+                        market=row["market"] or "US",
+                        side=row["side"],
+                        quantity=float(row["quantity"]),
+                        average_entry_price=float(row["average_entry_price"]),
+                        current_price=float(row["current_price"]) if row["current_price"] else None,
+                        unrealized_pnl=float(row["unrealized_pnl"]) if row["unrealized_pnl"] else 0.0,
+                        realized_pnl=float(row["realized_pnl"]) if row["realized_pnl"] else 0.0,
+                        stop_loss=float(row["stop_loss"]) if row["stop_loss"] else None,
+                        take_profit=float(row["take_profit"]) if row["take_profit"] else None,
+                    ))
+
+                logger.info("Fetched positions from database", count=len(positions))
+        except Exception as e:
+            logger.warning("Failed to fetch positions from database", error=str(e))
+
+    # Fallback to broker's in-memory positions if no database positions
+    if not positions and broker:
+        broker_positions = broker.get_positions()
+        positions = [Position(**p) for p in broker_positions]
+        logger.info("Using broker in-memory positions", count=len(positions))
+
+    return positions
 
 
 @app.get("/api/v1/positions/{symbol}/details")

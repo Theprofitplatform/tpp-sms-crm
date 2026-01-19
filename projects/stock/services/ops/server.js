@@ -21,6 +21,7 @@
  *   POST /api/v1/events/publish     - Publish event to outbox
  */
 
+import http from 'http';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -58,6 +59,7 @@ import { AlertHealthCheckJob } from './jobs/alert-health-check.js';
 import { SignalGenerationJob } from './jobs/signal-generation.js';
 import { PositionMonitorJob } from './jobs/position-monitor.js';
 import { NotificationService, AlertTypes } from './notifications/index.js';
+import { WebSocketBroadcaster, broadcast } from './websocket/server.js';
 
 // Authentication and rate limiting middleware
 import {
@@ -1317,6 +1319,14 @@ app.post('/api/v1/alerts/health/check', async (req, res, next) => {
   }
 });
 
+// WebSocket status endpoint
+app.get('/api/v1/ws/status', (req, res) => {
+  if (!wsServer) {
+    return res.status(503).json({ error: 'WebSocket server not initialized' });
+  }
+  res.json(wsServer.getStatus());
+});
+
 // System status endpoint (requires viewer role if auth enabled)
 app.get('/api/v1/status', async (req, res, next) => {
   if (authMiddleware) {
@@ -1672,6 +1682,9 @@ function scheduleDailyReport() {
   logger.info('Daily report scheduler initialized');
 }
 
+// WebSocket server instance
+let wsServer = null;
+
 // Start server
 async function start() {
   try {
@@ -1682,12 +1695,21 @@ async function start() {
       scheduleDailyReport();
     }
 
-    app.listen(config.port, () => {
+    // Create HTTP server from Express app
+    const httpServer = http.createServer(app);
+
+    // Initialize WebSocket server
+    wsServer = new WebSocketBroadcaster(httpServer, { logger });
+    logger.info('WebSocket server initialized', { path: '/ws' });
+
+    httpServer.listen(config.port, () => {
       logger.info(`Ops Service started`, {
         port: config.port,
         env: config.env,
         prometheus: config.prometheusEnabled,
         dailyReportScheduled: process.env.DAILY_REPORT_ENABLED !== 'false',
+        websocket: true,
+        wsPath: '/ws',
       });
     });
   } catch (error) {
@@ -1734,6 +1756,12 @@ async function gracefulShutdown(signal) {
   if (positionMonitorJob) {
     positionMonitorJob.stop();
     logger.info('Position monitor job stopped');
+  }
+
+  // Close WebSocket server
+  if (wsServer) {
+    wsServer.close();
+    logger.info('WebSocket server closed');
   }
 
   // Stop alert health check job

@@ -28,6 +28,7 @@ import axios from 'axios';
 import { Mutex } from 'async-mutex';
 import { getEventConfig, isValidEventType } from './events.js';
 import { Counter, Histogram, Gauge } from 'prom-client';
+import { broadcast } from '../websocket/server.js';
 
 /**
  * Prometheus metrics for outbox dispatcher
@@ -266,6 +267,15 @@ export class OutboxDispatcher {
           targetService: event.target_service,
           status: response.status,
           duration: durationSeconds,
+        });
+
+        // Broadcast event to connected WebSocket clients
+        broadcast('event_dispatched', {
+          event_id: event.id,
+          event_type: event.event_type,
+          target_service: event.target_service,
+          payload: event.payload,
+          response: response.data,
         });
       } else {
         // Non-2xx response, treat as failure

@@ -12,3 +12,4 @@ export {
   useMutation,
   useMultipleRequests,
 } from './useApiRequest'
+export { default as useWebSocket } from './useWebSocket'

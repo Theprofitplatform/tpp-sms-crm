@@ -3,6 +3,7 @@ import axios from 'axios'
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { API } from '@/config/api'
+import { useWebSocket } from '@/hooks/useWebSocket'
 import {
   Activity,
   TrendingUp,
@@ -13,7 +14,9 @@ import {
   DollarSign,
   BarChart3,
   CheckCircle,
-  XCircle
+  XCircle,
+  Wifi,
+  WifiOff
 } from 'lucide-react'
 import {
   AreaChart,
@@ -40,6 +43,51 @@ export default function Dashboard() {
   const [trades, setTrades] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  // WebSocket for real-time updates
+  const { isConnected, lastEvent, onMessage } = useWebSocket()
+
+  // Handle real-time events
+  useEffect(() => {
+    if (!lastEvent) return
+
+    const { type, data } = lastEvent
+
+    // Handle different event types
+    if (type === 'event_dispatched') {
+      const eventType = data?.event_type
+
+      if (eventType === 'signal_generated') {
+        toast.info({
+          title: 'New Signal',
+          description: `${data.payload?.direction} signal for ${data.payload?.symbol}`,
+        })
+      } else if (eventType === 'fill_received') {
+        // Add new trade to the list
+        if (data.response) {
+          setTrades(prev => [data.response, ...prev].slice(0, 20))
+          toast.success({
+            title: 'Trade Executed',
+            description: `${data.response.side} ${data.response.quantity} ${data.response.symbol}`,
+          })
+        }
+        // Refresh account data
+        axios.get(API.exec.account(), { timeout: 5000 })
+          .then(res => setAccount(res.data))
+          .catch(() => {})
+      } else if (eventType === 'kill_switch_activated' || eventType === 'kill_switch_deactivated') {
+        // Refresh mode data
+        axios.get(API.ops.mode(), { timeout: 5000 })
+          .then(res => setMode(res.data))
+          .catch(() => {})
+
+        toast.warning({
+          title: eventType === 'kill_switch_activated' ? 'Kill Switch Activated' : 'Kill Switch Deactivated',
+          description: data.payload?.reason || 'Status changed',
+        })
+      }
+    }
+  }, [lastEvent])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -103,7 +151,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData()
-    const interval = setInterval(fetchData, 30000)
+    // Reduce polling interval to 60s since we have WebSocket for real-time updates
+    const interval = setInterval(fetchData, 60000)
     return () => clearInterval(interval)
   }, [fetchData])
 
@@ -210,6 +259,23 @@ export default function Dashboard() {
         <div className="flex items-center gap-3">
           <TrendingUp className="h-8 w-8 text-primary" />
           <h1 className="text-2xl font-bold">Trading Dashboard</h1>
+          {/* WebSocket Connection Status */}
+          <div
+            className={cn(
+              "flex items-center gap-1 rounded-full px-2 py-1 text-xs",
+              isConnected
+                ? "bg-green-500/10 text-green-500"
+                : "bg-red-500/10 text-red-500"
+            )}
+            title={isConnected ? "Real-time updates active" : "Reconnecting..."}
+          >
+            {isConnected ? (
+              <Wifi className="h-3 w-3" />
+            ) : (
+              <WifiOff className="h-3 w-3" />
+            )}
+            <span>{isConnected ? "Live" : "Offline"}</span>
+          </div>
         </div>
         <Button
           variant="outline"
