@@ -1192,6 +1192,65 @@ async def list_positions():
     return [Position(**p) for p in positions]
 
 
+@app.get("/api/v1/positions/{symbol}/details")
+async def get_position_details(symbol: str, market: str = "US"):
+    """
+    Get detailed position information including stop-loss and take-profit.
+
+    This endpoint fetches position data from the database which includes
+    risk levels that are not stored in the in-memory broker.
+    """
+    if not pg_pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    try:
+        async with pg_pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT
+                    symbol,
+                    market,
+                    side,
+                    quantity,
+                    average_entry_price,
+                    current_price,
+                    unrealized_pnl,
+                    realized_pnl,
+                    stop_loss,
+                    take_profit,
+                    status,
+                    opened_at
+                FROM positions
+                WHERE symbol = $1 AND market = $2 AND status = 'OPEN'
+                """,
+                symbol.upper(), market.upper()
+            )
+
+            if not row:
+                raise HTTPException(status_code=404, detail=f"No open position found for {symbol}")
+
+            return {
+                "symbol": row["symbol"],
+                "market": row["market"],
+                "side": row["side"],
+                "quantity": float(row["quantity"]),
+                "average_entry_price": float(row["average_entry_price"]),
+                "current_price": float(row["current_price"]) if row["current_price"] else None,
+                "unrealized_pnl": float(row["unrealized_pnl"]) if row["unrealized_pnl"] else None,
+                "realized_pnl": float(row["realized_pnl"]) if row["realized_pnl"] else 0,
+                "stop_loss": float(row["stop_loss"]) if row["stop_loss"] else None,
+                "take_profit": float(row["take_profit"]) if row["take_profit"] else None,
+                "status": row["status"],
+                "opened_at": row["opened_at"].isoformat() if row["opened_at"] else None,
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to fetch position details", error=str(e), symbol=symbol)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch position details: {str(e)}")
+
+
 @app.get("/api/v1/trades", response_model=List[Trade])
 async def list_trades(
     symbol: Optional[str] = None,

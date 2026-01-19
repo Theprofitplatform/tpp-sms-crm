@@ -56,6 +56,7 @@ import { AlertManager } from './alerting/index.js';
 import { CriticalAlertHandler } from './alerts/critical_alerts.js';
 import { AlertHealthCheckJob } from './jobs/alert-health-check.js';
 import { SignalGenerationJob } from './jobs/signal-generation.js';
+import { PositionMonitorJob } from './jobs/position-monitor.js';
 import { NotificationService, AlertTypes } from './notifications/index.js';
 
 // Authentication and rate limiting middleware
@@ -218,6 +219,7 @@ let alertManager;
 let criticalAlertHandler;
 let alertHealthCheckJob;
 let signalGenerationJob;
+let positionMonitorJob;
 let notificationService;
 
 async function initializeServices() {
@@ -492,6 +494,31 @@ async function initializeServices() {
     }
   } catch (error) {
     logger.warn('Failed to initialize signal generation job', { error: error.message });
+  }
+
+  // Initialize Position Monitor Job
+  try {
+    positionMonitorJob = new PositionMonitorJob({
+      logger,
+      executionServiceUrl: config.services.execution,
+      dataServiceUrl: config.services.data,
+      discordWebhook: config.notifications.discordWebhook,
+      intervalSeconds: parseInt(process.env.POSITION_MONITOR_INTERVAL_SECONDS || '30', 10),
+      outboxPublisher: outboxPublisher || null,
+    });
+    app.locals.positionMonitorJob = positionMonitorJob;
+
+    // Auto-start position monitor job if signal generation is enabled
+    if (process.env.SIGNAL_GENERATION_ENABLED === 'true') {
+      positionMonitorJob.start();
+      logger.info('Position monitor job started', {
+        intervalSeconds: positionMonitorJob.config.intervalMs / 1000,
+      });
+    } else {
+      logger.info('Position monitor job disabled (starts when signal generation is enabled)');
+    }
+  } catch (error) {
+    logger.warn('Failed to initialize position monitor job', { error: error.message });
   }
 
   // Initialize Notification Service (Discord + Telegram)
@@ -886,6 +913,130 @@ app.put('/api/v1/signals/job/config', async (req, res, next) => {
     status: 'updated',
     ...status,
   });
+});
+
+// =============================================================================
+// Position Monitor Endpoints
+// =============================================================================
+
+/**
+ * GET /api/v1/positions/monitor/status - Get position monitor job status
+ */
+app.get('/api/v1/positions/monitor/status', async (req, res, next) => {
+  if (authMiddleware) {
+    return authMiddleware(req, res, () => {
+      requireRole('viewer')(req, res, next);
+    });
+  }
+  next();
+}, (req, res) => {
+  const { positionMonitorJob } = req.app.locals;
+
+  if (!positionMonitorJob) {
+    return res.status(503).json({ error: 'Position monitor job not initialized' });
+  }
+
+  res.json(positionMonitorJob.getStatus());
+});
+
+/**
+ * POST /api/v1/positions/monitor/start - Start the position monitor job
+ */
+app.post('/api/v1/positions/monitor/start', async (req, res, next) => {
+  if (authMiddleware) {
+    return authMiddleware(req, res, () => {
+      requireRole('operator')(req, res, next);
+    });
+  }
+  next();
+}, (req, res) => {
+  const { positionMonitorJob, logger: appLogger } = req.app.locals;
+
+  if (!positionMonitorJob) {
+    return res.status(503).json({ error: 'Position monitor job not initialized' });
+  }
+
+  if (positionMonitorJob.isRunning) {
+    return res.status(400).json({
+      error: 'Position monitor job is already running',
+      status: positionMonitorJob.getStatus(),
+    });
+  }
+
+  positionMonitorJob.start();
+  appLogger.info('Position monitor job started via API');
+
+  res.json({
+    status: 'started',
+    ...positionMonitorJob.getStatus(),
+  });
+});
+
+/**
+ * POST /api/v1/positions/monitor/stop - Stop the position monitor job
+ */
+app.post('/api/v1/positions/monitor/stop', async (req, res, next) => {
+  if (authMiddleware) {
+    return authMiddleware(req, res, () => {
+      requireRole('operator')(req, res, next);
+    });
+  }
+  next();
+}, (req, res) => {
+  const { positionMonitorJob, logger: appLogger } = req.app.locals;
+
+  if (!positionMonitorJob) {
+    return res.status(503).json({ error: 'Position monitor job not initialized' });
+  }
+
+  if (!positionMonitorJob.isRunning) {
+    return res.status(400).json({
+      error: 'Position monitor job is not running',
+      status: positionMonitorJob.getStatus(),
+    });
+  }
+
+  positionMonitorJob.stop();
+  appLogger.info('Position monitor job stopped via API');
+
+  res.json({
+    status: 'stopped',
+    ...positionMonitorJob.getStatus(),
+  });
+});
+
+/**
+ * POST /api/v1/positions/monitor/trigger - Manually trigger position monitoring
+ */
+app.post('/api/v1/positions/monitor/trigger', async (req, res, next) => {
+  if (authMiddleware) {
+    return authMiddleware(req, res, () => {
+      requireRole('operator')(req, res, next);
+    });
+  }
+  next();
+}, async (req, res) => {
+  const { positionMonitorJob, logger: appLogger } = req.app.locals;
+
+  if (!positionMonitorJob) {
+    return res.status(503).json({ error: 'Position monitor job not initialized' });
+  }
+
+  appLogger.info('Position monitoring manually triggered via API');
+
+  try {
+    const result = await positionMonitorJob.run();
+    res.json({
+      status: 'completed',
+      ...result,
+    });
+  } catch (error) {
+    appLogger.error('Manual position monitoring failed', { error: error.message });
+    res.status(500).json({
+      status: 'failed',
+      error: error.message,
+    });
+  }
 });
 
 // =============================================================================
@@ -1577,6 +1728,12 @@ async function gracefulShutdown(signal) {
   if (signalGenerationJob) {
     signalGenerationJob.stop();
     logger.info('Signal generation job stopped');
+  }
+
+  // Stop position monitor job
+  if (positionMonitorJob) {
+    positionMonitorJob.stop();
+    logger.info('Position monitor job stopped');
   }
 
   // Stop alert health check job
