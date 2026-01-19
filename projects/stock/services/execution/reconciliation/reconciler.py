@@ -182,7 +182,7 @@ class PositionReconciler:
                         current_price,
                         unrealized_pnl
                     FROM positions
-                    WHERE quantity > 0
+                    WHERE quantity > 0 AND status = 'OPEN'
                     ORDER BY symbol
                     """
                 )

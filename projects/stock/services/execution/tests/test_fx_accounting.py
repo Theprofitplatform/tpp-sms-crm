@@ -39,9 +39,10 @@ class TestFXAccountingLedger:
     def test_initialization(self, fx_ledger):
         """Test ledger initializes correctly."""
         assert fx_ledger.base_currency == "AUD"
-        assert len(fx_ledger.transactions) == 0
-        assert len(fx_ledger.currency_positions) == 0
-        assert len(fx_ledger.position_fx_data) == 0
+        # Access private attributes for testing
+        assert len(fx_ledger._transactions) == 0
+        assert len(fx_ledger._currency_positions) == 0
+        assert len(fx_ledger._position_entries) == 0
 
     def test_record_trade_open(self, fx_ledger):
         """Test recording a trade open transaction."""
@@ -55,23 +56,23 @@ class TestFXAccountingLedger:
         )
 
         # Check transaction was recorded
-        assert len(fx_ledger.transactions) == 1
-        txn = fx_ledger.transactions[0]
+        assert len(fx_ledger._transactions) == 1
+        txn = fx_ledger._transactions[0]
         assert txn.transaction_type == FXTransactionType.TRADE_OPEN
         assert txn.symbol == "AAPL"
         assert txn.trade_currency == "USD"
         assert txn.trade_amount == 15000.0
         assert txn.fx_rate == 0.65
 
-        # Check position FX data
-        assert "pos_AAPL" in fx_ledger.position_fx_data
-        pos_data = fx_ledger.position_fx_data["pos_AAPL"]
+        # Check position entry data
+        assert "pos_AAPL" in fx_ledger._position_entries
+        pos_data = fx_ledger._position_entries["pos_AAPL"]
         assert pos_data["entry_fx_rate"] == 0.65
         assert pos_data["trade_currency"] == "USD"
 
         # Check currency exposure
-        assert "USD" in fx_ledger.currency_positions
-        usd_pos = fx_ledger.currency_positions["USD"]
+        assert "USD" in fx_ledger._currency_positions
+        usd_pos = fx_ledger._currency_positions["USD"]
         assert usd_pos.gross_long > 0
 
     def test_record_trade_close_with_fx_gain(self, fx_ledger):
@@ -98,7 +99,7 @@ class TestFXAccountingLedger:
         )
 
         # Should have 2 transactions
-        assert len(fx_ledger.transactions) == 2
+        assert len(fx_ledger._transactions) == 2
 
         # Check P&L summary
         pnl = fx_ledger.get_fx_pnl_summary()
@@ -166,7 +167,7 @@ class TestFXAccountingLedger:
 
         assert "currency_count" in summary
         assert "total_exposure_base" in summary
-        assert "exposures" in summary
+        assert "currencies" in summary  # Note: actual key is "currencies", not "exposures"
         assert summary["currency_count"] >= 1
 
     def test_get_fx_pnl_summary_empty(self, fx_ledger):
@@ -239,8 +240,9 @@ class TestFXAccountingLedger:
         assert attribution.position_id == "pos_AAPL"
         assert attribution.entry_fx_rate == 0.65
         assert attribution.current_fx_rate == 0.62
-        assert attribution.trading_pnl_base != 0  # Should have trading P&L
-        assert attribution.fx_impact_base != 0  # Should have FX impact
+        assert attribution.trading_pnl_trade != 0  # Should have trading P&L in trade ccy
+        assert attribution.trading_pnl_base != 0  # Should have trading P&L in base ccy
+        assert attribution.fx_impact != 0  # Should have FX impact
 
     def test_get_position_fx_attribution_not_found(self, fx_ledger):
         """Test attribution returns None for unknown position."""
@@ -258,13 +260,53 @@ class TestFXAccountingLedger:
             trade_amount=10000.0, fx_rate=0.65, position_id="pos_1",
         )
 
-        assert len(fx_ledger.transactions) > 0
+        assert len(fx_ledger._transactions) > 0
 
         fx_ledger.reset()
 
-        assert len(fx_ledger.transactions) == 0
-        assert len(fx_ledger.currency_positions) == 0
-        assert len(fx_ledger.position_fx_data) == 0
+        assert len(fx_ledger._transactions) == 0
+        assert len(fx_ledger._currency_positions) == 0
+        assert len(fx_ledger._position_entries) == 0
+
+    def test_record_dividend(self, fx_ledger):
+        """Test recording dividend transaction."""
+        txn = fx_ledger.record_dividend(
+            trade_id="div_001",
+            symbol="AAPL",
+            trade_currency="USD",
+            dividend_amount=100.0,
+            fx_rate=0.65,
+        )
+
+        assert txn.transaction_type == FXTransactionType.DIVIDEND
+        assert txn.trade_amount == 100.0
+        assert txn.trade_currency == "USD"
+        assert len(fx_ledger._transactions) == 1
+
+    def test_revalue_positions(self, fx_ledger):
+        """Test mark-to-market revaluation."""
+        # Open a position
+        fx_ledger.record_trade_open(
+            trade_id="t1", symbol="AAPL", trade_currency="USD",
+            trade_amount=15000.0, fx_rate=0.65, position_id="pos_AAPL",
+        )
+
+        # Revalue with new FX rate
+        positions = [
+            {
+                "id": "pos_AAPL",
+                "symbol": "AAPL",
+                "trade_currency": "USD",
+                "current_value": 16000.0,
+            }
+        ]
+        current_rates = {"AUDUSD": 0.62}
+
+        unrealized, txns = fx_ledger.revalue_positions(positions, current_rates)
+
+        # Should have FX impact from rate change
+        assert len(txns) == 1
+        assert txns[0].transaction_type == FXTransactionType.REVALUATION
 
 
 class TestCurrencyPosition:
@@ -370,36 +412,24 @@ class TestFXPnLSummary:
 class TestPositionFXAttribution:
     """Tests for PositionFXAttribution dataclass."""
 
-    def test_total_pnl_base(self):
-        """Test total P&L calculation."""
-        attr = PositionFXAttribution(
-            position_id="pos_1",
-            symbol="AAPL",
-            trade_currency="USD",
-            entry_value_trade=15000.0,
-            current_value_trade=16500.0,
-            entry_fx_rate=0.65,
-            current_fx_rate=0.62,
-            trading_pnl_trade=1500.0,
-            trading_pnl_base=2307.69,
-            fx_impact_base=500.0,
-        )
-        # 2307.69 + 500.0 = 2807.69
-        assert abs(attr.total_pnl_base - 2807.69) < 0.01
-
     def test_to_dict(self):
         """Test serialization to dict."""
         attr = PositionFXAttribution(
             position_id="pos_1",
             symbol="AAPL",
             trade_currency="USD",
-            entry_value_trade=15000.0,
-            current_value_trade=16500.0,
+            entry_date=datetime(2024, 1, 15, 10, 30, 0),
             entry_fx_rate=0.65,
+            cost_base_at_entry=23076.92,
+            cost_trade=15000.0,
             current_fx_rate=0.62,
+            current_value_trade=16500.0,
+            current_value_base=26612.90,
             trading_pnl_trade=1500.0,
-            trading_pnl_base=2307.69,
-            fx_impact_base=500.0,
+            trading_pnl_base=2419.35,
+            fx_impact=1116.63,
+            fx_impact_pct=0.0484,
+            total_pnl_base=3535.98,
         )
         d = attr.to_dict()
 
@@ -408,9 +438,10 @@ class TestPositionFXAttribution:
         assert d["trade_currency"] == "USD"
         assert d["entry_fx_rate"] == 0.65
         assert d["current_fx_rate"] == 0.62
-        assert "trading_pnl" in d
-        assert "fx_impact" in d
-        assert "total_pnl_base" in d
+        assert d["trading_pnl_trade"] == 1500.0
+        assert d["trading_pnl_base"] == 2419.35
+        assert d["fx_impact"] == 1116.63
+        assert d["total_pnl_base"] == 3535.98
 
 
 class TestFXTransaction:
@@ -419,22 +450,25 @@ class TestFXTransaction:
     def test_to_dict(self):
         """Test transaction serialization."""
         txn = FXTransaction(
-            transaction_id="txn_001",
+            id="txn_001",
             transaction_type=FXTransactionType.TRADE_OPEN,
             timestamp=datetime(2024, 1, 15, 10, 30, 0),
+            trade_id="trade_001",
             symbol="AAPL",
             trade_currency="USD",
             trade_amount=15000.0,
-            fx_rate=0.65,
+            base_currency="AUD",
             base_amount=23076.92,
+            fx_rate=0.65,
         )
         d = txn.to_dict()
 
-        assert d["transaction_id"] == "txn_001"
+        assert d["id"] == "txn_001"
         assert d["transaction_type"] == "TRADE_OPEN"
         assert d["symbol"] == "AAPL"
         assert d["trade_currency"] == "USD"
         assert d["fx_rate"] == 0.65
+        assert d["base_amount"] == 23076.92
 
 
 class TestFXTransactionType:
@@ -447,6 +481,9 @@ class TestFXTransactionType:
         assert FXTransactionType.DIVIDEND
         assert FXTransactionType.FX_CONVERSION
         assert FXTransactionType.REVALUATION
+        assert FXTransactionType.HEDGE_OPEN
+        assert FXTransactionType.HEDGE_CLOSE
+        assert FXTransactionType.INTEREST
 
 
 class TestFXGainType:

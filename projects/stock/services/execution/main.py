@@ -718,6 +718,116 @@ async def health_check():
     )
 
 
+async def persist_position_to_db(
+    symbol: str,
+    market: str,
+    side: str,
+    quantity: float,
+    average_entry_price: float,
+    current_price: float,
+    order_id: str,
+    stop_loss: Optional[float] = None,
+    take_profit: Optional[float] = None,
+):
+    """
+    Persist a position to TimescaleDB after an order fill.
+
+    This keeps the local database in sync with the broker's in-memory positions,
+    enabling accurate reconciliation.
+
+    For BUY orders: Creates or updates a LONG position
+    For SELL orders: Updates or closes the position
+    """
+    if not pg_pool:
+        logger.warning("Cannot persist position - pg_pool not initialized")
+        return
+
+    try:
+        async with pg_pool.acquire() as conn:
+            # Determine position side based on order side
+            position_side = "LONG" if side == "BUY" else "SHORT"
+
+            # Check if there's an existing open position for this symbol
+            existing = await conn.fetchrow(
+                """
+                SELECT id, quantity, average_entry_price, side
+                FROM positions
+                WHERE symbol = $1 AND market = $2 AND status = 'OPEN'
+                """,
+                symbol, market
+            )
+
+            if existing:
+                if side == "BUY" and existing["side"] == "LONG":
+                    # Adding to long position - update average price
+                    old_qty = float(existing["quantity"])
+                    old_price = float(existing["average_entry_price"])
+                    new_qty = old_qty + quantity
+                    new_avg_price = ((old_qty * old_price) + (quantity * average_entry_price)) / new_qty
+
+                    await conn.execute(
+                        """
+                        UPDATE positions
+                        SET quantity = $1, average_entry_price = $2, current_price = $3, updated_at = NOW()
+                        WHERE id = $4
+                        """,
+                        new_qty, new_avg_price, current_price, existing["id"]
+                    )
+                    logger.info("Updated existing position", symbol=symbol, new_quantity=new_qty)
+
+                elif side == "SELL" and existing["side"] == "LONG":
+                    # Reducing or closing long position
+                    old_qty = float(existing["quantity"])
+                    new_qty = old_qty - quantity
+
+                    if new_qty <= 0:
+                        # Close the position
+                        await conn.execute(
+                            """
+                            UPDATE positions
+                            SET quantity = 0, status = 'CLOSED', closed_at = NOW(), updated_at = NOW()
+                            WHERE id = $1
+                            """,
+                            existing["id"]
+                        )
+                        logger.info("Closed position", symbol=symbol)
+                    else:
+                        # Partial close
+                        await conn.execute(
+                            """
+                            UPDATE positions
+                            SET quantity = $1, current_price = $2, updated_at = NOW()
+                            WHERE id = $3
+                            """,
+                            new_qty, current_price, existing["id"]
+                        )
+                        logger.info("Partially closed position", symbol=symbol, remaining_quantity=new_qty)
+                else:
+                    # Mixed scenario (e.g., selling into a short) - handle as new position
+                    logger.warning("Complex position scenario, creating new record", symbol=symbol)
+            else:
+                # No existing position - create new one for BUY orders
+                if side == "BUY":
+                    await conn.execute(
+                        """
+                        INSERT INTO positions (
+                            symbol, market, side, quantity, average_entry_price,
+                            current_price, stop_loss, take_profit, status, opened_at
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'OPEN', NOW())
+                        """,
+                        symbol, market, position_side, quantity, average_entry_price,
+                        current_price, stop_loss, take_profit
+                    )
+                    logger.info("Created new position", symbol=symbol, quantity=quantity, side=position_side)
+                else:
+                    # SELL with no existing position - could be opening a short
+                    logger.warning("SELL order with no existing position", symbol=symbol)
+
+    except Exception as e:
+        logger.error("Failed to persist position to database", error=str(e), symbol=symbol)
+        # Don't raise - the order was already executed in the broker
+
+
 @app.post("/api/v1/orders", response_model=Order)
 async def submit_order(
     request: OrderRequest,
@@ -858,6 +968,19 @@ async def submit_order(
             idempotency_key=x_idempotency_key[:8] + "..." if x_idempotency_key else None,
         )
 
+        # Persist position to database if order was filled
+        if order.get("status") == "FILLED":
+            await persist_position_to_db(
+                symbol=request.symbol,
+                market=request.market,
+                side=request.side.value,
+                quantity=order.get("filled_quantity", request.quantity),
+                average_entry_price=order.get("average_fill_price", execution_price),
+                current_price=order.get("average_fill_price", execution_price),
+                order_id=order["id"],
+                stop_loss=request.stop_price,
+            )
+
         # Store idempotency response to prevent duplicate orders on retry
         if x_idempotency_key:
             await store_idempotency(
@@ -919,10 +1042,44 @@ async def propose_order_from_signal(
     # Extract metadata
     metadata = request.metadata or {}
 
-    # Calculate position size based on confidence and risk limits
-    # Default: 100 shares, but could be adjusted based on strategy
-    base_quantity = float(os.getenv("DEFAULT_ORDER_QUANTITY", "100"))
-    quantity = base_quantity
+    # Calculate position size based on risk limits
+    # Use max 5% of portfolio per position to stay within 10% limit
+    max_position_pct = float(os.getenv("MAX_SIGNAL_POSITION_PCT", "0.05"))  # 5% default
+    portfolio_value = 100000.0  # Default, could fetch from broker
+
+    if broker:
+        try:
+            account = broker.get_account()
+            portfolio_value = account.get("equity", 100000.0)
+        except Exception:
+            pass
+
+    # Calculate max position value and shares
+    max_position_value = portfolio_value * max_position_pct
+    entry_price = request.entry_price or 100.0  # Fallback price
+
+    # Calculate quantity, minimum 1 share
+    quantity = max(1, int(max_position_value / entry_price))
+
+    # Optional: Scale by confidence (higher confidence = more shares)
+    if request.confidence >= 0.9:
+        quantity = int(quantity * 1.0)  # Full position for very high confidence
+    elif request.confidence >= 0.8:
+        quantity = int(quantity * 0.75)  # 75% for high confidence
+    else:
+        quantity = int(quantity * 0.5)  # 50% for medium confidence
+
+    quantity = max(1, quantity)  # Ensure at least 1 share
+
+    logger.info(
+        "Calculated position size",
+        symbol=request.symbol,
+        entry_price=entry_price,
+        portfolio_value=portfolio_value,
+        max_position_value=max_position_value,
+        quantity=quantity,
+        confidence=request.confidence,
+    )
 
     # Build order request
     try:
@@ -2157,6 +2314,19 @@ async def handle_order_approved(event: OrderApprovedEvent):
                 quantity=quantity,
                 idempotency_key=event_data.get("idempotency_key", "")[:16] + "...",
             )
+
+            # Persist position to database if order was filled
+            if order.get("status") == "FILLED":
+                await persist_position_to_db(
+                    symbol=symbol,
+                    market=market,
+                    side=side,
+                    quantity=order.get("filled_quantity", quantity),
+                    average_entry_price=order.get("average_fill_price", execution_price),
+                    current_price=order.get("average_fill_price", execution_price),
+                    order_id=order["id"],
+                    stop_loss=event_data.get("stop_price"),
+                )
 
             return order
 
