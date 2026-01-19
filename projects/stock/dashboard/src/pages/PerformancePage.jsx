@@ -52,6 +52,33 @@ const COLORS = {
 // Month names for heatmap
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
+// Default initial portfolio value (can be configured via account data)
+const DEFAULT_INITIAL_PORTFOLIO_VALUE = 100000
+
+/**
+ * Safely parse a date string, returning null for invalid dates
+ * @param {string|Date} dateInput - Date string or Date object
+ * @returns {Date|null} - Parsed Date object or null if invalid
+ */
+function safeParseDate(dateInput) {
+  if (!dateInput) return null
+  if (dateInput instanceof Date) {
+    return isNaN(dateInput.getTime()) ? null : dateInput
+  }
+  const parsed = new Date(dateInput)
+  return isNaN(parsed.getTime()) ? null : parsed
+}
+
+/**
+ * Get the initial portfolio value from account or use default
+ * @param {Object} account - Account object from API
+ * @returns {number} - Initial portfolio value
+ */
+function getInitialPortfolioValue(account) {
+  // Try to get initial value from account data, otherwise use default
+  return account?.initial_equity || account?.initialEquity || DEFAULT_INITIAL_PORTFOLIO_VALUE
+}
+
 /**
  * Calculate performance metrics from trades data
  */
@@ -81,9 +108,10 @@ function calculateMetrics(trades, account) {
   const totalProfit = winningTrades.reduce((sum, pnl) => sum + pnl, 0)
   const totalLoss = Math.abs(losingTrades.reduce((sum, pnl) => sum + pnl, 0))
 
-  const startValue = 100000 // Initial portfolio value
+  // Get initial portfolio value from account or use default
+  const startValue = getInitialPortfolioValue(account)
   const currentValue = account?.equity || startValue
-  const totalReturn = ((currentValue - startValue) / startValue) * 100
+  const totalReturn = startValue > 0 ? ((currentValue - startValue) / startValue) * 100 : 0
 
   // Calculate max drawdown from equity curve
   let peak = startValue
@@ -142,16 +170,23 @@ function calculateMetrics(trades, account) {
 
 /**
  * Build equity curve data from trades
+ * @param {Array} trades - Array of trade objects
+ * @param {number} startValue - Initial portfolio value
+ * @returns {Array} - Equity curve data points
  */
-function buildEquityCurve(trades, startValue = 100000) {
+function buildEquityCurve(trades, startValue = DEFAULT_INITIAL_PORTFOLIO_VALUE) {
   if (!trades || trades.length === 0) {
     return []
   }
 
-  // Sort trades by timestamp
+  // Sort trades by timestamp using safe date parsing
   const sortedTrades = [...trades]
-    .filter(t => t.timestamp)
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+    .filter(t => t.timestamp && safeParseDate(t.timestamp))
+    .sort((a, b) => {
+      const dateA = safeParseDate(a.timestamp)
+      const dateB = safeParseDate(b.timestamp)
+      return (dateA?.getTime() || 0) - (dateB?.getTime() || 0)
+    })
 
   let equity = startValue
   const curve = [{ date: 'Start', equity: startValue, drawdown: 0 }]
@@ -174,6 +209,8 @@ function buildEquityCurve(trades, startValue = 100000) {
 
 /**
  * Calculate monthly returns for heatmap
+ * @param {Array} trades - Array of trade objects
+ * @returns {Array} - Monthly returns data for heatmap
  */
 function calculateMonthlyReturns(trades) {
   if (!trades || trades.length === 0) {
@@ -186,7 +223,10 @@ function calculateMonthlyReturns(trades) {
   trades.forEach(trade => {
     if (!trade.timestamp) return
 
-    const date = new Date(trade.timestamp)
+    // Use safe date parsing to handle invalid timestamps
+    const date = safeParseDate(trade.timestamp)
+    if (!date) return
+
     const year = date.getFullYear()
     const month = date.getMonth()
     const key = `${year}-${month}`

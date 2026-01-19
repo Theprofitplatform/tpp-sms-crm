@@ -29,11 +29,6 @@
  */
 
 import axios from 'axios';
-import { fileURLToPath } from 'url';
-import path from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /**
  * US Market configuration for determining market hours
@@ -299,30 +294,59 @@ export class SignalGenerationJob {
 
   /**
    * Generate signals for a specific strategy
+   * Includes specific error handling for timeouts vs service errors
    */
   async _generateSignalsForStrategy(strategyId) {
-    const response = await axios.post(
-      `${this.config.signalServiceUrl}/api/v1/signals/generate`,
-      {
-        symbols: this.config.symbols,
-        market: this.config.market,
-        strategy_id: strategyId,
-        lookback_days: this.config.lookbackDays,
-      },
-      {
-        timeout: this.config.timeout,
-        headers: {
-          'Content-Type': 'application/json',
+    try {
+      const response = await axios.post(
+        `${this.config.signalServiceUrl}/api/v1/signals/generate`,
+        {
+          symbols: this.config.symbols,
+          market: this.config.market,
+          strategy_id: strategyId,
+          lookback_days: this.config.lookbackDays,
         },
-      }
-    );
+        {
+          timeout: this.config.timeout,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-    return {
-      signals: response.data.signals || [],
-      signals_generated: response.data.signals_generated || 0,
-      symbols_analyzed: response.data.symbols_analyzed || 0,
-      strategy_version: response.data.strategy_version,
-    };
+      return {
+        signals: response.data.signals || [],
+        signals_generated: response.data.signals_generated || 0,
+        symbols_analyzed: response.data.symbols_analyzed || 0,
+        strategy_version: response.data.strategy_version,
+      };
+    } catch (error) {
+      // Distinguish between different error types for better debugging
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        // Timeout error - signal service took too long
+        const timeoutError = new Error(`Signal generation timed out for strategy ${strategyId} after ${this.config.timeout}ms`);
+        timeoutError.type = 'timeout';
+        timeoutError.strategy = strategyId;
+        throw timeoutError;
+      } else if (error.code === 'ECONNREFUSED') {
+        // Connection refused - signal service is down
+        const connError = new Error(`Signal service unavailable (connection refused) for strategy ${strategyId}`);
+        connError.type = 'connection_refused';
+        connError.strategy = strategyId;
+        throw connError;
+      } else if (error.response?.status === 503) {
+        // Service unavailable (e.g., kill switch active)
+        const serviceError = new Error(`Signal service returned 503: ${error.response.data?.error || 'Service unavailable'}`);
+        serviceError.type = 'service_unavailable';
+        serviceError.strategy = strategyId;
+        throw serviceError;
+      } else {
+        // Other errors - preserve original error info
+        error.strategy = strategyId;
+        error.type = 'unknown';
+        throw error;
+      }
+    }
   }
 
   /**

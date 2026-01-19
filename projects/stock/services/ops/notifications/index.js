@@ -99,6 +99,10 @@ const DISCORD_COLORS = {
   neutral: 0x95A5A6,              // Gray
 };
 
+// Webhook URL patterns for validation
+const DISCORD_WEBHOOK_PATTERN = /^https:\/\/discord\.com\/api\/webhooks\/\d+\/[\w-]+$/;
+const TELEGRAM_API_PATTERN = /^https:\/\/api\.telegram\.org\/bot[\w:]+/;
+
 /**
  * NotificationService - Multi-channel notification delivery
  */
@@ -107,26 +111,39 @@ export class NotificationService {
     this.logger = options.logger || console;
     this.enabled = options.enabled !== false;
 
-    // Discord configuration
+    // Environment check for stack traces (only in development)
+    this.includeStackTraces = options.includeStackTraces ??
+      (process.env.NODE_ENV !== 'production');
+
+    // Discord configuration with URL validation
+    const discordUrl = options.discord?.webhookUrl;
+    const discordCriticalUrl = options.discord?.criticalWebhookUrl;
     this.discord = {
-      enabled: !!options.discord?.webhookUrl,
-      webhookUrl: options.discord?.webhookUrl,
-      criticalWebhookUrl: options.discord?.criticalWebhookUrl,
+      enabled: this._validateDiscordWebhookUrl(discordUrl),
+      webhookUrl: discordUrl,
+      criticalWebhookUrl: this._validateDiscordWebhookUrl(discordCriticalUrl) ? discordCriticalUrl : null,
     };
 
-    // Telegram configuration
+    // Telegram configuration with URL validation
+    const telegramToken = options.telegram?.botToken;
+    const telegramChatId = options.telegram?.chatId;
     this.telegram = {
-      enabled: !!options.telegram?.botToken && !!options.telegram?.chatId,
-      botToken: options.telegram?.botToken,
-      chatId: options.telegram?.chatId,
+      enabled: !!telegramToken && !!telegramChatId,
+      botToken: telegramToken,
+      chatId: telegramChatId,
       apiUrl: 'https://api.telegram.org',
     };
 
-    // Rate limiting configuration
+    // Rate limiting configuration with cleanup
     this.rateLimit = {
       minIntervalMs: options.rateLimitMs || 1000,
       lastSent: new Map(), // type -> timestamp
+      cleanupIntervalMs: options.rateLimitCleanupMs || 3600000, // 1 hour
+      maxAge: options.rateLimitMaxAge || 3600000, // 1 hour
     };
+
+    // Start periodic cleanup of rate limit map
+    this._startRateLimitCleanup();
 
     // Statistics
     this.stats = {
@@ -142,6 +159,67 @@ export class NotificationService {
       discord: this.discord.enabled,
       telegram: this.telegram.enabled,
     });
+  }
+
+  /**
+   * Validate Discord webhook URL format
+   * @private
+   */
+  _validateDiscordWebhookUrl(url) {
+    if (!url) return false;
+    if (!DISCORD_WEBHOOK_PATTERN.test(url)) {
+      this.logger.warn('Invalid Discord webhook URL format', {
+        hint: 'Expected format: https://discord.com/api/webhooks/{id}/{token}',
+      });
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Start periodic cleanup of rate limit map to prevent memory leaks
+   * @private
+   */
+  _startRateLimitCleanup() {
+    this._cleanupInterval = setInterval(() => {
+      this._cleanupRateLimitMap();
+    }, this.rateLimit.cleanupIntervalMs);
+
+    // Don't prevent process exit
+    if (this._cleanupInterval.unref) {
+      this._cleanupInterval.unref();
+    }
+  }
+
+  /**
+   * Clean up old entries from rate limit map
+   * @private
+   */
+  _cleanupRateLimitMap() {
+    const now = Date.now();
+    const maxAge = this.rateLimit.maxAge;
+    let cleaned = 0;
+
+    for (const [type, timestamp] of this.rateLimit.lastSent.entries()) {
+      if (now - timestamp > maxAge) {
+        this.rateLimit.lastSent.delete(type);
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      this.logger.debug('Cleaned up rate limit entries', { cleaned, remaining: this.rateLimit.lastSent.size });
+    }
+  }
+
+  /**
+   * Stop the cleanup interval (for graceful shutdown)
+   */
+  shutdown() {
+    if (this._cleanupInterval) {
+      clearInterval(this._cleanupInterval);
+      this._cleanupInterval = null;
+    }
   }
 
   /**
@@ -429,25 +507,34 @@ export class NotificationService {
 
   /**
    * Send error alert
+   * Note: Stack traces are only included in development mode to avoid exposing
+   * internal system details in production environments.
    */
   async sendErrorAlert(error) {
     const severity = error.critical ? Severity.CRITICAL : Severity.ERROR;
+
+    // Build fields array - only include stack trace in development
+    const fields = [
+      { name: 'Service', value: error.service || 'Unknown' },
+      { name: 'Error Type', value: error.errorType || error.name || 'Error' },
+      ...(error.code ? [{ name: 'Error Code', value: error.code }] : []),
+    ];
+
+    // Only include stack traces in development mode to avoid exposing internal details
+    if (this.includeStackTraces && error.stack) {
+      fields.push({
+        name: 'Stack Trace',
+        value: `\`\`\`${error.stack.slice(0, 500)}\`\`\``,
+        inline: false,
+      });
+    }
 
     return this.send({
       type: AlertTypes.ERROR,
       severity,
       title: error.title || 'System Error',
       message: error.message || 'An error occurred',
-      fields: [
-        { name: 'Service', value: error.service || 'Unknown' },
-        { name: 'Error Type', value: error.errorType || error.name || 'Error' },
-        ...(error.code ? [{ name: 'Error Code', value: error.code }] : []),
-        ...(error.stack ? [{
-          name: 'Stack Trace',
-          value: `\`\`\`${error.stack.slice(0, 500)}\`\`\``,
-          inline: false,
-        }] : []),
-      ],
+      fields,
       skipRateLimit: error.critical,
     });
   }

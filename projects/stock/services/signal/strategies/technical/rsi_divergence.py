@@ -293,6 +293,9 @@ class RSIDivergenceStrategy:
             # Check for bullish divergence:
             # Price: lower low (current < previous)
             # RSI: higher low (current > previous)
+            # Guard against division by zero (should not happen with validated data)
+            if prev_price <= 0:
+                continue
             price_divergence_pct = ((prev_price - current_price) / prev_price) * 100
             rsi_divergence = current_rsi - prev_rsi
 
@@ -374,6 +377,9 @@ class RSIDivergenceStrategy:
             # Check for bearish divergence:
             # Price: higher high (current > previous)
             # RSI: lower high (current < previous)
+            # Guard against division by zero (should not happen with validated data)
+            if prev_price <= 0:
+                continue
             price_divergence_pct = ((current_price - prev_price) / prev_price) * 100
             rsi_divergence = prev_rsi - current_rsi
 
@@ -424,7 +430,7 @@ class RSIDivergenceStrategy:
         Returns:
             Signal object or None if no divergence detected
         """
-        # Validate data
+        # Validate data length
         if not ohlcv_data or len(ohlcv_data) < self.config['min_data_bars']:
             logger.warning(
                 "Insufficient data for analysis",
@@ -434,8 +440,16 @@ class RSIDivergenceStrategy:
             )
             return None
 
-        # Extract price and volume data
-        opens = [bar['open'] for bar in ohlcv_data]
+        # Validate OHLCV data integrity
+        if not validate_ohlcv_data(ohlcv_data, symbol):
+            logger.warning(
+                "Invalid OHLCV data",
+                symbol=symbol,
+                bars=len(ohlcv_data),
+            )
+            return None
+
+        # Extract price and volume data (opens not needed for RSI divergence)
         highs = [bar['high'] for bar in ohlcv_data]
         lows = [bar['low'] for bar in ohlcv_data]
         closes = [bar['close'] for bar in ohlcv_data]

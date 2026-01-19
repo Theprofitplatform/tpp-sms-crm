@@ -46,8 +46,81 @@ import structlog
 from indicators.technical import TechnicalIndicators
 from models import Signal, SignalFeatures, SignalSide, EntryType, TimeInForce
 from confidence import ConfidenceScorer, generate_invalidation_rules
+from confidence.invalidation import InvalidationRule
 
 logger = structlog.get_logger(__name__)
+
+# Required keys for OHLCV bar data
+REQUIRED_OHLCV_KEYS = {'open', 'high', 'low', 'close', 'volume'}
+
+
+def validate_ohlcv_data(ohlcv_data: List[Dict[str, Any]], symbol: str = "") -> bool:
+    """
+    Validate OHLCV data has required keys and numeric values.
+
+    Args:
+        ohlcv_data: List of OHLCV bar dictionaries
+        symbol: Symbol name for logging
+
+    Returns:
+        True if valid, False otherwise
+    """
+    if not ohlcv_data:
+        return False
+
+    for i, bar in enumerate(ohlcv_data):
+        # Check required keys exist
+        missing_keys = REQUIRED_OHLCV_KEYS - set(bar.keys())
+        if missing_keys:
+            logger.warning(
+                "OHLCV bar missing required keys",
+                symbol=symbol,
+                bar_index=i,
+                missing_keys=list(missing_keys),
+            )
+            return False
+
+        # Validate values are numeric and not None
+        for key in REQUIRED_OHLCV_KEYS:
+            value = bar.get(key)
+            if value is None:
+                logger.warning(
+                    "OHLCV bar has None value",
+                    symbol=symbol,
+                    bar_index=i,
+                    key=key,
+                )
+                return False
+            if not isinstance(value, (int, float)):
+                logger.warning(
+                    "OHLCV bar has non-numeric value",
+                    symbol=symbol,
+                    bar_index=i,
+                    key=key,
+                    value_type=type(value).__name__,
+                )
+                return False
+            # Check for reasonable price values (not negative, not zero for prices)
+            if key in ('open', 'high', 'low', 'close') and value <= 0:
+                logger.warning(
+                    "OHLCV bar has invalid price value",
+                    symbol=symbol,
+                    bar_index=i,
+                    key=key,
+                    value=value,
+                )
+                return False
+            # Volume can be zero but not negative
+            if key == 'volume' and value < 0:
+                logger.warning(
+                    "OHLCV bar has negative volume",
+                    symbol=symbol,
+                    bar_index=i,
+                    value=value,
+                )
+                return False
+
+    return True
 
 
 class MACDCrossoverStrategy:
@@ -116,18 +189,26 @@ class MACDCrossoverStrategy:
         Returns:
             Signal object or None if no crossover detected
         """
-        # Validate data
-        if len(ohlcv_data) < self.config['min_data_bars']:
+        # Validate data length
+        if not ohlcv_data or len(ohlcv_data) < self.config['min_data_bars']:
             logger.warning(
                 "Insufficient data for analysis",
                 symbol=symbol,
-                bars=len(ohlcv_data),
+                bars=len(ohlcv_data) if ohlcv_data else 0,
                 required=self.config['min_data_bars'],
             )
             return None
 
-        # Extract price and volume data
-        opens = [bar['open'] for bar in ohlcv_data]
+        # Validate OHLCV data integrity
+        if not validate_ohlcv_data(ohlcv_data, symbol):
+            logger.warning(
+                "Invalid OHLCV data",
+                symbol=symbol,
+                bars=len(ohlcv_data),
+            )
+            return None
+
+        # Extract price and volume data (opens not needed for MACD crossover)
         highs = [bar['high'] for bar in ohlcv_data]
         lows = [bar['low'] for bar in ohlcv_data]
         closes = [bar['close'] for bar in ohlcv_data]
@@ -479,37 +560,37 @@ class MACDCrossoverStrategy:
             atr=current_atr,
         )
 
-        # Add MACD-specific invalidation rules
+        # Add MACD-specific invalidation rules (using InvalidationRule dataclass for consistency)
         if signal_side == SignalSide.BUY:
-            invalidation_rules.append({
-                "condition": "macd_reversal",
-                "threshold": current_signal,
-                "description": f"MACD crosses back below signal line ({current_signal:.4f})",
-                "comparison": "lt",
-                "feature_name": "macd_vs_signal",
-            })
-            invalidation_rules.append({
-                "condition": "histogram_reversal",
-                "threshold": 0,
-                "description": "Histogram turns negative",
-                "comparison": "lt",
-                "feature_name": "macd_histogram",
-            })
+            invalidation_rules.append(InvalidationRule(
+                condition="macd_reversal",
+                threshold=current_signal,
+                description=f"MACD crosses back below signal line ({current_signal:.4f})",
+                comparison="lt",
+                feature_name="macd_vs_signal",
+            ))
+            invalidation_rules.append(InvalidationRule(
+                condition="histogram_reversal",
+                threshold=0,
+                description="Histogram turns negative",
+                comparison="lt",
+                feature_name="macd_histogram",
+            ))
         else:  # SELL
-            invalidation_rules.append({
-                "condition": "macd_reversal",
-                "threshold": current_signal,
-                "description": f"MACD crosses back above signal line ({current_signal:.4f})",
-                "comparison": "gt",
-                "feature_name": "macd_vs_signal",
-            })
-            invalidation_rules.append({
-                "condition": "histogram_reversal",
-                "threshold": 0,
-                "description": "Histogram turns positive",
-                "comparison": "gt",
-                "feature_name": "macd_histogram",
-            })
+            invalidation_rules.append(InvalidationRule(
+                condition="macd_reversal",
+                threshold=current_signal,
+                description=f"MACD crosses back above signal line ({current_signal:.4f})",
+                comparison="gt",
+                feature_name="macd_vs_signal",
+            ))
+            invalidation_rules.append(InvalidationRule(
+                condition="histogram_reversal",
+                threshold=0,
+                description="Histogram turns positive",
+                comparison="gt",
+                feature_name="macd_histogram",
+            ))
 
         reasoning = "; ".join(reasoning_parts)
 
