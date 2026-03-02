@@ -2,7 +2,7 @@
 # Multi-stage build for optimized image size
 
 # Stage 1: Base
-FROM node:20-alpine AS base
+FROM node:25-alpine AS base
 LABEL maintainer="Instant Auto Traders"
 LABEL description="WordPress SEO Audit and Automation Tool v2.0.0"
 
